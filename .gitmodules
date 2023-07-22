@@ -1,0 +1,3 @@
+[submodule "Chess-Challenge"]
+	path = Chess-Challenge
+	url = https://github.com/SebLague/Chess-Challenge
