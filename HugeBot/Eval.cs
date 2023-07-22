@@ -3,6 +3,8 @@ using System;
 
 using BitBoard = System.UInt64;
 
+namespace HugeBot;
+
 // ported from STRO4K
 struct Eval
 {
@@ -31,6 +33,14 @@ struct Eval
 
 class Evaluator
 {
+    static readonly Eval[] MobilityEval =
+    {
+        new Eval(37, 21),
+        new Eval(24, 10),
+        new Eval(17, 1),
+        new Eval(12, 4),
+    };
+
     static readonly Eval[] MaterialEval =
     {
         new Eval(318, 311),
@@ -38,14 +48,6 @@ class Evaluator
         new Eval(914, 783).AccumulateAndRet(MobilityEval[1], -6),
         new Eval(1265, 1344).AccumulateAndRet(MobilityEval[2], -7),
         new Eval(2603, 2442).AccumulateAndRet(MobilityEval[3], -13),
-    };
-
-    static readonly Eval[] MobilityEval =
-    {
-        new Eval(37, 21),
-        new Eval(24, 10),
-        new Eval(17, 1),
-        new Eval(12, 4),
     };
 
     static readonly Eval BishopPairEval = new Eval(112, 161);

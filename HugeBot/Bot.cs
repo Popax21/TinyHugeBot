@@ -1,7 +1,6 @@
 ﻿using ChessChallenge.API;
-using System;
 
-namespace HugeBot { }
+namespace HugeBot;
 
 public class ChessBot : IChessBot
 {
