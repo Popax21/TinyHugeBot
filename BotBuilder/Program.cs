@@ -1,10 +1,12 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using AsmResolver;
 using AsmResolver.DotNet;
 using AsmResolver.DotNet.Builder;
+using AsmResolver.DotNet.Serialized;
 using AsmResolver.PE;
 using AsmResolver.PE.DotNet.Builder;
 using AsmResolver.PE.File;
@@ -13,7 +15,7 @@ using AsmResolver.PE.File.Headers;
 if (args.Length < 2) throw new ArgumentException("Usage: <huge bot DLL> <tiny bot DLL>");
 
 //Read the huge bot DLL
-ModuleDefinition botMod = ModuleDefinition.FromFile(args[0]);
+ModuleDefinition botMod = ModuleDefinition.FromFile(args[0], new ModuleReaderParameters(AppDomain.CurrentDomain.BaseDirectory));
 if(botMod.Assembly == null) throw new Exception("No assembly in huge bot DLL!");
 
 //Tiny-fy module and assembly metadata
@@ -45,9 +47,15 @@ void TinyfyType(TypeDefinition type, ref char nextName) {
     type.CustomAttributes.Clear();
 
     //Tiny-fy members
+    HashSet<string> ifaceNames = type.Interfaces.SelectMany(intf => intf.Interface!.Resolve()!.Methods.Select(m => m.Name!.Value)).ToHashSet();
+    
     char nextMemberName = 'A';
     foreach(FieldDefinition field in type.Fields) field.Name = (nextMemberName++).ToString();
-    foreach(MethodDefinition meth in type.Methods) if(!meth.IsConstructor) meth.Name = (nextMemberName++).ToString();
+    foreach(MethodDefinition meth in type.Methods) {
+        if(!meth.IsConstructor && meth.DeclaringType == type && !ifaceNames.Contains(meth.Name!.Value)) {
+            meth.Name = (nextMemberName++).ToString();
+        }
+    }
     foreach(TypeDefinition nestedType in type.NestedTypes) TinyfyType(nestedType, ref nextMemberName);
 }
 
