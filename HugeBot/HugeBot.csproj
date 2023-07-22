@@ -1,4 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\Chess-Challenge\Chess-Challenge\Chess-Challenge.csproj" />
+  </ItemGroup>
   <PropertyGroup>
     <TargetFramework>net7.0</TargetFramework>
     <Nullable>enable</Nullable>
@@ -6,7 +9,7 @@
   </PropertyGroup>
   
   <Target Name="CopyDLL" AfterTargets="Build">
-    <Error Text="Must be built in release configuration!" Condition="'$(Configuration)' != 'Release'"/>
+    <Error Text="Must be built in release configuration!" Condition="'$(Configuration)' != 'Release'" />
     <Copy SourceFiles="$(OutDir)\$(AssemblyName).dll" DestinationFiles="..\HugeBot.dll" />
   </Target>
 </Project>
