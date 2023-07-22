@@ -3,7 +3,7 @@
     <ProjectReference Include="..\Chess-Challenge\Chess-Challenge\Chess-Challenge.csproj" />
   </ItemGroup>
   <PropertyGroup>
-    <TargetFramework>net7.0</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
     <Nullable>enable</Nullable>
     <Configuration>Release</Configuration>
   </PropertyGroup>
