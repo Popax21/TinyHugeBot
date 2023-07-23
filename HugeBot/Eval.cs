@@ -204,9 +204,16 @@ class Evaluator
     // TODO: inline everything in this except for Dumb7Fill
     class MoveGen
     {
-        public static BitBoard Dumb7Fill(BitBoard gen, BitBoard leftMask, BitBoard occ, uint shift)
+        public static BitBoard Dumb7Fill(BitBoard gen, BitBoard leftMask, BitBoard occ, byte shift)
         {
-            throw new NotImplementedException();
+            BitBoard leftGen = gen, rightGen = gen;
+            for (int i = 0; i < 6; i++)
+            {
+                leftGen |= (leftGen << shift) & leftMask & ~occ;
+                rightGen |= ((rightGen & leftMask) >> shift) & ~occ;
+            }
+
+            return ((leftGen << shift) & leftMask) | ((rightGen & leftMask) >> shift);
         }
 
         public static BitBoard KingMoves() => throw new NotImplementedException();

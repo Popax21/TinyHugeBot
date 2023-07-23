@@ -9,7 +9,12 @@ public class MyBot : IChessBot {
             //Decode the assembly
             var asmDataBuf = new byte[<TINYASMSIZE>];
             int asmDataBufOff = 0, accum = 0, parity = 1;
-            foreach(decimal dec in TinyBotAsmEncodedData) {
+            foreach(decimal dec in new decimal[]
+            {
+            //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> BEGIN ENCODED ASSEMBLY <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+                <TINYASMENCDAT>
+            //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>  END ENCODED ASSEMBLY <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+            }) {
                 var bits = decimal.GetBits(dec);
 
                 //Add the 96 bit integer to the buffer
@@ -31,8 +36,8 @@ public class MyBot : IChessBot {
     }
 
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> BEGIN ENCODED ASSEMBLY <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-    private decimal[] TinyBotAsmEncodedData = {
-        <TINYASMENCDAT>
-    };
+    /*private decimal[] TinyBotAsmEncodedData = {
+        <TINYASMENCDA>
+    };*/
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> END ENCODED ASSEMBLY <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 }
