@@ -1,5 +1,4 @@
 ﻿using ChessChallenge.API;
-using System;
 
 using BitBoard = System.UInt64;
 
@@ -201,20 +200,38 @@ class Evaluator
     const BitBoard DarkSquares = ~LightSquares;
     const BitBoard All = ~0ul;
 
+    // TODO: inline everything in this except for Dumb7Fill
     class MoveGen
     {
-        public static BitBoard Dumb7Fill(BitBoard gen, BitBoard leftMask, BitBoard occ, uint shift)
+        const BitBoard AFile = 0x0101010101010101;
+        const BitBoard ABFile = 0x0303030303030303;
+        const BitBoard HFile = 0x8080808080808080;
+
+        public static BitBoard Dumb7Fill(BitBoard gen, BitBoard leftMask, BitBoard occ, byte shift)
         {
-            throw new NotImplementedException();
+            BitBoard leftGen = gen, rightGen = gen;
+            for (int i = 0; i < 6; i++)
+            {
+                leftGen |= (leftGen << shift) & leftMask & ~occ;
+                rightGen |= ((rightGen & leftMask) >> shift) & ~occ;
+            }
+
+            return ((leftGen << shift) & leftMask) | ((rightGen & leftMask) >> shift);
         }
 
-        public static BitBoard KingMoves() => throw new NotImplementedException();
-        public static BitBoard QueenMoves() => throw new NotImplementedException();
-        public static BitBoard BishopMoves() => throw new NotImplementedException();
-        public static BitBoard RookMoves() => throw new NotImplementedException();
-        public static BitBoard KnightMoves()
+        public static BitBoard QueenMoves(BitBoard pieces, BitBoard occ) => BishopMoves(pieces, occ) | RookMoves(pieces, occ);
+        public static BitBoard BishopMoves(BitBoard pieces, BitBoard occ) => Dumb7Fill(pieces, ~AFile, occ, 9) | Dumb7Fill(pieces, ~HFile, occ, 7);
+        public static BitBoard RookMoves(BitBoard pieces, BitBoard occ) => Dumb7Fill(pieces, ~AFile, occ, 1) | Dumb7Fill(pieces, All, occ, 8);
+        public static BitBoard KingMoves(BitBoard pieces, BitBoard occ)
         {
-            throw new NotImplementedException();
+            ulong rank = pieces | ((pieces << 1) & ~AFile) | ((pieces & ~AFile) >> 1);
+            return rank | (rank << 8) | (rank >> 8);
+        }
+        public static BitBoard KnightMoves(BitBoard pieces, BitBoard occ)
+        {
+            ulong out_1 = ((pieces << 1) & ~AFile) | ((pieces & ~AFile) >> 1);
+            ulong out_2 = ((pieces << 2) & ~ABFile) | ((pieces & ~ABFile) >> 2);
+            return (out_1 << 16) | (out_1 >> 16) | (out_2 << 8) | (out_2 >> 8);
         }
     }
 
