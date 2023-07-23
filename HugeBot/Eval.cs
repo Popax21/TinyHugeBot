@@ -308,8 +308,23 @@ class Evaluator
         return eval;
     }
 
-    public static int Evaluate()
+    public static Eval SidePawnStructure(BitBoard pawns)
     {
-        return 0;
+        throw new System.NotImplementedException();
+    }
+
+    public static Eval WhitePassedPawn(BitBoard side, BitBoard enemy)
+    { 
+        throw new System.NotImplementedException();
+    }
+
+    public static Eval SideOpenFile(BitBoard rook, BitBoard sidePawns, BitBoard enemyPawns)
+    { 
+        throw new System.NotImplementedException();
+    }
+
+    public static int Evaluate(Board board)
+    {
+        throw new System.NotImplementedException();
     }
 }
