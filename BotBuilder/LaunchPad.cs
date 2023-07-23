@@ -34,10 +34,4 @@ public class MyBot : IChessBot {
         }
         return TinyBot.Think(board, timer);
     }
-
-//>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> BEGIN ENCODED ASSEMBLY <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-    /*private decimal[] TinyBotAsmEncodedData = {
-        <TINYASMENCDA>
-    };*/
-//>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> END ENCODED ASSEMBLY <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 }
