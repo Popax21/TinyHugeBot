@@ -2,7 +2,7 @@ using System;
 using ChessChallenge.API;
 
 public class MyBot : IChessBot {
-    private IChessBot TinyBot;
+    private static IChessBot TinyBot;
 
     public Move Think(Board board, Timer timer) {
         if(TinyBot == null) {
@@ -24,8 +24,10 @@ public class MyBot : IChessBot {
             //Load the tiny bot from the assembly
             //We can't just load it and be done with it, because the byte[] overload doesn't add the assembly to the regular load path
             //As such load it whenever any assembly fails to load >:)
-            AppDomain.CurrentDomain.AssemblyResolve += (_, _) => AppDomain.CurrentDomain.Load(asmDataBuf);
+            ResolveEventHandler asmResolveCB = (_, _) => AppDomain.CurrentDomain.Load(asmDataBuf);
+            AppDomain.CurrentDomain.AssemblyResolve += asmResolveCB;
             TinyBot = (IChessBot) Activator.CreateInstance("B", "B").Unwrap();
+            AppDomain.CurrentDomain.AssemblyResolve -= asmResolveCB;
         }
         return TinyBot.Think(board, timer);
     }
