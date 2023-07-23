@@ -1,8 +1,6 @@
 ﻿using ChessChallenge.API;
 
-namespace HugeBot;
-
-public class ChessBot : IChessBot
+public class MyBot : IChessBot
 {
     public Move Think(Board board, Timer timer)
     {
