@@ -1,5 +1,6 @@
 ﻿using ChessChallenge.API;
 using System.ComponentModel;
+using System.Linq;
 using System.Reflection.Metadata.Ecma335;
 using System.Threading.Tasks;
 using BitBoard = System.UInt64;
@@ -268,7 +269,7 @@ class Evaluator
         return board.IsWhiteToMove ? score : -score;
     }
 
-    public static Eval SidePST(BitBoard[] pieces, byte rowMask)
+    public static Eval SidePst(BitBoard[] pieces, byte rowMask)
     {
         Eval eval = new Eval(0, 0);
         for (int i = 0; i < 6; i++)
@@ -359,12 +360,39 @@ class Evaluator
         return eval;    
     }
     public static Eval SideOpenFile(BitBoard rook, BitBoard sidePawns, BitBoard enemyPawns)
-    { 
-        throw new System.NotImplementedException();
+    {
+        Eval eval = new Eval(0, 0);
+        BitBoard file = AFile;
+        for (int i = 0; i < 8; i++) {
+            if (((sidePawns | enemyPawns) & file) == 0) {
+                eval.Accumulate(OpenFileEval, PopCount(rook & file));
+            } else if ((sidePawns & file) == 0) {
+                eval.Accumulate(SemiOpenFileEval, PopCount(rook & file));
+            }
+            file <<= 1;
+        }
+        return eval;
     }
 
     public static int Evaluate(Board board)
     {
+        Eval eval = new Eval(0, 0);
+        BitBoard[] whitePieces = (BitBoard[])(from i in Enumerable.Range(0, 6) select board.GetPieceBitboard((PieceType)i, true));
+        BitBoard[] blackPieces = (BitBoard[])(from i in Enumerable.Range(0, 6) select board.GetPieceBitboard((PieceType)i, false));
+        for (int i = 0; i < 5; i++)
+        {
+            short count = (short)(PopCount(whitePieces[i]) - PopCount(blackPieces[i]));
+            eval.Accumulate(MaterialEval[i], count);
+        }
+        if ((whitePieces[2] & DarkSquares) != 0)
+        {
+            eval.Accumulate(BishopPairEval, 1);
+        }
+        if ((blackPieces[2] & DarkSquares) != 0)
+        {
+            eval.Accumulate(BishopPairEval, -1);
+        }
+        eval.Accumulate(SidePST())
         throw new System.NotImplementedException();
     }
 }
