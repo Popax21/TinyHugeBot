@@ -1,25 +1,29 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using AsmResolver;
 using AsmResolver.DotNet;
 using AsmResolver.DotNet.Builder;
+using AsmResolver.DotNet.Collections;
 using AsmResolver.DotNet.Serialized;
 using AsmResolver.PE;
 using AsmResolver.PE.DotNet.Builder;
 using AsmResolver.PE.File;
 using AsmResolver.PE.File.Headers;
 
-if (args.Length < 2) throw new ArgumentException("Usage: <huge bot DLL> <tiny bot DLL>");
+if (args.Length < 2) throw new ArgumentException("Usage: <huge bot DLL> <tiny bot DLL> [tiny bot CS]");
 
 //Read the huge bot DLL
 ModuleDefinition botMod = ModuleDefinition.FromFile(args[0], new ModuleReaderParameters(AppDomain.CurrentDomain.BaseDirectory));
 if(botMod.Assembly == null) throw new Exception("No assembly in huge bot DLL!");
 
 //Tiny-fy module and assembly metadata
-botMod.Name = "B";
+botMod.Name = null;
 botMod.DebugData.Clear();
 botMod.CustomAttributes.Clear();
 botMod.ExportedTypes.Clear();
@@ -31,12 +35,12 @@ foreach(AssemblyReference asmRef in botMod.AssemblyReferences) {
     asmRef.PublicKeyOrToken = null;
 }
 
-botMod.Assembly.Name = "B";
+botMod.Assembly.Name = "B"; //We need an assembly name
 botMod.Assembly.PublicKey = null;
 botMod.Assembly.CustomAttributes.Clear();
 
 //Tiny-fy types
-TypeDefinition botType = botMod.TopLevelTypes.First(t => t.FullName == "HugeBot.ChessBot");
+TypeDefinition botType = botMod.TopLevelTypes.First(t => t.FullName == "MyBot");
 
 void TinyfyType(TypeDefinition type, ref char nextName) {
     //Tiny-fy the name
@@ -46,38 +50,49 @@ void TinyfyType(TypeDefinition type, ref char nextName) {
     //Clear attributes
     type.CustomAttributes.Clear();
 
-    //Tiny-fy members
-    HashSet<string> ifaceNames = type.Interfaces.SelectMany(intf => intf.Interface!.Resolve()!.Methods.Select(m => m.Name!.Value)).ToHashSet();
+    //Trim out constants
+    foreach(FieldDefinition field in type.Fields.ToArray()) {
+        if(field.Constant != null) type.Fields.Remove(field);
+    }
     
-    char nextMemberName = 'A';
-    foreach(FieldDefinition field in type.Fields) field.Name = (nextMemberName++).ToString();
+    //Trim out parameter names
+    foreach(MethodDefinition meth in type.Methods.ToArray()) {
+        foreach(Parameter param in meth.Parameters) param.Definition!.Name = null;
+    }
+
+    //Tiny-fy member names
+    HashSet<string> ifaceNames = type.Interfaces.SelectMany(intf => intf.Interface!.Resolve()!.Methods.Select(m => m.Name!.Value)).ToHashSet();
     foreach(MethodDefinition meth in type.Methods) {
         if(!meth.IsConstructor && meth.DeclaringType == type && !ifaceNames.Contains(meth.Name!.Value)) {
-            meth.Name = (nextMemberName++).ToString();
+            meth.Name = null;
         }
     }
-    foreach(TypeDefinition nestedType in type.NestedTypes) TinyfyType(nestedType, ref nextMemberName);
+
+    foreach(FieldDefinition field in type.Fields) field.Name = null;
+    
+    char nextNestedName = 'a';
+    foreach(TypeDefinition nestedType in type.NestedTypes) TinyfyType(nestedType, ref nextNestedName);
 }
 
 char nextName = 'a';
 foreach(TypeDefinition type in botMod.TopLevelTypes.ToArray()) {
-    if(type.Namespace?.Value?.StartsWith("HugeBot") ?? false) {
+    if(type == botType || (type.Namespace?.Value?.StartsWith("HugeBot") ?? false)) {
         TinyfyType(type, ref nextName);
     } else {
         botMod.TopLevelTypes.Remove(type);
     }
 }
 
+//Fixup the module
 botMod.GetOrCreateModuleType();
-
-//Only expose the bot type
-botType.Name = "B";
+botType.Name = "B"; //We need to expose the bot type
 
 //Build the tiny bot DLL by modifying some other parameters
 PEImageBuildResult tinyBotBuildRes = new ManagedPEImageBuilder().CreateImage(botMod);
 IPEImage tinyBotImg = tinyBotBuildRes.ConstructedImage ?? throw new Exception("No tiny bot PEImage was built!");
 tinyBotImg.PEKind = OptionalHeaderMagic.PE64;
 tinyBotImg.MachineType = MachineType.Amd64;
+tinyBotImg.Resources = null;
 
 PEFile tinyBot = new ManagedPEFileBuilder().CreateFile(tinyBotImg);
 tinyBot.OptionalHeader.FileAlignment = tinyBot.OptionalHeader.SectionAlignment = 512;
@@ -100,3 +115,39 @@ try {
 } catch(Exception e) {
     throw new Exception("TinyBot DLL verification error!", e);
 }
+
+if(args.Length <= 2) return;
+
+//Encode the TinyBot DLL
+byte[] tinyBotData = File.ReadAllBytes(args[1]);
+byte GetTinyBotNibble(long idx) => (byte) (idx < tinyBotData.Length*2 ? (tinyBotData[idx / 2] >> (int) (4 * (idx & 1))) & 0xf : 0);
+byte GetTinyBotByte(long nibbleIdx) => (byte) (GetTinyBotNibble(nibbleIdx) + (GetTinyBotNibble(nibbleIdx+1) << 4));
+int GetTinyBotInt(long nibbleIdx) => GetTinyBotByte(nibbleIdx) + (GetTinyBotByte(nibbleIdx+2) << 8) + (GetTinyBotByte(nibbleIdx+4) << 16) + (GetTinyBotByte(nibbleIdx+6) << 24);
+
+long tinyBotNonZeroNibbles = tinyBotData.Length*2;
+while(tinyBotNonZeroNibbles > 0 && GetTinyBotNibble(tinyBotNonZeroNibbles-1) == 0) tinyBotNonZeroNibbles--;
+
+StringBuilder tinyBotEncData = new StringBuilder();
+for(long i = 0; i < tinyBotNonZeroNibbles; i += 50) {
+    decimal decA = new decimal(GetTinyBotInt(i+00), GetTinyBotInt(i+08), GetTinyBotInt(i+16), false, GetTinyBotNibble(i+49));
+    decimal decB = new decimal(GetTinyBotInt(i+24), GetTinyBotInt(i+32), GetTinyBotInt(i+40), false, GetTinyBotNibble(i+48));
+
+    if(tinyBotEncData.Length > 0) tinyBotEncData.Append(',');
+    tinyBotEncData.Append(decA.ToString(CultureInfo.InvariantCulture));
+    tinyBotEncData.Append('M');
+    tinyBotEncData.Append(',');
+    tinyBotEncData.Append(decB.ToString(CultureInfo.InvariantCulture));
+    tinyBotEncData.Append('M');
+}
+
+long tinyBotBufSize = tinyBotData.Length*8;
+if(tinyBotBufSize % 200 != 0) tinyBotBufSize += 200 - (tinyBotBufSize % 200);
+if(tinyBotBufSize % 8 != 0) tinyBotBufSize += 8 - (tinyBotBufSize % 8);
+tinyBotBufSize /= 8;
+
+//Format the launchpad
+using Stream launchPadStream = Assembly.GetEntryAssembly()!.GetManifestResourceStream("launchpad") ?? throw new Exception("Couldn't open launchpad resource!");
+using StreamReader launchPadReader = new StreamReader(launchPadStream);
+string launchpad = launchPadReader.ReadToEnd();
+
+File.WriteAllText(args[2], launchpad.Replace("<TINYASMENCDAT>", tinyBotEncData.ToString()).Replace("<TINYASMSIZE>", tinyBotBufSize.ToString()));

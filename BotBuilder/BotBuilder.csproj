@@ -6,11 +6,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="LaunchPad.cs" />
+    <EmbeddedResource Include="LaunchPad.cs" LogicalName="launchpad" />
+
     <PackageReference Include="AsmResolver" Version="5.4.0" />
     <PackageReference Include="AsmResolver.DotNet" Version="5.4.0" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\Chess-Challenge\Chess-Challenge\Chess-Challenge.csproj" />
   </ItemGroup>
 </Project>
