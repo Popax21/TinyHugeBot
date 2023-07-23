@@ -201,6 +201,7 @@ class Evaluator
     const BitBoard DarkSquares = ~LightSquares;
     const BitBoard All = ~0ul;
 
+    // TODO: inline everything in this except for Dumb7Fill
     class MoveGen
     {
         public static BitBoard Dumb7Fill(BitBoard gen, BitBoard leftMask, BitBoard occ, uint shift)
