@@ -1,5 +1,7 @@
 ﻿using ChessChallenge.API;
+using System.ComponentModel;
 using System.Reflection.Metadata.Ecma335;
+using System.Threading.Tasks;
 using BitBoard = System.UInt64;
 
 namespace HugeBot;
@@ -233,7 +235,7 @@ class Evaluator
     public static short PopCount(BitBoard board)
     {
         short ret = 0;
-        for (BitBoard i = 1;  i > 0; i <<= 1)
+        for (BitBoard i = 1; i > 0; i <<= 1)
         {
             if ((board & i) == 1)
             {
@@ -241,6 +243,16 @@ class Evaluator
             }
         }
         return ret;
+    }
+
+    public static int LeadingZeros(BitBoard board)
+    {
+        int ret = 0;
+        for (BitBoard i = 1; i > 0; i >>= 1)
+        {
+            ret++;
+        }
+        return 64 - ret;
     }
 
     public static int Resolve(Board board, Eval eval)
@@ -327,10 +339,25 @@ class Evaluator
     }
 
     public static Eval WhitePassedPawn(BitBoard side, BitBoard enemy)
-    { 
-        throw new System.NotImplementedException();
+    {
+        Eval eval = new Eval(0, 0);
+        enemy |= enemy >> 8;
+        enemy |= enemy >> 16;
+        enemy |= enemy >> 32;
+        enemy |= ((enemy >> 7) & ~AFile) | ((enemy & ~AFile) >> 9);
+        BitBoard pawns = side & ~enemy;
+        BitBoard file = AFile;
+        for (int i = 0; i < 8; i++)
+        {
+            int index = LeadingZeros(pawns & file);
+            if (index != 64)
+            {
+                eval.Accumulate(PassedPawnEval[6 - index / 8], 1);
+            }
+            file <<= 1;
+        }
+        return eval;    
     }
-
     public static Eval SideOpenFile(BitBoard rook, BitBoard sidePawns, BitBoard enemyPawns)
     { 
         throw new System.NotImplementedException();
