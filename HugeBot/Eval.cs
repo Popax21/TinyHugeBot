@@ -1,5 +1,5 @@
 ﻿using ChessChallenge.API;
-
+using System.Reflection.Metadata.Ecma335;
 using BitBoard = System.UInt64;
 
 namespace HugeBot;
@@ -198,12 +198,12 @@ class Evaluator
 
     const BitBoard LightSquares = 0xAA55AA55AA55AA55;
     const BitBoard DarkSquares = ~LightSquares;
+    const BitBoard AFile = 0x0101010101010101;
     const BitBoard All = ~0ul;
 
     // TODO: inline everything in this except for Dumb7Fill
     class MoveGen
     {
-        const BitBoard AFile = 0x0101010101010101;
         const BitBoard ABFile = 0x0303030303030303;
         const BitBoard HFile = 0x8080808080808080;
 
@@ -310,7 +310,20 @@ class Evaluator
 
     public static Eval SidePawnStructure(BitBoard pawns)
     {
-        throw new System.NotImplementedException();
+        Eval eval = new Eval(0, 0);
+        BitBoard file = AFile;
+        for (int i = 0; i < 8; i++)
+        {
+            short pawnCount = PopCount(pawns & file);
+            BitBoard adjacent = ((file << 1) & ~AFile) | ((file & ~AFile) >> 1);
+            if ((pawns & adjacent) == 0)
+            {
+                eval.Accumulate(IsolatedPawnEval[i], pawnCount);
+            }
+            eval.Accumulate(DoubledPawnEval[i], (short)(System.Math.Max(pawnCount, (short)1) - 1));
+            file <<= 1;
+        }
+        return eval;
     }
 
     public static Eval WhitePassedPawn(BitBoard side, BitBoard enemy)
