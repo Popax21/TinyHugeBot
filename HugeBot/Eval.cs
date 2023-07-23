@@ -222,17 +222,25 @@ class Evaluator
         public static BitBoard QueenMoves(BitBoard pieces, BitBoard occ) => BishopMoves(pieces, occ) | RookMoves(pieces, occ);
         public static BitBoard BishopMoves(BitBoard pieces, BitBoard occ) => Dumb7Fill(pieces, ~AFile, occ, 9) | Dumb7Fill(pieces, ~HFile, occ, 7);
         public static BitBoard RookMoves(BitBoard pieces, BitBoard occ) => Dumb7Fill(pieces, ~AFile, occ, 1) | Dumb7Fill(pieces, All, occ, 8);
-        public static BitBoard KingMoves(BitBoard pieces, BitBoard occ)
-        {
-            ulong rank = pieces | ((pieces << 1) & ~AFile) | ((pieces & ~AFile) >> 1);
-            return rank | (rank << 8) | (rank >> 8);
-        }
         public static BitBoard KnightMoves(BitBoard pieces, BitBoard occ)
         {
             ulong out_1 = ((pieces << 1) & ~AFile) | ((pieces & ~AFile) >> 1);
             ulong out_2 = ((pieces << 2) & ~ABFile) | ((pieces & ~ABFile) >> 2);
             return (out_1 << 16) | (out_1 >> 16) | (out_2 << 8) | (out_2 >> 8);
         }
+    }
+
+    public static short PopCount(BitBoard board)
+    {
+        short ret = 0;
+        for (BitBoard i = 1;  i > 0; i <<= 1)
+        {
+            if ((board & i) == 1)
+            {
+                ret++;
+            }
+        }
+        return ret;
     }
 
     public static int Resolve(Board board, Eval eval)
@@ -268,9 +276,35 @@ class Evaluator
         return eval;
     }
 
-    public static Eval SideMobility(BitBoard[] pieces, BitBoard mask)
+    public static Eval SideMobility(BitBoard[] pieces, BitBoard occ, BitBoard mask)
     {
         Eval eval = new Eval(0, 0);
+        for (int i = 0; i < 4; i++)
+        {
+            BitBoard pieceBoard = pieces[i + 1];
+            byte pieceIndex = 0;
+            while (pieceIndex < 64)
+            {
+                BitBoard piece = pieceBoard & (pieceBoard << 1 >> 1);
+                BitBoard movement;
+                switch (i) {
+                    case 0:
+                        movement = MoveGen.KnightMoves(piece, occ);
+                        break;
+                    case 1:
+                        movement = MoveGen.BishopMoves(piece, occ);
+                        break;
+                    case 2:
+                        movement = MoveGen.RookMoves(piece, occ);
+                        break;
+                    default:
+                        movement = MoveGen.QueenMoves(piece, occ);
+                        break;
+                }
+                movement &= mask;
+                eval.Accumulate(MobilityEval[i], PopCount(movement));
+            }
+        }
         return eval;
     }
 
