@@ -256,6 +256,18 @@ class Evaluator
         return 64 - ret;
     }
 
+    public static BitBoard SwapBytes(BitBoard board)
+    {
+        return (board << 56)
+            | (board << 48 & 0xff000000000000)
+            | (board << 40 & 0xff0000000000)
+            | (board << 32 & 0xff00000000)
+            | (board << 24 & 0xff000000)
+            | (board << 16 & 0xff0000)
+            | (board << 8 & 0xff00)
+            | (board & 0xff);
+    }
+
     public static int Resolve(Board board, Eval eval)
     {
         int phase = 0;
@@ -394,6 +406,14 @@ class Evaluator
         }
         eval.Accumulate(SidePst(whitePieces, 0), 1);
         eval.Accumulate(SidePst(blackPieces, 0b1100), -1);
-        throw new System.NotImplementedException();
+        eval.Accumulate(SideMobility(whitePieces, board.AllPiecesBitboard, All), 1);
+        eval.Accumulate(SideMobility(blackPieces, board.AllPiecesBitboard, All), -1);
+        eval.Accumulate(SidePawnStructure(whitePieces[0]), 1);
+        eval.Accumulate(SidePawnStructure(blackPieces[0]), -1);
+        eval.Accumulate(WhitePassedPawn(whitePieces[0], blackPieces[0]), 1);
+        eval.Accumulate(WhitePassedPawn(SwapBytes(blackPieces[0]), SwapBytes(whitePieces[0])), -1);
+        eval.Accumulate(SideOpenFile(whitePieces[3], whitePieces[0], blackPieces[0]), 1);
+        eval.Accumulate(SideOpenFile(blackPieces[3], blackPieces[0], whitePieces[0]), -1);
+        return Resolve(board, eval);
     }
 }
