@@ -392,7 +392,8 @@ class Evaluator
         {
             eval.Accumulate(BishopPairEval, -1);
         }
-        eval.Accumulate(SidePST())
+        eval.Accumulate(SidePst(whitePieces, 0), 1);
+        eval.Accumulate(SidePst(blackPieces, 0b1100), -1);
         throw new System.NotImplementedException();
     }
 }
