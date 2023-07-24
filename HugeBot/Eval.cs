@@ -15,7 +15,7 @@ struct Eval
 
     public short top;
     public short bottom;
-        
+
     public Eval(short white, short black)
     {
         this.top = white;
@@ -202,35 +202,20 @@ class Evaluator
     const BitBoard LightSquares = 0xAA55AA55AA55AA55;
     const BitBoard DarkSquares = ~LightSquares;
     const BitBoard AFile = 0x0101010101010101;
+    const BitBoard ABFile = 0x0303030303030303;
+    const BitBoard HFile = 0x8080808080808080;
     const BitBoard All = ~0ul;
 
-    // TODO: inline everything in this except for Dumb7Fill
-    class MoveGen
+    public static BitBoard Dumb7Fill(BitBoard gen, BitBoard leftMask, BitBoard occ, byte shift)
     {
-        const BitBoard ABFile = 0x0303030303030303;
-        const BitBoard HFile = 0x8080808080808080;
-
-        public static BitBoard Dumb7Fill(BitBoard gen, BitBoard leftMask, BitBoard occ, byte shift)
+        BitBoard leftGen = gen, rightGen = gen;
+        for (int i = 0; i < 6; i++)
         {
-            BitBoard leftGen = gen, rightGen = gen;
-            for (int i = 0; i < 6; i++)
-            {
-                leftGen |= (leftGen << shift) & leftMask & ~occ;
-                rightGen |= ((rightGen & leftMask) >> shift) & ~occ;
-            }
-
-            return ((leftGen << shift) & leftMask) | ((rightGen & leftMask) >> shift);
+            leftGen |= (leftGen << shift) & leftMask & ~occ;
+            rightGen |= ((rightGen & leftMask) >> shift) & ~occ;
         }
 
-        public static BitBoard QueenMoves(BitBoard pieces, BitBoard occ) => BishopMoves(pieces, occ) | RookMoves(pieces, occ);
-        public static BitBoard BishopMoves(BitBoard pieces, BitBoard occ) => Dumb7Fill(pieces, ~AFile, occ, 9) | Dumb7Fill(pieces, ~HFile, occ, 7);
-        public static BitBoard RookMoves(BitBoard pieces, BitBoard occ) => Dumb7Fill(pieces, ~AFile, occ, 1) | Dumb7Fill(pieces, All, occ, 8);
-        public static BitBoard KnightMoves(BitBoard pieces, BitBoard occ)
-        {
-            ulong out_1 = ((pieces << 1) & ~AFile) | ((pieces & ~AFile) >> 1);
-            ulong out_2 = ((pieces << 2) & ~ABFile) | ((pieces & ~ABFile) >> 2);
-            return (out_1 << 16) | (out_1 >> 16) | (out_2 << 8) | (out_2 >> 8);
-        }
+        return ((leftGen << shift) & leftMask) | ((rightGen & leftMask) >> shift);
     }
 
     public static short PopCount(BitBoard board)
@@ -312,18 +297,22 @@ class Evaluator
             {
                 BitBoard piece = pieceBoard & (pieceBoard << 1 >> 1);
                 BitBoard movement;
-                switch (i) {
+                switch (i)
+                {
                     case 0:
-                        movement = MoveGen.KnightMoves(piece, occ);
+                        ulong out1 = ((piece << 1) & ~AFile) | ((piece & ~AFile) >> 1);
+                        ulong out2 = ((piece << 2) & ~ABFile) | ((piece & ~ABFile) >> 2);
+                        movement = (out1 << 16) | (out1 >> 16) | (out2 << 8) | (out2 >> 8);
                         break;
                     case 1:
-                        movement = MoveGen.BishopMoves(piece, occ);
+                        movement = Dumb7Fill(piece, ~AFile, occ, 9) | Dumb7Fill(piece, ~HFile, occ, 7);
                         break;
                     case 2:
-                        movement = MoveGen.RookMoves(piece, occ);
+                        movement = Dumb7Fill(piece, ~AFile, occ, 1) | Dumb7Fill(piece, All, occ, 8);
                         break;
                     default:
-                        movement = MoveGen.QueenMoves(piece, occ);
+                        movement = (Dumb7Fill(piece, ~AFile, occ, 9) | Dumb7Fill(piece, ~HFile, occ, 7))
+                            | (Dumb7Fill(piece, ~AFile, occ, 1) | Dumb7Fill(piece, All, occ, 8));
                         break;
                 }
                 movement &= mask;
@@ -369,16 +358,20 @@ class Evaluator
             }
             file <<= 1;
         }
-        return eval;    
+        return eval;
     }
     public static Eval SideOpenFile(BitBoard rook, BitBoard sidePawns, BitBoard enemyPawns)
     {
         Eval eval = new Eval(0, 0);
         BitBoard file = AFile;
-        for (int i = 0; i < 8; i++) {
-            if (((sidePawns | enemyPawns) & file) == 0) {
+        for (int i = 0; i < 8; i++)
+        {
+            if (((sidePawns | enemyPawns) & file) == 0)
+            {
                 eval.Accumulate(OpenFileEval, PopCount(rook & file));
-            } else if ((sidePawns & file) == 0) {
+            }
+            else if ((sidePawns & file) == 0)
+            {
                 eval.Accumulate(SemiOpenFileEval, PopCount(rook & file));
             }
             file <<= 1;
