@@ -238,26 +238,13 @@ class Evaluator
             | (board & 0xff);
     }
 
-    public static int Resolve(Board board, Eval eval)
-    {
-        int phase = 0;
-        int[] weights = { 1, 1, 2, 4 };
-        PieceList[] pieces = board.GetAllPieceLists();
-        for (int i = 0; i < 4; i++)
-        {
-            phase += weights[i] * (pieces[i].Count + pieces[i + 6].Count);
-        }
-        int score = (eval.top * phase + eval.bottom * (24 - phase)) / phase;
-        return board.IsWhiteToMove ? score : -score;
-    }
-
     public static Eval SidePst(BitBoard[] pieces, byte rowMask)
     {
         Eval eval = new Eval(0, 0);
         for (int i = 0; i < 6; i++)
         {
             BitBoard pieceBoard = pieces[i];
-            byte pieceIndex = 0;
+            int pieceIndex = 0;
             while (pieceIndex < 64)
             {
                 if ((pieceBoard & (1ul << pieceIndex)) == 1)
@@ -277,8 +264,7 @@ class Evaluator
         for (int i = 0; i < 4; i++)
         {
             BitBoard pieceBoard = pieces[i + 1];
-            byte pieceIndex = 0;
-            while (pieceIndex < 64)
+            while (pieceBoard != 0)
             {
                 BitBoard piece = pieceBoard & (pieceBoard << 1 >> 1);
                 BitBoard movement;
@@ -302,6 +288,7 @@ class Evaluator
                 }
                 movement &= mask;
                 eval.Accumulate(MobilityEval[i], BitboardHelper.GetNumberOfSetBits(movement));
+                pieceBoard &= pieceBoard - 1;
             }
         }
         return eval;
@@ -392,6 +379,14 @@ class Evaluator
         eval.Accumulate(WhitePassedPawn(SwapBytes(blackPieces[0]), SwapBytes(whitePieces[0])), -1);
         eval.Accumulate(SideOpenFile(whitePieces[3], whitePieces[0], blackPieces[0]), 1);
         eval.Accumulate(SideOpenFile(blackPieces[3], blackPieces[0], whitePieces[0]), -1);
-        return Resolve(board, eval);
+        int phase = 0;
+        int[] weights = { 1, 1, 2, 4 };
+        PieceList[] pieces = board.GetAllPieceLists();
+        for (int i = 0; i < 4; i++)
+        {
+            phase += weights[i] * (pieces[i].Count + pieces[i + 6].Count);
+        }
+        int score = (eval.top * phase + eval.bottom * (24 - phase)) / phase;
+        return board.IsWhiteToMove ? score : -score;
     }
 }
