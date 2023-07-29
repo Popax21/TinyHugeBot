@@ -1,8 +1,6 @@
 ﻿using ChessChallenge.API;
-using System.ComponentModel;
 using System.Linq;
-using System.Reflection.Metadata.Ecma335;
-using System.Threading.Tasks;
+using System.Numerics;
 using BitBoard = System.UInt64;
 
 namespace HugeBot;
@@ -22,12 +20,12 @@ struct Eval
         this.bottom = black;
     }
 
-    public Eval AccumulateAndRet(Eval eval, short count)
+    public Eval AccumulateAndRet(Eval eval, int count)
     {
         return new Eval((short)(this.top + eval.top * count), (short)(this.bottom + eval.bottom * count));
     }
 
-    public void Accumulate(Eval eval, short count)
+    public void Accumulate(Eval eval, int count)
     {
         this = this.AccumulateAndRet(eval, count);
     }
@@ -218,19 +216,6 @@ class Evaluator
         return ((leftGen << shift) & leftMask) | ((rightGen & leftMask) >> shift);
     }
 
-    public static short PopCount(BitBoard board)
-    {
-        short ret = 0;
-        for (BitBoard i = 1; i > 0; i <<= 1)
-        {
-            if ((board & i) == 1)
-            {
-                ret++;
-            }
-        }
-        return ret;
-    }
-
     public static int LeadingZeros(BitBoard board)
     {
         int ret = 0;
@@ -316,7 +301,7 @@ class Evaluator
                         break;
                 }
                 movement &= mask;
-                eval.Accumulate(MobilityEval[i], PopCount(movement));
+                eval.Accumulate(MobilityEval[i], BitboardHelper.GetNumberOfSetBits(movement));
             }
         }
         return eval;
@@ -328,7 +313,7 @@ class Evaluator
         BitBoard file = AFile;
         for (int i = 0; i < 8; i++)
         {
-            short pawnCount = PopCount(pawns & file);
+            short pawnCount = (short)BitboardHelper.GetNumberOfSetBits(pawns & file);
             BitBoard adjacent = ((file << 1) & ~AFile) | ((file & ~AFile) >> 1);
             if ((pawns & adjacent) == 0)
             {
@@ -368,11 +353,11 @@ class Evaluator
         {
             if (((sidePawns | enemyPawns) & file) == 0)
             {
-                eval.Accumulate(OpenFileEval, PopCount(rook & file));
+                eval.Accumulate(OpenFileEval, BitboardHelper.GetNumberOfSetBits(rook & file));
             }
             else if ((sidePawns & file) == 0)
             {
-                eval.Accumulate(SemiOpenFileEval, PopCount(rook & file));
+                eval.Accumulate(SemiOpenFileEval, BitboardHelper.GetNumberOfSetBits(rook & file));
             }
             file <<= 1;
         }
@@ -386,7 +371,7 @@ class Evaluator
         BitBoard[] blackPieces = (BitBoard[])(from i in Enumerable.Range(0, 6) select board.GetPieceBitboard((PieceType)i, false));
         for (int i = 0; i < 5; i++)
         {
-            short count = (short)(PopCount(whitePieces[i]) - PopCount(blackPieces[i]));
+            short count = (short)(BitboardHelper.GetNumberOfSetBits(whitePieces[i]) - BitboardHelper.GetNumberOfSetBits(blackPieces[i]));
             eval.Accumulate(MaterialEval[i], count);
         }
         if ((whitePieces[2] & DarkSquares) != 0)
