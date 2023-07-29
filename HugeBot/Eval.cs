@@ -20,182 +20,182 @@ struct Eval
         this.bottom = black;
     }
 
-    public Eval AccumulateAndRet(Eval eval, int count)
-    {
-        return new Eval((short)(this.top + eval.top * count), (short)(this.bottom + eval.bottom * count));
-    }
-
     public void Accumulate(Eval eval, int count)
     {
-        this = this.AccumulateAndRet(eval, count);
+        this = new Eval((short)(this.top + eval.top * count), (short)(this.bottom + eval.bottom * count));
+    }
+
+    public void Accumulate(uint eval, int count)
+    {
+        this = new Eval((short)(this.top + (short)(eval >> 16) * count), (short)(this.bottom + (short)(eval & 0xFFFF) * count));
     }
 }
 
 class Evaluator
 {
-    static readonly Eval[] MobilityEval =
+    static readonly uint[] MobilityEval =
     {
-        new Eval(37, 21),
-        new Eval(24, 10),
-        new Eval(17, 1),
-        new Eval(12, 4),
+        2424853,
+        1572874,
+        1114113,
+        786436,
     };
 
-    static readonly Eval[] MaterialEval =
+    static readonly uint[] MaterialEval =
     {
-        new Eval(318, 311),
-        new Eval(814, 747).AccumulateAndRet(MobilityEval[0], -4),
-        new Eval(914, 783).AccumulateAndRet(MobilityEval[1], -6),
-        new Eval(1265, 1344).AccumulateAndRet(MobilityEval[2], -7),
-        new Eval(2603, 2442).AccumulateAndRet(MobilityEval[3], -13),
+        20840759,
+        43647639,
+        50463443,
+        75105593,
+        160368982,
     };
 
-    static readonly Eval BishopPairEval = new Eval(112, 161);
+    const uint BishopPairEval = 7340193;
 
-    static readonly Eval[,] Pst = {
+    static readonly uint[,] Pst = {
         {
-            new Eval(-53, 2),
-            new Eval(-74, 19),
-            new Eval(-0, 6),
-            new Eval(-7, -40),
-            new Eval(-55, -14),
-            new Eval(-19, -31),
-            new Eval(-3, -26),
-            new Eval(-9, -56),
-            new Eval(-1, 34),
-            new Eval(43, -9),
-            new Eval(75, -26),
-            new Eval(38, -15),
-            new Eval(41, 75),
-            new Eval(40, 56),
-            new Eval(16, 33),
-            new Eval(5, 29),
+            4291493890,
+            4290117651,
+            6,
+            4294574040,
+            4291428338,
+            4293787617,
+            4294836198,
+            4294442952,
+            4294901794,
+            2883575,
+            4980710,
+            2555889,
+            2687051,
+            2621496,
+            1048609,
+            327709,
         },
         {
-            new Eval(-24, -19),
-            new Eval(-38, -33),
-            new Eval(-24, -33),
-            new Eval(-22, -7),
-            new Eval(-30, -4),
-            new Eval(-43, -13),
-            new Eval(-48, -20),
-            new Eval(8, 9),
-            new Eval(39, 13),
-            new Eval(49, 9),
-            new Eval(28, 23),
-            new Eval(70, 29),
-            new Eval(2, 4),
-            new Eval(23, 14),
-            new Eval(20, 12),
-            new Eval(5, 1),
+            4293459949,
+            4292542431,
+            4293459935,
+            4293591033,
+            4293066748,
+            4292214771,
+            4291887084,
+            524297,
+            2555917,
+            3211273,
+            1835031,
+            4587549,
+            131076,
+            1507342,
+            1310732,
+            327681,
         },
         {
-            new Eval(22, -16),
-            new Eval(-37, -24),
-            new Eval(-29, -16),
-            new Eval(24, -18),
-            new Eval(6, 4),
-            new Eval(1, 2),
-            new Eval(-23, 4),
-            new Eval(11, -6),
-            new Eval(4, 11),
-            new Eval(29, 6),
-            new Eval(27, 15),
-            new Eval(22, 16),
-            new Eval(-7, 3),
-            new Eval(-0, 7),
-            new Eval(2, 3),
-            new Eval(-6, -5),
+            1507312,
+            4292607976,
+            4293132272,
+            1638382,
+            393220,
+            65538,
+            4293459972,
+            786426,
+            262155,
+            1900550,
+            1769487,
+            1441808,
+            4294508547,
+            7,
+            131075,
+            4294639611,
         },
         {
-            new Eval(-60, -35),
-            new Eval(-4, -38),
-            new Eval(-20, -47),
-            new Eval(-51, -43),
-            new Eval(-49, -12),
-            new Eval(-23, -3),
-            new Eval(-22, -9),
-            new Eval(-5, -19),
-            new Eval(13, 23),
-            new Eval(28, 31),
-            new Eval(29, 20),
-            new Eval(29, 10),
-            new Eval(30, 38),
-            new Eval(46, 44),
-            new Eval(34, 33),
-            new Eval(33, 31),
+            4291100637,
+            4294770650,
+            4293722065,
+            4291690453,
+            4291821556,
+            4293525501,
+            4293591031,
+            4294705133,
+            851991,
+            1835039,
+            1900564,
+            1900554,
+            1966118,
+            3014700,
+            2228257,
+            2162719,
         },
         {
-            new Eval(-18, -22),
-            new Eval(-4, -47),
-            new Eval(-15, -46),
-            new Eval(-19, -21),
-            new Eval(-31, -7),
-            new Eval(-34, 3),
-            new Eval(-15, -1),
-            new Eval(16, -1),
-            new Eval(-17, -5),
-            new Eval(-3, 25),
-            new Eval(31, 37),
-            new Eval(60, 24),
-            new Eval(-17, -2),
-            new Eval(13, 23),
-            new Eval(31, 31),
-            new Eval(34, 12),
+            4293853162,
+            4294770641,
+            4294049746,
+            4293787627,
+            4293001209,
+            4292739075,
+            4294049791,
+            1114111,
+            4293918715,
+            4294770713,
+            2031653,
+            3932184,
+            4293918718,
+            851991,
+            2031647,
+            2228236,
         },
         {
-            new Eval(42, -30),
-            new Eval(-20, -38),
-            new Eval(-75, -38),
-            new Eval(48, -68),
-            new Eval(5, -6),
-            new Eval(-4, 6),
-            new Eval(-16, -3),
-            new Eval(-17, -21),
-            new Eval(11, 22),
-            new Eval(12, 40),
-            new Eval(9, 42),
-            new Eval(6, 23),
-            new Eval(6, 7),
-            new Eval(9, 22),
-            new Eval(11, 28),
-            new Eval(5, 14),
+            2818018,
+            4293722074,
+            4290117594,
+            3211196,
+            393210,
+            4294705158,
+            4293984253,
+            4293918699,
+            720918,
+            786472,
+            589866,
+            393239,
+            393223,
+            589846,
+            720924,
+            327694,
         },
     };
 
-    static readonly Eval[] DoubledPawnEval = {
-        new Eval(-59, -53),
-        new Eval(-34, -41),
-        new Eval(-61, -30),
-        new Eval(-38, -16),
-        new Eval(-61, -25),
-        new Eval(-51, -47),
-        new Eval(-19, -36),
-        new Eval(-41, -48),
+    static readonly uint[] DoubledPawnEval = {
+        4291166155,
+        4292804567,
+        4291035106,
+        4292542448,
+        4291035111,
+        4291690449,
+        4293787612,
+        4292345808,
     };
 
-    static readonly Eval[] IsolatedPawnEval = {
-        new Eval(-33, -20),
-        new Eval(-22, -22),
-        new Eval(-58, -29),
-        new Eval(-64, -41),
-        new Eval(-87, -45),
-        new Eval(-41, -39),
-        new Eval(-27, -21),
-        new Eval(-88, -31),
+    static readonly uint[] IsolatedPawnEval = {
+        4292870124,
+        4293591018,
+        4291231715,
+        4290838487,
+        4289331155,
+        4292345817,
+        4293263339,
+        4289265633,
     };
 
-    static readonly Eval[] PassedPawnEval = {
-        new Eval(0, 0),
-        new Eval(0, 0),
-        new Eval(0, 41),
-        new Eval(29, 58),
-        new Eval(102, 126),
-        new Eval(102, 193),
+    static readonly uint[] PassedPawnEval = {
+        0,
+        0,
+        41,
+        1900602,
+        6684798,
+        6684865,
     };
 
-    static readonly Eval OpenFileEval = new Eval(73, 0);
-    static readonly Eval SemiOpenFileEval = new Eval(38, 1);
+    const uint OpenFileEval = 4784128;
+    const uint SemiOpenFileEval = 2490369;
 
     const BitBoard LightSquares = 0xAA55AA55AA55AA55;
     const BitBoard DarkSquares = ~LightSquares;
