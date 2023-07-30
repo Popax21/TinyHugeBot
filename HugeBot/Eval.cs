@@ -5,7 +5,7 @@ using BitBoard = System.UInt64;
 
 namespace HugeBot;
 
-// ported from STRO4K
+// ported from STRO4K (https://github.com/ONE-RANDOM-HUMAN/STRO4K/tree/master)
 struct Eval
 {
     public const int MaxEval = 128 * 256 - 1;
