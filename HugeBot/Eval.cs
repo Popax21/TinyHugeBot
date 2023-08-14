@@ -31,7 +31,7 @@ struct Eval
     }
 }
 
-sealed class Evaluator
+class Evaluator
 {
     static readonly uint[] MobilityEval =
     {
@@ -354,8 +354,13 @@ sealed class Evaluator
     public static int Evaluate(Board board)
     {
         Eval eval = new Eval(0, 0);
-        BitBoard[] whitePieces = (BitBoard[])(from i in Enumerable.Range(0, 6) select board.GetPieceBitboard((PieceType)i, true));
-        BitBoard[] blackPieces = (BitBoard[])(from i in Enumerable.Range(0, 6) select board.GetPieceBitboard((PieceType)i, false));
+        BitBoard[] whitePieces = new BitBoard[6];
+        BitBoard[] blackPieces = new BitBoard[6];
+        for (int i = 0; i < 6; i++)
+        {
+            whitePieces[i] = board.GetPieceBitboard((PieceType)i, true);
+            blackPieces[i] = board.GetPieceBitboard((PieceType)i, false);
+        }
         for (int i = 0; i < 5; i++)
         {
             short count = (short)(BitboardHelper.GetNumberOfSetBits(whitePieces[i]) - BitboardHelper.GetNumberOfSetBits(blackPieces[i]));
@@ -388,5 +393,6 @@ sealed class Evaluator
         }
         int score = (eval.top * phase + eval.bottom * (24 - phase)) / phase;
         return board.IsWhiteToMove ? score : -score;
+        return 0;
     }
 }

@@ -7,7 +7,7 @@ using System.Runtime.InteropServices;
 
 namespace HugeBot;
 
-sealed class Search
+class Search
 {
     // TODO: history
     public static Move SearchMoves(Board board)
@@ -17,14 +17,13 @@ sealed class Search
         foreach (Move move in board.GetLegalMoves())
         {
             board.MakeMove(move);
-            (Move, int) found = (move, AlphaBeta(board, 7, Eval.MinEval, Eval.MaxEval)); // setting depth to 7 just for testing
+            (Move, int) found = (move, AlphaBeta(board, 5, Eval.MinEval, Eval.MaxEval)); // setting depth to 5 just for testing
             board.UndoMove(move);
             if (best == null || (board.IsWhiteToMove && best?.Item2 < found.Item2) || (!board.IsWhiteToMove && best?.Item2 > found.Item2)) {
                 best = found;
             }
         }
         return (Move)best?.Item1;
-        return board.GetLegalMoves()[0];
     }
 
     public static int AlphaBeta(Board board, uint depth, int alpha, int beta)
