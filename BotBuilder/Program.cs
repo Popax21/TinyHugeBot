@@ -20,6 +20,7 @@ if(args.Length < 2) throw new ArgumentException("Usage: <huge bot DLL> <tiny bot
 
 bool DEBUG = args.Length >= 4 && args[3].Equals("--debug", StringComparison.InvariantCultureIgnoreCase);
 
+string asmPath, botClass;
 if(!DEBUG) {
     //Read the huge bot DLL
     ModuleDefinition botMod = ModuleDefinition.FromFile(args[0], new ModuleReaderParameters(AppDomain.CurrentDomain.BaseDirectory));
@@ -116,7 +117,7 @@ if(!DEBUG) {
 
     //Fixup the module
     botMod.GetOrCreateModuleType();
-    botType.Name = "B"; //We need to expose the bot type
+    botType.Name = botClass = "B"; //We need to expose the bot type
 
     //Build the tiny bot DLL by modifying some other parameters
     PEImageBuildResult tinyBotBuildRes = new ManagedPEImageBuilder().CreateImage(botMod);
@@ -146,12 +147,18 @@ if(!DEBUG) {
     } catch(Exception e) {
         throw new Exception("TinyBot DLL verification error!", e);
     }
-} else Console.WriteLine("Skipping tiny bot build as --debug flag was given");
+
+    asmPath = args[1];
+} else {
+    asmPath = args[0];
+    botClass = "MyBot";
+    Console.WriteLine("Skipping tiny bot build as --debug flag was given");
+}
 
 if(args.Length <= 2) return;
 
 //Encode the TinyBot DLL
-byte[] tinyBotData = File.ReadAllBytes(args[DEBUG ? 0 : 1]);
+byte[] tinyBotData = File.ReadAllBytes(asmPath);
 byte GetTinyBotNibble(long idx) => (byte) (idx < tinyBotData.Length*2 ? (tinyBotData[idx / 2] >> (int) (4 * (idx & 1))) & 0xf : 0);
 byte GetTinyBotByte(long nibbleIdx) => (byte) (GetTinyBotNibble(nibbleIdx) + (GetTinyBotNibble(nibbleIdx+1) << 4));
 int GetTinyBotInt(long nibbleIdx) => GetTinyBotByte(nibbleIdx) + (GetTinyBotByte(nibbleIdx+2) << 8) + (GetTinyBotByte(nibbleIdx+4) << 16) + (GetTinyBotByte(nibbleIdx+6) << 24);
@@ -182,5 +189,5 @@ using Stream launchPadStream = Assembly.GetEntryAssembly()!.GetManifestResourceS
 using StreamReader launchPadReader = new StreamReader(launchPadStream);
 string launchpad = launchPadReader.ReadToEnd();
 
-File.WriteAllText(args[2], launchpad.Replace("<TINYASMENCDAT>", tinyBotEncData.ToString()).Replace("<TINYASMSIZE>", tinyBotBufSize.ToString()));
+File.WriteAllText(args[2], launchpad.Replace("<TINYASMENCDAT>", tinyBotEncData.ToString()).Replace("<TINYASMSIZE>", tinyBotBufSize.ToString()).Replace("<TINYBOTCLASS>", botClass));
 Console.WriteLine($"Wrote launchpad with encoded bot to '{args[2]}'");

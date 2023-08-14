@@ -26,7 +26,7 @@ public class MyBot : IChessBot {
             //As such load it whenever any assembly fails to load >:)
             ResolveEventHandler asmResolveCB = (_, _) => AppDomain.CurrentDomain.Load(asmDataBuf);
             AppDomain.CurrentDomain.AssemblyResolve += asmResolveCB;
-            TinyBot = (IChessBot) Activator.CreateInstance("B", "B").Unwrap();
+            TinyBot = (IChessBot) Activator.CreateInstance("B", "<TINYBOTCLASS>").Unwrap();
             AppDomain.CurrentDomain.AssemblyResolve -= asmResolveCB;
         }
         return TinyBot.Think(board, timer);
