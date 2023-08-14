@@ -50,6 +50,8 @@ bool TinyfyType(TypeDefinition type, ref char nextName) {
 
     //Clear attributes
     type.CustomAttributes.Clear();
+    foreach(MethodDefinition meth in type.Methods) meth.CustomAttributes.Clear();
+    foreach(FieldDefinition field in type.Fields) field.CustomAttributes.Clear();
 
     //Trim out constants
     foreach(FieldDefinition field in type.Fields.ToArray()) {
@@ -58,7 +60,9 @@ bool TinyfyType(TypeDefinition type, ref char nextName) {
     
     //Trim out parameter names
     foreach(MethodDefinition meth in type.Methods.ToArray()) {
-        foreach(Parameter param in meth.Parameters) param.Definition!.Name = null;
+        foreach(Parameter param in meth.Parameters) {
+            if(param.Definition != null) param.Definition!.Name = null;
+        }
     }
 
     //Tiny-fy member names
