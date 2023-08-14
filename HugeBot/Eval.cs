@@ -16,8 +16,8 @@ struct Eval
 
     public Eval(short white, short black)
     {
-        this.top = white;
-        this.bottom = black;
+        top = white;
+        bottom = black;
     }
 
     public void Accumulate(Eval eval, int count)
