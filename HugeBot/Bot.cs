@@ -6,8 +6,6 @@ public class MyBot : IChessBot
 {
     public Move Think(Board board, Timer timer)
     {
-        Move[] moves = board.GetLegalMoves();
-        Console.WriteLine(Eval.MaxEval);
-        return moves[0];
+        return Search.SearchMoves(board);
     }
 }
