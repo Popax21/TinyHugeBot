@@ -392,7 +392,6 @@ class Evaluator
             phase += weights[i] * (pieces[i].Count + pieces[i + 6].Count);
         }
         int score = (eval.top * phase + eval.bottom * (24 - phase)) / phase;
-        return board.IsWhiteToMove ? score : -score;
-        return 0;
+        return score;
     }
 }
