@@ -17,7 +17,7 @@ class Search
         foreach (Move move in board.GetLegalMoves())
         {
             board.MakeMove(move);
-            (Move, int) found = (move, AlphaBeta(board, 5, Eval.MinEval, Eval.MaxEval)); // setting depth to 5 just for testing
+            (Move, int) found = (move, AlphaBeta(board, 3, Eval.MinEval, Eval.MaxEval)); // setting depth to 5 just for testing
             board.UndoMove(move);
             if (best == null || (board.IsWhiteToMove && best?.Item2 < found.Item2) || (!board.IsWhiteToMove && best?.Item2 > found.Item2)) {
                 best = found;

@@ -1,6 +1,5 @@
 ﻿using ChessChallenge.API;
-using System.Linq;
-using System.Numerics;
+using System;
 using BitBoard = System.UInt64;
 
 namespace HugeBot;
@@ -326,7 +325,7 @@ class Evaluator
             int index = LeadingZeros(pawns & file);
             if (index != 64)
             {
-                eval.Accumulate(PassedPawnEval[6 - index / 8], 1);
+                eval.Accumulate(PassedPawnEval[Math.Clamp(6 - index / 8, 0, 5)], 1);
             }
             file <<= 1;
         }
