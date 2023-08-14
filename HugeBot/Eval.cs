@@ -31,7 +31,7 @@ struct Eval
     }
 }
 
-sealed class Evaluator
+class Evaluator
 {
     static readonly uint[] MobilityEval =
     {
