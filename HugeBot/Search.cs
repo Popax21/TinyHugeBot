@@ -6,7 +6,7 @@ using System.Linq;
 
 namespace HugeBot;
 
-class Search
+sealed class Search
 {
     // TODO: history
     public static Move SearchMoves(Board board)

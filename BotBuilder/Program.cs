@@ -86,7 +86,7 @@ foreach(TypeDefinition type in botMod.TopLevelTypes.ToArray()) {
 
     if(type == botType || (type.Namespace?.Value?.StartsWith("HugeBot") ?? false)) {
         // Merge static types (there's no concept of "static classes" at the IL level, so we have to cheat a bit)
-        if (type.IsAbstract && type.IsSealed) {
+        if (type.IsSealed) {
             if (staticType != null) {
                 // Merge the types by transfering over fields, methods and properties
                 foreach(FieldDefinition field in type.Fields) staticType.Fields.Add(field);
