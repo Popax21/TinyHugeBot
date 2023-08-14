@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.Design;
 using System.Linq;
+using System.Runtime.InteropServices;
 
 namespace HugeBot;
 
@@ -12,15 +13,17 @@ class Search
     public static Move SearchMoves(Board board)
     {
         // TODO: dynamic depth and timer
-        var moves = new List<(Move, int)>();
+        (Move, int)? best = null;
         foreach (Move move in board.GetLegalMoves())
         {
             board.MakeMove(move);
-            moves.Add((move, AlphaBeta(board, 7, Eval.MinEval, Eval.MaxEval))); // setting depth to 7 just for testing
+            (Move, int) found = (move, AlphaBeta(board, 5, Eval.MinEval, Eval.MaxEval)); // setting depth to 5 just for testing
             board.UndoMove(move);
+            if (best == null || (board.IsWhiteToMove && best?.Item2 < found.Item2) || (!board.IsWhiteToMove && best?.Item2 > found.Item2)) {
+                best = found;
+            }
         }
-        Func<(Move, int), int> selector = item => item.Item2;
-        return board.IsWhiteToMove ? moves.MaxBy(selector).Item1 : moves.MinBy(selector).Item1;
+        return (Move)best?.Item1;
     }
 
     public static int AlphaBeta(Board board, uint depth, int alpha, int beta)
