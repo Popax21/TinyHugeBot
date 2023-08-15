@@ -122,7 +122,7 @@ public class Searcher {
         int numOrderedMoves = 0;
 
         //Check the transposition table
-        if(depth > 0 && TranspositionTable.Lookup(transpositionTable, board.ZobristKey, out ushort ttRawMove, out int ttEval, out int ttDepth, out TTBound bound)) {
+        if(depth > 0 && TranspositionTable.Lookup(transpositionTable, board.ZobristKey, out ushort ttRawMove, out int ttEval, out int ttDepth, out byte bound)) {
             //Lookup the move stored in the transposition table in the current legal moves list
             for(int i = 0; i < moves.Length; i++) {
                 if(moves[i].RawValue == ttRawMove) {
@@ -188,7 +188,7 @@ public class Searcher {
         //Search moves we could make from here
         Move bestMove = default;
         int bestEval = depth <= 0 ? staticEval : MinEval;
-        TTBound evalBound = TTBound.Upper;
+        byte evalBound = TTBound.Upper;
 
         if(bestEval >= beta) return bestEval;
         if(bestEval > alpha) {

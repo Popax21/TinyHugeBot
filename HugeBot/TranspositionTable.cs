@@ -3,8 +3,8 @@ using ChessChallenge.API;
 
 namespace HugeBot;
 
-public enum TTBound {
-    None, Lower, Upper, Exact
+public static class TTBound {
+    public const int None = 0, Lower = 1, Upper = 2, Exact = 3;
 };
 
 public static class TranspositionTable {
@@ -14,7 +14,7 @@ public static class TranspositionTable {
 
     public static void Reset(ulong[] table) => Array.Clear(table);
 
-    public static void Store(ulong[] table, ulong hash, Move move, int eval, int depth, TTBound bound) {
+    public static void Store(ulong[] table, ulong hash, Move move, int eval, int depth, byte bound) {
         depth = Math.Clamp(depth, -(1 << 13), +(1 << 13) - 1);
         table[hash % TableSize] =
             move.RawValue |
@@ -25,7 +25,7 @@ public static class TranspositionTable {
         ;
     }
 
-    public static bool Lookup(ulong[] table, ulong hash, out ushort rawMove, out int eval, out int depth, out TTBound bound) {
+    public static bool Lookup(ulong[] table, ulong hash, out ushort rawMove, out int eval, out int depth, out byte bound) {
         ulong ttData = table[hash % TableSize];
     
         //Check if the upper bits of the hash match
@@ -40,7 +40,7 @@ public static class TranspositionTable {
         //Decode the table data
         rawMove = (ushort) ttData;
         eval = (short) (ttData >> 16);
-        bound = (TTBound) ((ttData >> 32) & 0b11);
+        bound = (byte) ((ttData >> 32) & 0b11);
         depth = (int) (ttData >> 34) & TTDepthMask;
         depth = (depth & TTDepthSignBit) - (depth & ~TTDepthSignBit);
         return true;

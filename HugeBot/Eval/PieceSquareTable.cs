@@ -27,48 +27,53 @@ static partial class Evaluator {
         return eval;
     }
 
-    public static readonly Eval[,] PieceSquareTable = {
+    private static ushort[] ComprPieceSquareTable = {
         //Pawns
-        {
-            0x00_ffffcb_00_000002, 0x00_ffffb6_00_000013, 0x00_000000_00_000006, 0x00_fffff9_00_ffffd8,
-            0x00_ffffc9_00_fffff2, 0x00_ffffed_00_ffffe1, 0x00_fffffd_00_ffffe6, 0x00_fffff7_00_ffffc8,
-            0x00_ffffff_00_000022, 0x00_00002b_00_fffff7, 0x00_00004b_00_ffffe6, 0x00_000026_00_fffff1,
-            0x00_000029_00_00004b, 0x00_000028_00_000038, 0x00_000010_00_000021, 0x00_000005_00_00001d,
-        },
+        0xcb_02, 0xb6_13, 0x00_06, 0xf9_d8,
+        0xc9_f2, 0xed_e1, 0xfd_e6, 0xf7_c8,
+        0xff_22, 0x2b_f7, 0x4b_e6, 0x26_f1,
+        0x29_4b, 0x28_38, 0x10_21, 0x05_1d,
+
         //Knights
-        {
-            0x00_ffffe8_00_ffffed, 0x00_ffffda_00_ffffdf, 0x00_ffffe8_00_ffffdf, 0x00_ffffea_00_fffff9,
-            0x00_ffffe2_00_fffffc, 0x00_ffffd5_00_fffff3, 0x00_ffffd0_00_ffffec, 0x00_000008_00_000009,
-            0x00_000027_00_00000d, 0x00_000031_00_000009, 0x00_00001c_00_000017, 0x00_000046_00_00001d,
-            0x00_000002_00_000004, 0x00_000017_00_00000e, 0x00_000014_00_00000c, 0x00_000005_00_000001,
-        },
+        0xe8_ed, 0xda_df, 0xe8_df, 0xea_f9,
+        0xe2_fc, 0xd5_f3, 0xd0_ec, 0x08_09,
+        0x27_0d, 0x31_09, 0x1c_17, 0x46_1d,
+        0x02_04, 0x17_0e, 0x14_0c, 0x05_01,
+
         //Bishops
-        {
-            0x00_000016_00_fffff0, 0x00_ffffdb_00_ffffe8, 0x00_ffffe3_00_fffff0, 0x00_000018_00_ffffee,
-            0x00_000006_00_000004, 0x00_000001_00_000002, 0x00_ffffe9_00_000004, 0x00_00000b_00_fffffa,
-            0x00_000004_00_00000b, 0x00_00001d_00_000006, 0x00_00001b_00_00000f, 0x00_000016_00_000010,
-            0x00_fffff9_00_000003, 0x00_000000_00_000007, 0x00_000002_00_000003, 0x00_fffffa_00_fffffb,
-        },
+        0x16_f0, 0xdb_e8, 0xe3_f0, 0x18_ee,
+        0x06_04, 0x01_02, 0xe9_04, 0x0b_fa,
+        0x04_0b, 0x1d_06, 0x1b_0f, 0x16_10,
+        0xf9_03, 0x00_07, 0x02_03, 0xfa_fb,
+
         //Rooks
-        {
-            0x00_ffffc4_00_ffffdd, 0x00_fffffc_00_ffffda, 0x00_ffffec_00_ffffd1, 0x00_ffffcd_00_ffffd5,
-            0x00_ffffcf_00_fffff4, 0x00_ffffe9_00_fffffd, 0x00_ffffea_00_fffff7, 0x00_fffffb_00_ffffed,
-            0x00_00000d_00_000017, 0x00_00001c_00_00001f, 0x00_00001d_00_000014, 0x00_00001d_00_00000a,
-            0x00_00001e_00_000026, 0x00_00002e_00_00002c, 0x00_000022_00_000021, 0x00_000021_00_00001f,
-        },
+        0xc4_dd, 0xfc_da, 0xec_d1, 0xcd_d5,
+        0xcf_f4, 0xe9_fd, 0xea_f7, 0xfb_ed,
+        0x0d_17, 0x1c_1f, 0x1d_14, 0x1d_0a,
+        0x1e_26, 0x2e_2c, 0x22_21, 0x21_1f,
+
         //Queens
-        {
-            0x00_ffffee_00_ffffea, 0x00_fffffc_00_ffffd1, 0x00_fffff1_00_ffffd2, 0x00_ffffed_00_ffffeb,
-            0x00_ffffe1_00_fffff9, 0x00_ffffde_00_000003, 0x00_fffff1_00_ffffff, 0x00_000010_00_ffffff,
-            0x00_ffffef_00_fffffb, 0x00_fffffd_00_000019, 0x00_00001f_00_000025, 0x00_00003c_00_000018,
-            0x00_ffffef_00_fffffe, 0x00_00000d_00_000017, 0x00_00001f_00_00001f, 0x00_000022_00_00000c,
-        },
+        0xee_ea, 0xfc_d1, 0xf1_d2, 0xed_eb,
+        0xe1_f9, 0xde_03, 0xf1_ff, 0x10_ff,
+        0xef_fb, 0xfd_19, 0x1f_25, 0x3c_18,
+        0xef_fe, 0x0d_17, 0x1f_1f, 0x22_0c,
+
         //Kings
-        {
-            0x00_00002a_00_ffffe2, 0x00_ffffec_00_ffffda, 0x00_ffffb5_00_ffffda, 0x00_000030_00_ffffbc,
-            0x00_000005_00_fffffa, 0x00_fffffc_00_000006, 0x00_fffff0_00_fffffd, 0x00_ffffef_00_ffffeb,
-            0x00_00000b_00_000016, 0x00_00000c_00_000028, 0x00_000009_00_00002a, 0x00_000006_00_000017,
-            0x00_000006_00_000007, 0x00_000009_00_000016, 0x00_00000b_00_00001c, 0x00_000005_00_00000e,
-        }
+        0x2a_e2, 0xec_da, 0xb5_da, 0x30_bc,
+        0x05_fa, 0xfc_06, 0xf0_fd, 0xef_eb,
+        0x0b_16, 0x0c_28, 0x09_2a, 0x06_17,
+        0x06_07, 0x09_16, 0x0b_1c, 0x05_0e,
     };
+
+    public static readonly Eval[,] PieceSquareTable = DecompressPieceSquareTable(ComprPieceSquareTable);
+
+    private static Eval[,] DecompressPieceSquareTable(ushort[] comprPST) {
+        Eval[,] pst = new Eval[6, 4*4];
+        for(int i = 0; i < 6*4*4; i++) {
+            ushort comprVal = comprPST[i];
+            sbyte mgVal = (sbyte) (comprVal >> 8), egVal = (sbyte) comprVal;
+            pst[i >> 4, i & 0xf] = (((ulong) (int) mgVal) << 32 | (uint) (int) egVal) & 0x00_ffffff_00_ffffff;
+        }
+        return pst;
+    }
 }
