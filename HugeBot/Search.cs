@@ -88,7 +88,7 @@ public static class Search {
         bool improving = plyIdx >= 2 && staticEval > plyStaticEvals[plyIdx-2];
 
         //Null move pruning
-        if (beta - alpha == 1 && !board.IsInCheck() && staticEval >= beta) {
+        if (depth > 0 && beta - alpha == 1 && !board.IsInCheck() && staticEval >= beta) {
             //Static null move pruning
             if (depth <= 5) {
                 int margin = depth * 256;
@@ -141,6 +141,8 @@ public static class Search {
             }
 
             //TODO: Delta pruning
+            if (fPrune && depth <= 0) {
+            }
             //TODO: PVS
 
             //Evaluate the move recursively
