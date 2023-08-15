@@ -109,9 +109,6 @@ public class Searcher {
         //Search one move more if we're in check
         if(board.IsInCheck()) depth++;
 
-        //Check if we reached the bottom of our search
-        if(depth == 0) return Evaluator.Evaluate(board);
-
         //Check if this is a PV (Principal Variation) node in the search tree
         bool isPVNode = alpha + 1 != beta;
 
