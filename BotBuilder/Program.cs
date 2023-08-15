@@ -99,6 +99,7 @@ if(!DEBUG) {
                     foreach(FieldDefinition field in StealElements(type.Fields)) staticType.Fields.Add(field);
                     foreach(MethodDefinition method in StealElements(type.Methods)) staticType.Methods.Add(method);
                     foreach(PropertyDefinition prop in StealElements(type.Properties)) staticType.Properties.Add(prop);
+                    foreach(TypeDefinition nestedType in StealElements(type.NestedTypes)) staticType.NestedTypes.Add(nestedType);
                 } else {
                     staticType = type;
                     keepType = true;
@@ -111,7 +112,7 @@ if(!DEBUG) {
         }
 
         //Remove the type if we don't need it
-        if(!keepType && type != privImplType) botMod.TopLevelTypes.Remove(type);
+        if(!keepType) botMod.TopLevelTypes.Remove(type);
     }
 
     if(staticType != null) TinyfyType(staticType, ref nextName);
