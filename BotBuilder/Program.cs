@@ -9,12 +9,16 @@ using System.Text;
 using AsmResolver;
 using AsmResolver.DotNet;
 using AsmResolver.DotNet.Builder;
+using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.DotNet.Collections;
 using AsmResolver.DotNet.Serialized;
+using AsmResolver.DotNet.Signatures;
 using AsmResolver.PE;
 using AsmResolver.PE.DotNet.Builder;
+using AsmResolver.PE.DotNet.Cil;
 using AsmResolver.PE.File;
 using AsmResolver.PE.File.Headers;
+using MethodAttributes = AsmResolver.PE.DotNet.Metadata.Tables.Rows.MethodAttributes;
 
 if(args.Length < 2) throw new ArgumentException("Usage: <huge bot DLL> <tiny bot DLL> [tiny bot CS] [--debug]");
 
@@ -115,7 +119,32 @@ if(!DEBUG) {
         if(!keepType) botMod.TopLevelTypes.Remove(type);
     }
 
-    if(staticType != null) TinyfyType(staticType, ref nextName);
+    if(staticType != null) {
+        //Merge static constructors
+        List<MethodDefinition> cctors = new List<MethodDefinition>();
+
+        foreach(MethodDefinition method in staticType.Methods) {
+            if(!method.IsConstructor) continue;
+            method.Name = $"cctor{cctors.Count}";
+            method.IsSpecialName = method.IsRuntimeSpecialName = false;
+            cctors.Add(method);
+        }
+
+        if(cctors.Count > 0) {
+            MethodDefinition mergedCctor = new MethodDefinition(".cctor", MethodAttributes.Private | MethodAttributes.Static | MethodAttributes.SpecialName | MethodAttributes.RuntimeSpecialName, MethodSignature.CreateStatic(botMod.CorLibTypeFactory.Void));
+            mergedCctor.CilMethodBody = new CilMethodBody(mergedCctor);
+            
+            foreach(MethodDefinition cctor in cctors) {
+                mergedCctor.CilMethodBody.Instructions.Add(new CilInstruction(CilOpCodes.Call, cctor));
+            }
+            mergedCctor.CilMethodBody.Instructions.Add(new CilInstruction(CilOpCodes.Ret));
+            
+            staticType.Methods.Add(mergedCctor);
+        }
+
+        //Tinfy the type
+        TinyfyType(staticType, ref nextName);
+    }
 
     //Fixup the module
     botMod.GetOrCreateModuleType();
