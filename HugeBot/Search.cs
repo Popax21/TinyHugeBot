@@ -20,14 +20,14 @@ public static class Search {
             board.UndoMove(move);
 
             //Check if this move is better
-            if(bestEval < moveEval) (bestMove, bestEval) = (move, moveEval);
+            if(bestMove.IsNull || bestEval < moveEval) (bestMove, bestEval) = (move, moveEval);
         }
 
         return bestMove;
     }
 
     public static int AlphaBeta(Board board, uint depth, int alpha, int beta) {
-        //Check if we're in checkmate / stalemate / 50 move role
+        //Check if we're in checkmate / stalemate / 50 move rule
         if(board.IsInCheckmate()) return MinEval;
         if(board.IsInStalemate() || board.IsFiftyMoveDraw()) return 0;
 
