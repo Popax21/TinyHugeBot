@@ -44,10 +44,7 @@ if(!DEBUG) {
     botMod.Assembly.CustomAttributes.Clear();
 
     //Tiny-fy types
-    TypeDefinition botType = botMod.TopLevelTypes.First(t => t.FullName == "MyBot");
-    TypeDefinition? staticType = null;
-
-    bool TinyfyType(TypeDefinition type, ref char nextName) {
+    void TinyfyType(TypeDefinition type, ref char nextName) {
         //Tiny-fy the name
         type.Namespace = null;
         type.Name = (nextName++).ToString();
@@ -61,7 +58,7 @@ if(!DEBUG) {
         foreach(FieldDefinition field in type.Fields.ToArray()) {
             if(field.Constant != null) type.Fields.Remove(field);
         }
-        
+
         //Trim out parameter names
         foreach(MethodDefinition meth in type.Methods.ToArray()) {
             foreach(Parameter param in meth.Parameters) {
@@ -72,45 +69,49 @@ if(!DEBUG) {
         //Tiny-fy member names
         HashSet<string> ifaceNames = type.Interfaces.SelectMany(intf => intf.Interface!.Resolve()!.Methods.Select(m => m.Name!.Value)).ToHashSet();
         foreach(MethodDefinition meth in type.Methods) {
-            if(!meth.IsConstructor && meth.DeclaringType == type && !ifaceNames.Contains(meth.Name!.Value)) {
-                meth.Name = null;
-            }
+            if(!meth.IsConstructor && meth.DeclaringType == type && !ifaceNames.Contains(meth.Name!.Value)) meth.Name = null;
         }
 
         foreach(FieldDefinition field in type.Fields) field.Name = null;
         
         char nextNestedName = 'a';
-        foreach(TypeDefinition nestedType in type.NestedTypes.ToArray()) {
-            if(!TinyfyType(nestedType, ref nextNestedName)) type.NestedTypes.Remove(nestedType);
-        }
-
-        // If the type is empty, remove it
-        return type.Fields.Count > 0 || type.Methods.Count > 0 || type.Properties.Count > 0 || type.NestedTypes.Count > 0;
+        foreach(TypeDefinition nestedType in type.NestedTypes.ToArray()) TinyfyType(nestedType, ref nextNestedName);
     }
+
+    TypeDefinition botType = botMod.TopLevelTypes.First(t => t.FullName == "MyBot");
+    TypeDefinition? privImplType = botMod.TopLevelTypes.FirstOrDefault(t => t.FullName == "<PrivateImplementationDetails>");
+    TypeDefinition? staticType = null;
 
     char nextName = 'a';
     foreach(TypeDefinition type in botMod.TopLevelTypes.ToArray()) {
         bool keepType = false;
 
-        if(type == botType || (type.Namespace?.Value?.StartsWith("HugeBot") ?? false)) {
-            // Merge static types (there's no concept of "static classes" at the IL level, so we have to cheat a bit)
-            if (type.IsSealed) {
-                if (staticType != null) {
-                    // Merge the types by transfering over fields, methods and properties
-                    foreach(FieldDefinition field in type.Fields) staticType.Fields.Add(field);
-                    foreach(MethodDefinition method in type.Methods) staticType.Methods.Add(method);
-                    foreach(PropertyDefinition prop in type.Properties) staticType.Properties.Add(prop);
+        if(type == botType || type == privImplType || (type.Namespace?.Value?.StartsWith("HugeBot") ?? false)) {
+            //Merge static types (there's no concept of "static classes" at the IL level, so we have to cheat a bit)
+            if((type.IsSealed && type.IsAbstract) || type == privImplType) {
+                if(staticType != null) {
+                    //Merge the types by transfering over fields, methods and properties
+                    static T[] StealElements<T>(IList<T> list) {
+                        T[] elems = list.ToArray();
+                        list.Clear();
+                        return elems;
+                    }
+                    foreach(FieldDefinition field in StealElements(type.Fields)) staticType.Fields.Add(field);
+                    foreach(MethodDefinition method in StealElements(type.Methods)) staticType.Methods.Add(method);
+                    foreach(PropertyDefinition prop in StealElements(type.Properties)) staticType.Properties.Add(prop);
                 } else {
                     staticType = type;
                     keepType = true;
                 }
-            } else
-                // Tinfy other types
-                keepType = TinyfyType(type, ref nextName);
+            } else {
+                //Tinfy other types
+                TinyfyType(type, ref nextName);
+                keepType = true;
+            }
         }
 
-        // Remove the type if we don't need it
-        if(!keepType) botMod.TopLevelTypes.Remove(type);
+        //Remove the type if we don't need it
+        if(!keepType && type != privImplType) botMod.TopLevelTypes.Remove(type);
     }
 
     if(staticType != null) TinyfyType(staticType, ref nextName);
