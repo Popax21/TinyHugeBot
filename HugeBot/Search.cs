@@ -159,7 +159,7 @@ public static class Search {
             //Temporarily make a move
             board.MakeMove(move);
 
-            //Eliminate futile moves that dont check
+            //Eliminate futile moves that dont check and arent noisy
             if (fPrune && !board.IsInCheck() && !move.IsCapture && !move.IsPromotion) {
                 board.UndoMove(move);
                 continue;
