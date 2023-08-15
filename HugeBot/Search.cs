@@ -1,5 +1,6 @@
 ﻿using ChessChallenge.API;
 using System;
+using System.Collections.Generic;
 
 namespace HugeBot;
 
@@ -14,6 +15,7 @@ public static class Search {
     private static readonly int[] plyStaticEvals = new int[MaxPly];
     private static readonly long[] whiteHistoryTable = new long[HistoryTable.TableSize], blackHistoryTable = new long[HistoryTable.TableSize];
     private static readonly Move[][] killerTables = new Move[MaxPly][];
+    private static readonly Dictionary<Board, (Move, int, int)> transpositionTable = new Dictionary<Board, (Move, int, int)>(); //Key is ZobristKey, values are stored move, eval and depth
 
     private static int searchCallIndex = 0;
 
@@ -34,6 +36,9 @@ public static class Search {
             for(int i = 0; i < MaxPly; i++) killerTables[i] = new Move[KillerTable.TableSize];
         }
         Array.ForEach(killerTables, KillerTable.Reset);
+
+        //Reset the transposition table
+        transpositionTable.Clear();
     }
 
     public static Move SearchMoves(Board board, Timer timer) {
@@ -121,7 +126,23 @@ public static class Search {
         
         int numOrderedMoves = 0;
 
-        //TODO: Transposition table
+        //Read the transposition table
+        (Move, int, int) data;
+        if (transpositionTable.TryGetValue(board, out data)) {
+            //Check for collisions by seeing if the move is legal
+            int index = moves.IndexOf(data.Item1);
+            if (index != -1) {
+                if (data.Item3 >= depth) {
+                    //Use stored value
+                    return data.Item2;
+                } else {
+                    //Bring previous best move to the front
+                    Move temp = moves[0];
+                    moves[0] = moves[index];
+                    moves[index] = temp;
+                }
+            }
+        }
 
         //Determine the static evaluation of the ply and check if we're improving
         int staticEval = Evaluator.Evaluate(board);
@@ -241,6 +262,10 @@ public static class Search {
 
             //This means we ran out of time during searching
             if (moveEval == null) return null;
+
+            //Update the transposition table
+            transpositionTable.Remove(board);
+            transpositionTable.Add(board, (move, (int)moveEval, depth));
 
             //Update search variables
             bestEval = Math.Max(bestEval, (int)moveEval);
