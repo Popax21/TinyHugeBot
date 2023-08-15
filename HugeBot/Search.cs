@@ -112,7 +112,9 @@ public static class Search {
         //Order noisy moves
         numOrderedMoves += MoveOrder.OrderNoisyMoves(moves[numOrderedMoves..]);
 
-        //TODO: Futility pruning
+        //Futility pruning
+        bool fPrune = depth <= 5 && !board.IsInCheck() && beta - alpha == 1
+            && staticEval + Math.Max(1, depth + (improving ? 1 : 0)) * 256 <= alpha;
 
         //By now we will have ordered all non-quiet moves
         int firstQuietMoveIdx = numOrderedMoves;
