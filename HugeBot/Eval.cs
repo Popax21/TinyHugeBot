@@ -390,7 +390,7 @@ static class Evaluator
         {
             phase += weights[i] * (pieces[i].Count + pieces[i + 6].Count);
         }
-        int score = (eval.top * phase + eval.bottom * (24 - phase)) / phase;
+        int score = (eval.top * phase + eval.bottom * (24 - phase)) / Math.Max(1, phase);
         return score;
     }
 }

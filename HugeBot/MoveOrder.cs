@@ -1,6 +1,7 @@
 ﻿using ChessChallenge.API;
 using System;
 using System.Diagnostics;
+using System.Linq;
 
 namespace HugeBot;
 
@@ -21,18 +22,6 @@ struct KillerTable
     }
 }
 
-struct PlyData
-{
-    public KillerTable kt;
-    public int staticEval;
-
-    public PlyData()
-    {
-        kt = new KillerTable();
-        staticEval = 0;
-    }
-}
-
 struct HistoryTable
 {
     public long[] data;
@@ -45,6 +34,12 @@ struct HistoryTable
     public void Reset()
     {
         data = new long[4096];
+    }
+
+    public long Get(Move move)
+    {
+        int index = (move.StartSquare.Index << 6) | move.TargetSquare.Index;
+        return data[index];
     }
 
     public void BetaCutoff(Move move, long depth)
@@ -62,19 +57,68 @@ struct HistoryTable
 
 static class MoveOrder
 {
-    public static uint OrderNoisyMoves(Board position, ref Move[] moves)
+    public static int OrderNoisyMoves(Board position, ref Move[] moves, int startIndex)
     {
-        throw new NotImplementedException();
+        InsertionSortFlags(ref moves, startIndex);
+        int promo = moves.TakeWhile(t => t.IsPromotion).Count();
+        int noisy = moves.TakeWhile(t => t.IsCapture || t.IsPromotion).Count();
+        InsertionSortBy(ref moves, promo, noisy, (lhs, rhs) =>
+        {
+            int mvv = CmpMVV(position, lhs, rhs);
+            if (mvv != 0)
+            {
+                return mvv > 0;
+            }
+            else
+            {
+                return CmpLVA(position, lhs, rhs);
+            }
+        });
+        return noisy;
     }
 
-    public static uint OrderQuietMoves(ref Move[] moves, int startIndex, KillerTable kt, HistoryTable history)
+    public static int OrderQuietMoves(ref Move[] moves, int startIndex, KillerTable kt, HistoryTable history)
     {
-        throw new NotImplementedException();
+        int len = moves.Length - startIndex;
+        foreach (Move move in kt.data)
+        {
+            if (move.IsNull)
+            {
+                break;
+            }
+            int index = moves.TakeWhile(t => t != move).Count();
+            if (index >= startIndex && index < moves.Length)
+            {
+                Move temp = moves[0 + startIndex];
+                moves[0 + startIndex] = moves[index];
+                moves[index] = temp;
+                startIndex++;
+            }
+        }
+        InsertionSortBy(ref moves, startIndex, moves.Length, (lhs, rhs) => history.Get(lhs) < history.Get(rhs));
+        return len;
     }
 
     public static void InsertionSortBy(ref Move[] moves, int startIndex, int endIndex, Func<Move, Move, bool> cmp)
     {
-        throw new NotImplementedException();
+        for (int i = startIndex + 1; i < endIndex; i++)
+        {
+            Move move = moves[i];
+            int j = i;
+            while (j > 0)
+            {
+                if (cmp(moves[j - 1], move))
+                {
+                    moves[j] = moves[j - 1];
+                }
+                else
+                {
+                    break;
+                }
+                j--;
+            }
+            moves[j] = move;
+        }
     }
 
     public static void InsertionSortFlags(ref Move[] moves, int startIndex)
@@ -114,11 +158,11 @@ static class MoveOrder
         }
         else if (lhs_v < rhs_v)
         {
-            return -1;
+            return 1;
         }
         else
         {
-            return 1;
+            return -1;
         }
     }
 
