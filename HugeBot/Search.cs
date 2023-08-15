@@ -17,8 +17,7 @@ public static class Search {
 
     private static int searchCallIndex = 0;
 
-    //This is for delta pruning
-    private static readonly int[] PieceValues = {256, 832, 832, 1344, 2496};
+    private static readonly int[] DeltaPruningPieceValues = { 256, 832, 832, 1344, 2496 };
 
     public static void Reset() {
         //Initialize the move buffers
@@ -178,14 +177,13 @@ public static class Search {
 
             //Do delta pruning
             if(doFutilityPruning && depth <= 0) {
+                const int DeltaPruningBaseBonus = 224, DeltaPruningImprovingBonus = 64;
                 //Get piece values for captures and promotions (if applicable)
-                int capture = move.IsCapture ? PieceValues[(int)move.CapturePieceType] : 0;
-                int promotion = move.IsPromotion ? PieceValues[(int)move.PromotionPieceType] : 0;
+                int capture = move.IsCapture ? DeltaPruningPieceValues[(int) (move.CapturePieceType - 1)] : 0;
+                int promotion = move.IsPromotion ? DeltaPruningPieceValues[(int) (move.PromotionPieceType - 1)] : 0;
 
                 //Ignore move if this new eval is below or equal to alpha
-                if (staticEval + capture + promotion + 224 + (improving ? 64 : 0) <= alpha) {
-                    continue;
-                }
+                if(staticEval + capture + promotion + DeltaPruningBaseBonus + (improving ? DeltaPruningImprovingBonus : 0) <= alpha) continue;
             }
 
             //Temporarily make the move to evaluate it
