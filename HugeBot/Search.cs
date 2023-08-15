@@ -49,7 +49,7 @@ public static class Search {
 
             //Use alpha-beta pruning to evaluate the move
             board.MakeMove(move);
-            int moveEval = -AlphaBeta(board, 3, MinEval, -bestEval, 1);
+            int moveEval = -AlphaBeta(board, 4, MinEval, -bestEval, 1);
             board.UndoMove(move);
 
             //Check if this move is better
@@ -87,7 +87,27 @@ public static class Search {
 
         bool improving = plyIdx >= 2 && staticEval > plyStaticEvals[plyIdx-2];
 
-        //TODO: Null move pruning
+        //Null move pruning
+        if (beta - alpha == 1 && !board.IsInCheck() && staticEval >= beta) {
+            //Static null move pruning
+            if (depth <= 5) {
+                int margin = depth * 256;
+                if (staticEval >= beta + margin) {
+                    return beta;
+                }
+            }
+
+            //Non-static null move pruning
+            if (depth >= 3) {
+                int r = 2 + (depth - 2) / 4;
+                board.TrySkipTurn();
+                int eval = -AlphaBeta(board, depth - r - 2 + (improving ? 1 : 0), -beta, -beta + 1, plyIdx + 1);
+                board.UndoSkipTurn();
+                if (eval >= beta) {
+                    return eval;
+                }
+            }
+        }
 
         //Order noisy moves
         numOrderedMoves += MoveOrder.OrderNoisyMoves(moves[numOrderedMoves..]);
