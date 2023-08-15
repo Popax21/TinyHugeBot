@@ -2,6 +2,7 @@
 using System;
 
 using System.Linq;
+using System.Xml;
 
 namespace HugeBot;
 
@@ -26,7 +27,7 @@ static class Search
         foreach(Move move in board.GetLegalMoves()) {
             //Use alpha-beta pruning to evaluate the move
             board.MakeMove(move);
-            int moveEval = -AlphaBeta(board, 3, int.MinValue, int.MaxValue, 0);
+            int moveEval = -AlphaBeta(board, 4, int.MinValue, int.MaxValue, 0);
             board.UndoMove(move);
 
             //Check if this move is better
@@ -38,6 +39,13 @@ static class Search
 
     public static int AlphaBeta(Board board, uint depth, int alpha, int beta, int plyIndex)
     {
+        //Check for checkmate or draw
+        if (board.IsInCheckmate()) return int.MinValue;
+        if (board.IsInStalemate() || board.IsFiftyMoveDraw()) return 0;
+
+        //Check for draw
+        if (board.IsDraw()) return 0;
+
         //Search one move more if we're in check
         if (board.IsInCheck()) depth++;
 
