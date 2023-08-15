@@ -1,81 +1,55 @@
 ﻿using ChessChallenge.API;
 using System;
-using System.Collections.Generic;
-using System.ComponentModel.Design;
-using System.Linq;
-using System.Runtime.InteropServices;
 
 namespace HugeBot;
 
-static class Search
-{
+public static class Search {
+    //Use these to prevent integer overlow
+    public const int MinEval = -int.MaxValue, MaxEval = +int.MaxValue;
+
     // TODO: history
-    public static Move SearchMoves(Board board)
-    {
+    public static Move SearchMoves(Board board) {
         // TODO: dynamic depth and timer
-        (Move, int)? best = null;
-        foreach (Move move in board.GetLegalMoves())
-        {
+        Move bestMove = Move.NullMove;
+        int bestEval = MinEval;
+
+        foreach(Move move in board.GetLegalMoves()) {
+            //Use alpha-beta pruning to evaluate the move
             board.MakeMove(move);
-            (Move, int) found = (move, AlphaBeta(board, 3, Eval.MinEval, Eval.MaxEval)); // setting depth to 5 just for testing
+            int moveEval = -AlphaBeta(board, 3, MinEval, MaxEval);
             board.UndoMove(move);
-            if (best == null || (board.IsWhiteToMove && best?.Item2 < found.Item2) || (!board.IsWhiteToMove && best?.Item2 > found.Item2)) {
-                best = found;
-            }
+
+            //Check if this move is better
+            if(bestEval < moveEval) (bestMove, bestEval) = (move, moveEval);
         }
-        return (Move)best?.Item1;
+
+        return bestMove;
     }
 
-    public static int AlphaBeta(Board board, uint depth, int alpha, int beta)
-    {
-        bool turn = board.IsWhiteToMove;
-        if (board.IsInCheckmate())
-        {
-            return turn ? Eval.MinEval : Eval.MaxEval;
+    public static int AlphaBeta(Board board, uint depth, int alpha, int beta) {
+        //Check if we're in checkmate / stalemate / 50 move role
+        if(board.IsInCheckmate()) return MinEval;
+        if(board.IsInStalemate() || board.IsFiftyMoveDraw()) return 0;
+
+        //Search one move more if we're in check
+        if(board.IsInCheck()) depth++;
+
+        //Check if we reached the bottom of our search
+        if(depth == 0) return Evaluator.Evaluate(board);
+
+        //Search moves we could make from here
+        int maxEval = int.MinValue;
+        foreach(Move move in board.GetLegalMoves()) {
+            //Evaluate the move recursively
+            board.MakeMove(move);
+            int moveEval = -AlphaBeta(board, depth - 1, -beta, -alpha);
+            board.UndoMove(move);
+
+            //Update search variables
+            maxEval = Math.Max(maxEval, moveEval);
+            alpha = Math.Max(alpha, moveEval);
+            if(moveEval >= beta) break;
         }
-        else if (depth == 0)
-        {
-            return Evaluator.Evaluate(board);
-        }
-        else if (board.IsInStalemate() || board.IsDraw())
-        {
-            return 0;
-        }
-        if (board.IsInCheck())
-        {
-            depth++;
-        }
-        if (turn)
-        {
-            int value = Eval.MinEval;
-            foreach (Move move in board.GetLegalMoves())
-            {
-                board.MakeMove(move);
-                value = Math.Max(value, AlphaBeta(board, depth - 1, alpha, beta));
-                board.UndoMove(move);
-                alpha = Math.Max(alpha, value);
-                if (value >= beta)
-                {
-                    break;
-                }
-            }
-            return value;
-        }
-        else
-        {
-            int value = Eval.MaxEval;
-            foreach (Move move in board.GetLegalMoves())
-            {
-                board.MakeMove(move);
-                value = Math.Min(value, AlphaBeta(board, depth - 1, alpha, beta));
-                board.UndoMove(move);
-                beta = Math.Min(beta, value);
-                if (value <= alpha)
-                {
-                    break;
-                }
-            }
-            return value;
-        }
+        return maxEval;
     }
 }
