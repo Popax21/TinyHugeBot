@@ -122,6 +122,9 @@ public static class Search {
         //By now we will have ordered all non-quiet moves
         int firstQuietMoveIdx = numOrderedMoves;
 
+        //Flag for PVS
+        bool firstEval = true;
+
         //Search moves we could make from here
         int bestEval = depth <= 0 ? staticEval : MinEval;
         if(bestEval >= beta) return bestEval;
@@ -146,8 +149,8 @@ public static class Search {
             //Delta pruning
             if (fPrune && depth <= 0) {
                 //Get piece values for captures and promotions (if applicable)
-                int capture = move.IsCapture ? PieceValues[(int)move.CapturePieceType] : 0;
-                int promotion = move.IsPromotion ? PieceValues[(int)move.PromotionPieceType] : 0;
+                int capture = move.IsCapture ? PieceValues[(int)move.CapturePieceType - 1] : 0;
+                int promotion = move.IsPromotion ? PieceValues[(int)move.PromotionPieceType - 1] : 0;
 
                 //Ignore move if this new eval is below or equal to alpha
                 if (staticEval + capture + promotion + 224 + (improving ? 64 : 0) <= alpha) {
@@ -155,6 +158,8 @@ public static class Search {
                 }
             }
 
+            //Store the current state of check for PVS
+            bool inCheck = board.IsInCheck();
 
             //Temporarily make a move
             board.MakeMove(move);
@@ -165,10 +170,39 @@ public static class Search {
                 continue;
             }
 
-            //TODO: PVS
+            //Evaluate the move recursively with PVS
+            int moveEval;
+            if (firstEval || depth <= 0) {
+                moveEval = -AlphaBeta(board, depth - 1, -beta, -alpha, plyIdx + 1);
+            } else {
+                int lmrDepth;
+                if (depth >= 3 && i >= 3 && beta - alpha == 1 && !move.IsCapture && !move.IsPromotion && !inCheck && !board.IsInCheck()) {
+                    lmrDepth = depth - (2 * depth + i) / 8 - 1 + (improving ? 1 : 0);
+                    if (lmrDepth < 1) {
+                        //History leaf pruning
+                        long[] history = board.IsWhiteToMove ? blackHistoryTable : whiteHistoryTable;
+                        if (HistoryTable.Get(history, move) < 0) {
+                            board.UndoMove(move);
+                            continue;
+                        }
 
-            //Evaluate the move recursively
-            int moveEval = -AlphaBeta(board, depth-1, -beta, -alpha, plyIdx+1);
+                        //Set lmrDepth to minimum
+                        lmrDepth = 1;
+                    }
+                } else {
+                    lmrDepth = depth - 1;
+                }
+                //Search using lmr
+                moveEval = -AlphaBeta(board, lmrDepth, -alpha - 1, -alpha, plyIdx + 1);
+
+                //Re-search the moves normally if necessary
+                if (moveEval > alpha && (moveEval < beta || lmrDepth != depth - 1)) {
+                    moveEval = -AlphaBeta(board, depth - 1, -beta, -alpha, plyIdx + 1);
+                }
+            }
+            firstEval = false;
+
+            //Undo our temporary move
             board.UndoMove(move);
 
             //Update search variables
