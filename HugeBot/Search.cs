@@ -143,7 +143,7 @@ public static class Search {
                 if(!move.IsCapture && !move.IsPromotion) throw new Exception("Encountered quiet move at depth 0!");
             }
 
-            //TODO: Delta pruning
+            //Delta pruning
             if (fPrune && depth <= 0) {
                 //Get piece values for captures and promotions (if applicable)
                 int capture = move.IsCapture ? PieceValues[(int)move.CapturePieceType] : 0;
