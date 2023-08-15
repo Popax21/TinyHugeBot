@@ -73,7 +73,7 @@ public static class Search {
                 moveEvalBuf[i] = moveEval.Value;
 
                 //Update the best move
-                if(bestEval < moveEval) (bestMove, bestEval) = (move, moveEval.Value);
+                if(bestMove.IsNull || bestEval < moveEval) (bestMove, bestEval) = (move, moveEval.Value);
 
                 //Check if we have a forced mate
                 if(bestEval == MaxEval) goto EndSearch;
