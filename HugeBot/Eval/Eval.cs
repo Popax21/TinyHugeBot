@@ -50,8 +50,8 @@ public static partial class Evaluator {
 
         eval += EvalPieceSquareTable(whitePieces, 0b0000);
         eval -= EvalPieceSquareTable(blackPieces, 0b1100);
-        eval += EvalMobility(whitePieces, board.AllPiecesBitboard, All);
-        eval -= EvalMobility(blackPieces, board.AllPiecesBitboard, All);
+        eval += EvalMobility(whitePieces, ~board.AllPiecesBitboard, ~board.WhitePiecesBitboard);
+        eval -= EvalMobility(blackPieces, ~board.AllPiecesBitboard, ~board.BlackPiecesBitboard);
         eval += EvalPawnStructure(whitePieces[0]);
         eval -= EvalPawnStructure(blackPieces[0]);
         eval += EvalWhitePassedPawns(whitePieces[0], blackPieces[0]);
