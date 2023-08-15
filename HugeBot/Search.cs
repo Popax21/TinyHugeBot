@@ -154,14 +154,12 @@ public static class Search {
         bool doFutilityPruning = depth <= 5 && !board.IsInCheck() && !isPVNode;
         doFutilityPruning &= staticEval + Math.Max(1, depth + (improving ? 1 : 0)) * FutilityPruningMarging <= alpha;
 
-        //Flag for PVS
-        bool firstEval = true;
-
         //Search moves we could make from here
         int bestEval = depth <= 0 ? staticEval : MinEval;
         if(bestEval >= beta) return bestEval;
         if(bestEval > alpha) alpha = bestEval;
 
+        bool hasEvaluatedAMove = false;
         for(int i = 0; i < moves.Length; i++) {
             //Check if we've entered the unordered moves
             if(i >= numOrderedMoves) {
@@ -172,11 +170,10 @@ public static class Search {
             }
 
             Move move = moves[i];
+            bool isNoisyMove = move.IsCapture || move.IsPromotion;
 
             //We only consider captures or promotions as our last moves
-            if(depth <= 0) {
-                if(!move.IsCapture && !move.IsPromotion) throw new Exception("Encountered quiet move at depth 0!");
-            }
+            if(depth <= 0 && !isNoisyMove) throw new Exception("Encountered quiet move at depth 0!");
 
             //Do delta pruning
             if(doFutilityPruning && depth <= 0) {
@@ -189,59 +186,64 @@ public static class Search {
                 if(staticEval + capture + promotion + DeltaPruningBaseBonus + (improving ? DeltaPruningImprovingBonus : 0) <= alpha) continue;
             }
 
-            //Store the current state of check for PVS
-            bool inCheck = board.IsInCheck();
-
-            //Temporarily make a move
+            //Temporarily make the move to evaluate it
+            bool wasInCheck = board.IsInCheck();
             board.MakeMove(move);
 
-            //Eliminate futile moves that dont check and arent noisy
-            if (doFutilityPruning && !board.IsInCheck() && !move.IsCapture && !move.IsPromotion) {
+            //Eliminate futile moves that don't check and aren't noisy
+            if(doFutilityPruning && !board.IsInCheck() && !isNoisyMove) {
                 board.UndoMove(move);
                 continue;
             }
 
-            //Evaluate the move recursively with PVS
-            int? moveEval;
-            if (firstEval || depth <= 0) {
-                moveEval = -AlphaBeta(board, depth - 1, -beta, -alpha, plyIdx + 1, timer, maxSearchTime);
-            } else {
-                int lmrDepth;
-                if (depth >= 3 && i >= 3 && beta - alpha == 1 && !move.IsCapture && !move.IsPromotion && !inCheck && !board.IsInCheck()) {
-                    lmrDepth = depth - (2 * depth + i) / 8 - 1 + (improving ? 1 : 0);
-                    if (lmrDepth < 1) {
+            //Use PVS (Principal Variation Search) if possible
+            int moveEval;
+            if(depth > 0 && hasEvaluatedAMove) {
+                //Determine the LMR (Late Move Reduction) depth
+                int lmrDepth = depth - 1;
+                if(depth >= 3 && i >= 3 && !isPVNode && !isNoisyMove && !wasInCheck && !board.IsInCheck()) {
+                    lmrDepth = depth - (2 * depth + i) / 8 - (improving ? 0 : 1);
+                    if(lmrDepth < 1) {
+                        lmrDepth = 1;
+
                         //History leaf pruning
-                        long[] history = board.IsWhiteToMove ? blackHistoryTable : whiteHistoryTable;
-                        if (HistoryTable.Get(history, move) < 0) {
+                        if(HistoryTable.Get(board.IsWhiteToMove ? blackHistoryTable : whiteHistoryTable, move) < 0) {
                             board.UndoMove(move);
                             continue;
-                        }
-
-                        //Set lmrDepth to minimum
-                        lmrDepth = 1;
+                        }                        
                     }
-                } else {
-                    lmrDepth = depth - 1;
                 }
-                //Search using lmr
-                moveEval = -AlphaBeta(board, lmrDepth, -alpha - 1, -alpha, plyIdx + 1, timer, maxSearchTime);
 
-                //Re-search the moves normally if necessary
-                if (moveEval > alpha && (moveEval < beta || lmrDepth != depth - 1)) {
-                    moveEval = -AlphaBeta(board, depth - 1, -beta, -alpha, plyIdx + 1, timer, maxSearchTime);
+                //Do the LMR search
+                int? eval = -AlphaBeta(board, lmrDepth, -alpha - 1, -alpha, plyIdx+1, timer, maxSearchTime);
+
+                if(eval.HasValue && eval > alpha && (eval < beta || lmrDepth != depth-1)) {
+                    //Re-search using regular alpha-beta pruning
+                    eval = -AlphaBeta(board, depth-1, -beta, -alpha, plyIdx+1, timer, maxSearchTime);
                 }
+
+                if(!eval.HasValue) {
+                    board.UndoMove(move);
+                    return null;
+                }
+                moveEval = eval.Value;
+            } else {
+                //Fall back to simple alpha-beta pruning
+                int? eval = -AlphaBeta(board, depth-1, -beta, -alpha, plyIdx+1, timer, maxSearchTime);
+                if(!eval.HasValue) {
+                    board.UndoMove(move);
+                    return null;
+                }
+                moveEval = eval.Value;
             }
-            firstEval = false;
-
-            //This means we ran out of time during searching
-            if (moveEval == null) return null;
 
             //Undo our temporary move
             board.UndoMove(move);
 
             //Update search variables
-            bestEval = Math.Max(bestEval, (int)moveEval);
-            alpha = Math.Max(alpha, (int)moveEval);
+            bestEval = Math.Max(bestEval, moveEval);
+            alpha = Math.Max(alpha, moveEval);
+            hasEvaluatedAMove = true;
 
             if(moveEval >= beta) {
                 //Update the history and killer tables if this was a quiet move
