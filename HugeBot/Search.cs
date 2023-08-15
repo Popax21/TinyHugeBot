@@ -5,7 +5,7 @@ namespace HugeBot;
 
 public static class Search {
     //Use these to prevent integer overlow
-    public const int MinEval = -int.MaxValue, MaxEval = +int.MaxValue;
+    public const int MinEval = -2000000, MaxEval = +2000000;
 
     public const int MaxPly = 6144, MoveBufSize = 256;
 
