@@ -7,7 +7,7 @@ using System.Runtime.InteropServices;
 
 namespace HugeBot;
 
-class Search
+static class Search
 {
     // TODO: history
     public static Move SearchMoves(Board board)
