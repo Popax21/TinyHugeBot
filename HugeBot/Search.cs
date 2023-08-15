@@ -1,8 +1,6 @@
 ﻿using ChessChallenge.API;
 using System;
 
-using System.Linq;
-
 namespace HugeBot;
 
 public static class Search {
@@ -11,10 +9,13 @@ public static class Search {
 
     public const int MaxPly = 6144, MoveBufSize = 256;
 
+    private static readonly int[] moveEvalBuf = new int[MoveBufSize];
     private static readonly Move[][] moveBufs = new Move[MaxPly][];
     private static readonly int[] plyStaticEvals = new int[MaxPly];
     private static readonly long[] whiteHistoryTable = new long[HistoryTable.TableSize], blackHistoryTable = new long[HistoryTable.TableSize];
     private static readonly Move[][] killerTables = new Move[MaxPly][];
+
+    private static int searchCallIndex = 0;
 
     public static void Reset() {
         //Initialize the move buffers
@@ -33,35 +34,68 @@ public static class Search {
         Array.ForEach(killerTables, KillerTable.Reset);
     }
 
-    public static Move SearchMoves(Board board) {
+    public static Move SearchMoves(Board board, Timer timer) {
+        //Determine the amount of time to search for
+        int minSearchTime = timer.MillisecondsRemaining / 80;
+        int maxSearchTime = 2*minSearchTime + timer.IncrementMilliseconds / 2;
+
         //Determine the initial ply static evaluation
         plyStaticEvals[0] = Evaluator.Evaluate(board);
 
-        //Generate all legal moves and pick the best one
-        //TODO: Iterative deepening
+        //Generate all legal moves
         Span<Move> moves = moveBufs[0];
         board.GetLegalMovesNonAlloc(ref moves);
 
-        Move bestMove = Move.NullMove;
-        int bestEval = MinEval;
-        for(int i = 0; i < moves.Length; i++) {
-            Move move = moves[i];
+        //Iteratively search to deeper depths for the best move
+        for(int depth = 0;; depth++) {
+            Move bestMove = Move.NullMove;
+            int bestEval = MinEval;
+            for(int i = 0; i < moves.Length; i++) {
+                Move move = moves[i];
 
-            //Use alpha-beta pruning to evaluate the move
-            board.MakeMove(move);
-            int moveEval = -AlphaBeta(board, 3, MinEval, -bestEval, 1);
-            board.UndoMove(move);
+                //Use alpha-beta pruning to evaluate the move
+                board.MakeMove(move);
+                int? moveEval = -AlphaBeta(board, depth, MinEval, -bestEval, 1, timer, depth > 0 ? maxSearchTime : int.MaxValue);
+                board.UndoMove(move);
 
-            //Check if this move is better
-            if(bestMove.IsNull || bestEval < moveEval) (bestMove, bestEval) = (move, moveEval);
+                //Check if we ran out of time
+                if(!moveEval.HasValue) {
+                    if(i == 0) {
+                        //Get the best move from the previous depth search
+                        bestMove = move;
+                        bestEval = moveEvalBuf[0];
+                    }
+                    goto EndSearch;
+                }
+
+                moveEvalBuf[i] = moveEval.Value;
+
+                //Update the best move
+                if(bestEval < moveEval) (bestMove, bestEval) = (move, moveEval.Value);
+
+                //Check if we have a forced mate
+                if(bestEval == MaxEval) goto EndSearch;
+            }
+
+            //Check if we ran out of time
+            if(timer.MillisecondsElapsedThisTurn < minSearchTime) {
+                //Sort the moves by their evaluation
+                moveEvalBuf.AsSpan(0, moves.Length).Sort(moves, static (a, b) => -a.CompareTo(b));
+                continue;
+            }
+
+            EndSearch:;
+            Console.Write($"Searched to depth {depth} in {timer.MillisecondsElapsedThisTurn:d4}ms, best move eval: {bestEval}");
+            if(bestEval == MaxEval) Console.Write($" (forced mate in approx. {1 + (depth+1)/2})");
+            Console.WriteLine();
+            return bestMove;
         }
-
-        return bestMove;
     }
 
-    public static int AlphaBeta(Board board, int depth, int alpha, int beta, int plyIdx) {
-        //TODO: Adaptive stop check
-        //TODO: Repetition check
+    public static int? AlphaBeta(Board board, int depth, int alpha, int beta, int plyIdx, Timer timer, int maxSearchTime) {
+        //Check if we ran out of time
+        if(searchCallIndex % 4096 == 0 && timer.MillisecondsElapsedThisTurn >= maxSearchTime) return null;
+        searchCallIndex++;
 
         //Check if we're in checkmate or have drawn
         if(board.IsInCheckmate()) return MinEval;
@@ -123,12 +157,14 @@ public static class Search {
 
             //Evaluate the move recursively
             board.MakeMove(move);
-            int moveEval = -AlphaBeta(board, depth-1, -beta, -alpha, plyIdx+1);
+            int? moveEval = -AlphaBeta(board, depth-1, -beta, -alpha, plyIdx+1, timer, maxSearchTime);
             board.UndoMove(move);
 
+            if(!moveEval.HasValue) return null;
+
             //Update search variables
-            bestEval = Math.Max(bestEval, moveEval);
-            alpha = Math.Max(alpha, moveEval);
+            bestEval = Math.Max(bestEval, moveEval.Value);
+            alpha = Math.Max(alpha, moveEval.Value);
 
             if(moveEval >= beta) {
                 //Update the history and killer tables if this was a quiet move
