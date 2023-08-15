@@ -155,10 +155,19 @@ public static class Search {
                 }
             }
 
+
+            //Temporarily make a move
+            board.MakeMove(move);
+
+            //Eliminate futile moves that dont check
+            if (fPrune && !board.IsInCheck() && !move.IsCapture && !move.IsPromotion) {
+                board.UndoMove(move);
+                continue;
+            }
+
             //TODO: PVS
 
             //Evaluate the move recursively
-            board.MakeMove(move);
             int moveEval = -AlphaBeta(board, depth-1, -beta, -alpha, plyIdx+1);
             board.UndoMove(move);
 
