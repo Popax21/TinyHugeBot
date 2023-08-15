@@ -94,7 +94,7 @@ if(!DEBUG) {
 
         if(type == botType || (type.Namespace?.Value?.StartsWith("HugeBot") ?? false)) {
             // Merge static types (there's no concept of "static classes" at the IL level, so we have to cheat a bit)
-            if (type.IsSealed) {
+            if (type.IsAbstract && type.IsSealed) {
                 if (staticType != null) {
                     // Merge the types by transfering over fields, methods and properties
                     foreach(FieldDefinition field in type.Fields) staticType.Fields.Add(field);
@@ -110,7 +110,7 @@ if(!DEBUG) {
         }
 
         // Remove the type if we don't need it
-        if(!keepType) botMod.TopLevelTypes.Remove(type);
+        if(!keepType && type.ToString() != "<PrivateImplementationDetails>") botMod.TopLevelTypes.Remove(type);
     }
 
     if(staticType != null) TinyfyType(staticType, ref nextName);
