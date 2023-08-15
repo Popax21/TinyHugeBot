@@ -5,11 +5,9 @@
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
     <Nullable>enable</Nullable>
-    <Configuration>Release</Configuration>
   </PropertyGroup>
   
   <Target Name="CopyDLL" AfterTargets="Build">
-    <Error Text="Must be built in release configuration!" Condition="'$(Configuration)' != 'Release'" />
     <Copy SourceFiles="$(OutDir)\$(AssemblyName).dll" DestinationFiles="..\HugeBot.dll" />
   </Target>
 </Project>

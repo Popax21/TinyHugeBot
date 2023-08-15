@@ -88,8 +88,10 @@ public class Searcher {
 
             EndSearch:;
 
+#if DEBUG
             //Some stats, having these lines takes up ~400 bytes though
             Console.WriteLine($"Searched to depth {depth} in {timer.MillisecondsElapsedThisTurn:d4}ms, best move eval: {bestEval}");
+#endif
 
             return bestMove;
         }
@@ -206,8 +208,10 @@ public class Searcher {
             Move move = moves[i];
             bool isNoisyMove = move.IsCapture || move.IsPromotion;
 
-            //DEBUG - We only consider captures or promotions as our last moves
+#if DEBUG
+            //We only consider captures or promotions as our last moves
             if(depth <= 0 && !isNoisyMove) throw new Exception("Encountered quiet move at depth 0!");
+#endif
 
             //Do delta pruning
             if(doFutilityPruning && depth <= 0) {
