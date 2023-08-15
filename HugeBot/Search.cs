@@ -4,8 +4,65 @@ using System.Collections.Generic;
 using System.ComponentModel.Design;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace HugeBot;
+
+// ported from STRO4K (https://github.com/ONE-RANDOM-HUMAN/STRO4K/tree/master)
+struct KillerTable
+{
+    public Move[] data;
+
+    public KillerTable()
+    {
+        data = new Move[] {Move.NullMove, Move.NullMove};
+    }
+
+    public void BetaCutoff(Move move)
+    {
+        data[1] = data[0];
+        data[0] = move;
+    }
+}
+
+struct PlyData
+{
+    public KillerTable kt;
+    public int staticEval;
+
+    public PlyData()
+    {
+        kt = new KillerTable();
+        staticEval = 0;
+    }
+}
+
+struct HistoryTable
+{
+    public long[] data;
+
+    public HistoryTable()
+    {
+        data = new long[4096];
+    }
+
+    public void Reset()
+    {
+        data = new long[4096];
+    }
+
+    public void BetaCutoff(Move move, long depth)
+    {
+        int index = (move.StartSquare.Index << 6) | move.TargetSquare.Index;
+        data[index] += depth * depth;
+    }
+
+    public void FailedCutoff(Move move, long depth)
+    {
+        int index = (move.StartSquare.Index << 6) | move.TargetSquare.Index;
+        data[index] -= depth;
+    }
+}
 
 static class Search
 {
