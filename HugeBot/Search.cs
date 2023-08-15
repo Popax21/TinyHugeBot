@@ -17,6 +17,9 @@ public static class Search {
 
     private static int searchCallIndex = 0;
 
+    //This is for delta pruning
+    private static readonly int[] PieceValues = {256, 832, 832, 1344, 2496};
+
     public static void Reset() {
         //Initialize the move buffers
         if(moveBufs[0] == null) {
@@ -121,12 +124,34 @@ public static class Search {
 
         bool improving = plyIdx >= 2 && staticEval > plyStaticEvals[plyIdx-2];
 
-        //TODO: Null move pruning
+        //Null move pruning
+        if (depth > 0 && beta - alpha == 1 && !board.IsInCheck() && staticEval >= beta) {
+            //Static null move pruning
+            if (depth <= 5) {
+                int margin = depth * 256;
+                if (staticEval >= beta + margin) {
+                    return beta;
+                }
+            }
+
+            //Non-static null move pruning
+            if (depth >= 3) {
+                int r = 2 + (depth - 2) / 4;
+                board.TrySkipTurn();
+                int eval = -AlphaBeta(board, depth - r - 2 + (improving ? 1 : 0), -beta, -beta + 1, plyIdx + 1);
+                board.UndoSkipTurn();
+                if (eval >= beta) {
+                    return eval;
+                }
+            }
+        }
 
         //Order noisy moves
         numOrderedMoves += MoveOrder.OrderNoisyMoves(moves[numOrderedMoves..]);
 
-        //TODO: Futility pruning
+        //Futility pruning
+        bool fPrune = depth <= 5 && !board.IsInCheck() && beta - alpha == 1
+            && staticEval + Math.Max(1, depth + (improving ? 1 : 0)) * 256 <= alpha;
 
         //By now we will have ordered all non-quiet moves
         int firstQuietMoveIdx = numOrderedMoves;
@@ -152,7 +177,28 @@ public static class Search {
                 if(!move.IsCapture && !move.IsPromotion) throw new Exception("Encountered quiet move at depth 0!");
             }
 
-            //TODO: Delta pruning
+            //Delta pruning
+            if (fPrune && depth <= 0) {
+                //Get piece values for captures and promotions (if applicable)
+                int capture = move.IsCapture ? PieceValues[(int)move.CapturePieceType] : 0;
+                int promotion = move.IsPromotion ? PieceValues[(int)move.PromotionPieceType] : 0;
+
+                //Ignore move if this new eval is below or equal to alpha
+                if (staticEval + capture + promotion + 224 + (improving ? 64 : 0) <= alpha) {
+                    continue;
+                }
+            }
+
+
+            //Temporarily make a move
+            board.MakeMove(move);
+
+            //Eliminate futile moves that dont check and arent noisy
+            if (fPrune && !board.IsInCheck() && !move.IsCapture && !move.IsPromotion) {
+                board.UndoMove(move);
+                continue;
+            }
+
             //TODO: PVS
 
             //Evaluate the move recursively
