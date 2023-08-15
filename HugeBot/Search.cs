@@ -16,6 +16,9 @@ public static class Search {
     private static readonly long[] whiteHistoryTable = new long[HistoryTable.TableSize], blackHistoryTable = new long[HistoryTable.TableSize];
     private static readonly Move[][] killerTables = new Move[MaxPly][];
 
+    //This is for delta pruning
+    private static readonly int[] PieceValues = {256, 832, 832, 1344, 2496};
+
     public static void Reset() {
         //Initialize the move buffers
         if(moveBufs[0] == null) {
@@ -142,7 +145,16 @@ public static class Search {
 
             //TODO: Delta pruning
             if (fPrune && depth <= 0) {
+                //Get piece values for captures and promotions (if applicable)
+                int capture = move.IsCapture ? PieceValues[(int)move.CapturePieceType] : 0;
+                int promotion = move.IsPromotion ? PieceValues[(int)move.PromotionPieceType] : 0;
+
+                //Ignore move if this new eval is below or equal to alpha
+                if (staticEval + capture + promotion + 224 + (improving ? 64 : 0) <= alpha) {
+                    continue;
+                }
             }
+
             //TODO: PVS
 
             //Evaluate the move recursively
