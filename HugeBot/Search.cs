@@ -87,9 +87,12 @@ public static class Search {
             }
 
             EndSearch:;
+
+            //Some stats, having these lines takes up ~400 bytes though. Make sure to comment these out!
             Console.Write($"Searched to depth {depth} in {timer.MillisecondsElapsedThisTurn:d4}ms, best move eval: {bestEval}");
             if(bestEval == MaxEval) Console.Write($" (forced mate in approx. {1 + depth/2} turns)");
             Console.WriteLine();
+
             return bestMove;
         }
     }
@@ -233,11 +236,11 @@ public static class Search {
             }
             firstEval = false;
 
-            //This means we ran out of time during searching
-            if (moveEval == null) return null;
-
             //Undo our temporary move
             board.UndoMove(move);
+
+            //This means we ran out of time during searching
+            if (moveEval == null) return null;
 
             //Update search variables
             bestEval = Math.Max(bestEval, (int)moveEval);
