@@ -1,5 +1,6 @@
 ﻿using ChessChallenge.API;
 using System;
+
 using System.Linq;
 
 namespace HugeBot;
@@ -8,24 +9,47 @@ public static class Search {
     //Use these to prevent integer overlow
     public const int MinEval = -int.MaxValue, MaxEval = +int.MaxValue;
 
-    //Default values shouldnt exist once we are called reset at the start of each match
-    public static KillerTable[] ply = Enumerable.Repeat<KillerTable>(new KillerTable(), 6144).ToArray();
-    public static HistoryTable[] history = Enumerable.Repeat<HistoryTable>(new HistoryTable(), 2).ToArray();
+    public const int MaxPly = 6144, MoveBufSize = 256;
+
+    private static readonly Move[][] moveBufs = new Move[MaxPly][];
+    private static readonly int[] plyStaticEvals = new int[MaxPly];
+    private static readonly long[] whiteHistoryTable = new long[HistoryTable.TableSize], blackHistoryTable = new long[HistoryTable.TableSize];
+    private static readonly Move[][] killerTables = new Move[MaxPly][];
 
     public static void Reset() {
-        ply = new KillerTable[6144];
-        history = new HistoryTable[2];
+        //Initialize the move buffers
+        if(moveBufs[0] == null) {
+            for(int i = 0; i < MaxPly; i++) moveBufs[i] = new Move[MoveBufSize];
+        }
+
+        //Reset the history tables
+        HistoryTable.Reset(whiteHistoryTable);
+        HistoryTable.Reset(blackHistoryTable);
+
+        //Reset the killer tables
+        if(killerTables[0] == null) {
+            for(int i = 0; i < MaxPly; i++) killerTables[i] = new Move[KillerTable.TableSize];
+        }
+        Array.ForEach(killerTables, KillerTable.Reset);
     }
 
     public static Move SearchMoves(Board board) {
-        // TODO: dynamic depth and timer
-        Move bestMove = Move.NullMove;
-        int bestEval = int.MinValue;
+        //Determine the initial ply static evaluation
+        plyStaticEvals[0] = Evaluator.Evaluate(board);
 
-        foreach(Move move in board.GetLegalMoves()) {
+        //Generate all legal moves and pick the best one
+        //TODO: Iterative deepening
+        Span<Move> moves = moveBufs[0];
+        board.GetLegalMovesNonAlloc(ref moves);
+
+        Move bestMove = Move.NullMove;
+        int bestEval = MinEval;
+        for(int i = 0; i < moves.Length; i++) {
+            Move move = moves[i];
+
             //Use alpha-beta pruning to evaluate the move
             board.MakeMove(move);
-            int moveEval = -AlphaBeta(board, 4, int.MinValue, int.MaxValue, 0);
+            int moveEval = -AlphaBeta(board, 3, MinEval, -bestEval, 1);
             board.UndoMove(move);
 
             //Check if this move is better
@@ -35,7 +59,10 @@ public static class Search {
         return bestMove;
     }
 
-    public static int AlphaBeta(Board board, uint depth, int alpha, int beta, int plyIndex) {
+    public static int AlphaBeta(Board board, int depth, int alpha, int beta, int plyIdx) {
+        //TODO: Adaptive stop check
+        //TODO: Repetition check
+
         //Check if we're in checkmate or have drawn
         if(board.IsInCheckmate()) return MinEval;
         if(board.IsDraw()) return 0;
@@ -46,35 +73,77 @@ public static class Search {
         //Check if we reached the bottom of our search
         if(depth == 0) return Evaluator.Evaluate(board);
 
+        //Generate the legal moves we can make
+        Span<Move> moves = moveBufs[plyIdx];
+        board.GetLegalMovesNonAlloc(ref moves);
+        
+        int numOrderedMoves = 0;
+
+        //TODO: Transposition table
+
+        //Determine the static evaluation of the ply and check if we're improving
+        int staticEval = Evaluator.Evaluate(board);
+        plyStaticEvals[plyIdx] = staticEval;
+
+        bool improving = plyIdx >= 2 && staticEval > plyStaticEvals[plyIdx-2];
+
+        //TODO: Null move pruning
+
+        //Order noisy moves
+        numOrderedMoves += MoveOrder.OrderNoisyMoves(moves[numOrderedMoves..]);
+
+        //TODO: Futility pruning
+
+        //By now we will have ordered all non-quiet moves
+        int firstQuietMoveIdx = numOrderedMoves;
+
         //Search moves we could make from here
-        int maxEval = int.MinValue;
+        int bestEval = depth <= 0 ? staticEval : MinEval;
+        if(bestEval >= beta) return bestEval;
+        if(bestEval > alpha) alpha = bestEval;
 
-        //Counter for later
-        int i = 0;
+        for(int i = 0; i < moves.Length; i++) {
+            //Check if we've entered the unordered moves
+            if(i >= numOrderedMoves) {
+                if(depth <= 0) break;
 
-        //Order moves
-        Move[] moves = board.GetLegalMoves();
-        int noisy = MoveOrder.OrderNoisyMoves(board, ref moves, 0);
-        MoveOrder.OrderQuietMoves(ref moves, noisy, ply[plyIndex], history[board.IsWhiteToMove ? 0 : 1]);
-        foreach(Move move in moves) {
+                //Sort the moves before proceeding
+                numOrderedMoves += MoveOrder.OrderQuietMoves(moves[numOrderedMoves..], board.IsWhiteToMove ? whiteHistoryTable : blackHistoryTable, killerTables[plyIdx]);
+            }
+
+            Move move = moves[i];
+
+            //We only consider captures or promotions as our last moves
+            if(depth <= 0) {
+                if(!move.IsCapture && !move.IsPromotion) throw new Exception("Encountered quiet move at depth 0!");
+            }
+
+            //TODO: Delta pruning
+            //TODO: PVS
+
             //Evaluate the move recursively
             board.MakeMove(move);
-            int moveEval = -AlphaBeta(board, depth - 1, -beta, -alpha, plyIndex + 1);
+            int moveEval = -AlphaBeta(board, depth-1, -beta, -alpha, plyIdx+1);
             board.UndoMove(move);
 
             //Update search variables
-            maxEval = Math.Max(maxEval, moveEval);
+            bestEval = Math.Max(bestEval, moveEval);
             alpha = Math.Max(alpha, moveEval);
+
             if(moveEval >= beta) {
-                //More updating
-                ply[plyIndex].BetaCutoff(move);
-                HistoryTable table = history[board.IsWhiteToMove ? 0 : 1];
-                table.BetaCutoff(move, depth);
-                for(int j = noisy; j < i; j++) table.FailedCutoff(moves[j], depth);
+                //Update the history and killer tables if this was a quiet move
+                if(move.IsCapture || move.IsPromotion) break;
+
+                long[] historyTable = board.IsWhiteToMove ? whiteHistoryTable : blackHistoryTable;
+                KillerTable.OnBetaCutoff(killerTables[plyIdx], move);
+                HistoryTable.OnBetaCutoff(historyTable, move, depth);
+
+                //Decrease the history value of all the moves we searched before
+                for(int j = firstQuietMoveIdx; j < i; j++) HistoryTable.OnFailedCutoff(historyTable, moves[j], depth);
+
                 break;
             }
-            i++;
         }
-        return maxEval;
+        return bestEval;
     }
 }

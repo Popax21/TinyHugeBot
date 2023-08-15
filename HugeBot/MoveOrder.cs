@@ -1,118 +1,78 @@
 ﻿using ChessChallenge.API;
 using System;
-using System.Linq;
 
 namespace HugeBot;
 
 // ported from STRO4K (https://github.com/ONE-RANDOM-HUMAN/STRO4K)
 
-public struct KillerTable {
-    public Move[] data;
+public static class KillerTable {
+    public const int TableSize = 2;
 
-    public KillerTable() => data = new Move[] { Move.NullMove, Move.NullMove };
+    public static void Reset(Move[] table) => Array.Clear(table);
 
-    public void BetaCutoff(Move move) {
-        data[1] = data[0];
-        data[0] = move;
+    public static void OnBetaCutoff(Move[] table, Move move) {
+        //Insert into the killer table
+        for(int i = 1; i < TableSize; i++) table[i] = table[i - 1];
+        table[0] = move;
     }
 }
 
-public struct HistoryTable {
-    private long[] data;
+public static class HistoryTable {
+    public const int TableSize = 64*64;
 
-    public HistoryTable() => data = new long[4096];
+    public static void Reset(long[] table) => Array.Clear(table);
 
-    public void Reset() => data = new long[4096];
-
-    public long Get(Move move) {
-        int index = (move.StartSquare.Index << 6) | move.TargetSquare.Index;
-        return data[index];
-    }
-
-    public void BetaCutoff(Move move, long depth) {
-        int index = (move.StartSquare.Index << 6) | move.TargetSquare.Index;
-        data[index] += depth * depth;
-    }
-
-    public void FailedCutoff(Move move, long depth) {
-        int index = (move.StartSquare.Index << 6) | move.TargetSquare.Index;
-        data[index] -= depth;
-    }
+    public static long Get(long[] table, Move move) => table[move.RawValue & 0xfff];
+    public static void OnBetaCutoff(long[] table, Move move, int depth) => table[move.RawValue & 0xfff] += (long) depth * depth;
+    public static void OnFailedCutoff(long[] table, Move move, int depth) => table[move.RawValue & 0xfff] -= depth;
 }
 
 public static class MoveOrder {
-    public static int OrderNoisyMoves(Board position, ref Move[] moves, int startIndex) {
-        InsertionSortFlags(ref moves, startIndex);
-        int promo = moves.TakeWhile(t => t.IsPromotion).Count();
-        int noisy = moves.TakeWhile(t => t.IsCapture || t.IsPromotion).Count();
-        InsertionSortBy(ref moves, promo, noisy, (lhs, rhs) => {
-            int mvv = CmpMVV(position, lhs, rhs);
-            if(mvv != 0) return mvv > 0;
-            else return CmpLVA(position, lhs, rhs);
+    public static int OrderNoisyMoves(Span<Move> moves) {
+        //Sort by move group
+        static int GetMoveGroup(Move move) => move.IsPromotion ? 0 : move.IsCapture ? 1 : 2;
+        moves.Sort(static (a, b) => GetMoveGroup(a).CompareTo(GetMoveGroup(b)));
+
+        //Find the first non-promo and quiet move
+        int nonPromoMovesIdx = 0;
+        while(nonPromoMovesIdx < moves.Length && moves[nonPromoMovesIdx].IsPromotion) nonPromoMovesIdx++;
+
+        int quietMovesIdx = nonPromoMovesIdx;
+        while(quietMovesIdx < moves.Length && moves[quietMovesIdx].IsCapture) quietMovesIdx++;
+
+        //Sort the non-quiet moves
+        moves[nonPromoMovesIdx..quietMovesIdx].Sort(static (a, b) => {
+            //Sort by the captured piece's value (more valuable pieces first)
+            if(a.CapturePieceType != b.CapturePieceType) return -a.CapturePieceType.CompareTo(b.CapturePieceType);
+
+            //Sort by the moved piece's value (less valuable pieces first)
+            return a.MovePieceType.CompareTo(b.MovePieceType);
         });
-        return noisy;
+
+        return quietMovesIdx;
     }
 
-    public static int OrderQuietMoves(ref Move[] moves, int startIndex, KillerTable kt, HistoryTable history) {
-        int len = moves.Length - startIndex;
-        foreach(Move move in kt.data) {
-            if(move.IsNull) break;
-            int index = moves.TakeWhile(t => t != move).Count();
-            if(index >= startIndex && index < moves.Length) {
-                Move temp = moves[0 + startIndex];
-                moves[0 + startIndex] = moves[index];
-                moves[index] = temp;
-                startIndex++;
+    public static int OrderQuietMoves(Span<Move> moves, long[] historyTable, Move[] killerTable) {
+        //Put moves in the killer table at the start
+        int killerInsertIdx = 0;
+        for(int i = 0; i < KillerTable.TableSize; i++) {
+            if(killerTable[i].IsNull) break;
+            ushort rawKillerMove = killerTable[i].RawValue;
+
+            for(int j = killerInsertIdx; j < moves.Length; j++) {
+                if(moves[j].RawValue == rawKillerMove) {
+                    //Swap the move to move it to the start
+                    //We'll sort the moves anyway later, so this is good to do
+                    (moves[killerInsertIdx], moves[j]) = (moves[j], moves[killerInsertIdx]);
+                    killerInsertIdx++;
+                    break;
+                }
             }
         }
-        InsertionSortBy(ref moves, startIndex, moves.Length, (lhs, rhs) => history.Get(lhs) < history.Get(rhs));
-        return len;
-    }
 
-    public static void InsertionSortBy(ref Move[] moves, int startIndex, int endIndex, Func<Move, Move, bool> cmp) {
-        for(int i = startIndex + 1; i < endIndex; i++) {
-            Move move = moves[i];
-            int j = i;
-            while(j > 0) {
-                if(!cmp(moves[j - 1], move)) break;
-                moves[j] = moves[j - 1];
-                j--;
-            }
-            moves[j] = move;
-        }
-    }
+        //Sort the remaining moves using the history table
+        moves[killerInsertIdx..].Sort((a, b) => -HistoryTable.Get(historyTable, a).CompareTo(HistoryTable.Get(historyTable, b)));
 
-    public static void InsertionSortFlags(ref Move[] moves, int startIndex) {
-        for(int i = startIndex + 1; i < moves.Length; i++) {
-            Move move = moves[i];
-            int cmp = (move.IsPromotion ? 8 : 0) | (move.IsEnPassant ? 4 : 0) | (move.IsCapture ? 2 : 0) | (move.IsCastles ? 1 : 0);
-            int j = i;
-            while(j > 0) {
-                Move move2 = moves[j - 1];
-                int cmp2 = (move2.IsPromotion ? 8 : 0) | (move2.IsEnPassant ? 4 : 0) | (move2.IsCapture ? 2 : 0) | (move2.IsCastles ? 1 : 0);
-                if(cmp2 >= cmp) break;
-                moves[j] = move2;
-                j--;
-            }
-            moves[j] = move;
-        }
-    }
-
-    public static int CmpMVV(Board position, Move lhs, Move rhs) {
-        Piece lhs_p = position.GetPiece(lhs.TargetSquare);
-        int lhs_v = lhs_p.IsWhite != position.IsWhiteToMove ? (int)lhs_p.PieceType : 0;
-        Piece rhs_p = position.GetPiece(rhs.TargetSquare);
-        int rhs_v = rhs_p.IsWhite != position.IsWhiteToMove ? (int)rhs_p.PieceType : 0;
-        if(lhs_v == rhs_v) return 0;
-        else if(lhs_v < rhs_v) return 1;
-        else return -1;
-    }
-
-    public static bool CmpLVA(Board position, Move lhs, Move rhs) {
-        Piece lhs_p = position.GetPiece(lhs.StartSquare);
-        int lhs_v = lhs_p.IsWhite == position.IsWhiteToMove ? (int)lhs_p.PieceType : 0;
-        Piece rhs_p = position.GetPiece(rhs.StartSquare);
-        int rhs_v = rhs_p.IsWhite == position.IsWhiteToMove ? (int)rhs_p.PieceType : 0;
-        return lhs_v > rhs_v;
+        return moves.Length;
     }
 }
