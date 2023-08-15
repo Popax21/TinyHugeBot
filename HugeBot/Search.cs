@@ -1,10 +1,7 @@
 ﻿using ChessChallenge.API;
 using System;
-using System.Collections.Generic;
-using System.ComponentModel.Design;
+
 using System.Linq;
-using System.Runtime.InteropServices;
-using System.Threading;
 
 namespace HugeBot;
 
@@ -24,12 +21,12 @@ static class Search
     {
         // TODO: dynamic depth and timer
         Move bestMove = Move.NullMove;
-        int bestEval = MinEval;
+        int bestEval = int.MinValue;
 
         foreach(Move move in board.GetLegalMoves()) {
             //Use alpha-beta pruning to evaluate the move
             board.MakeMove(move);
-            int moveEval = -AlphaBeta(board, 3, MinEval, MaxEval, 0);
+            int moveEval = -AlphaBeta(board, 3, int.MinValue, int.MaxValue, 0);
             board.UndoMove(move);
 
             //Check if this move is better
