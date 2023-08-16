@@ -6,8 +6,8 @@ using Eval = System.UInt64;
 
 namespace HugeBot;
 
-//Evaluation Format: 0x00_MMMMMM_00_EEEEEE
-// - MMMM/EEEE: midgame/endgame evaluation (24 bit int)
+//Evaluation Format: 0x000_MMMMM_000_EEEEE
+// - MMMM/EEEE: midgame/endgame evaluation (20 bit int)
 // - the middle regions are buffers for catching carry bits
 
 public static partial class Evaluator {
@@ -18,10 +18,10 @@ public static partial class Evaluator {
     public const BitBoard DarkSquares   = 0xAA55_AA55_AA55_AA55;
     public const BitBoard LightSquares  = 0x55AA_55AA_55AA_55AA;
 
-    public const Eval BishopPairEval = 0x00_000070_00_0000a1;
+    public const Eval BishopPairEval = 0x000_00070_000_000a1;
 
     public static int Evaluate(Board board) {
-        Eval eval = 0x80_000000_80_000000; //Don't zero the buffer regions to prevent underflows
+        Eval eval = 0x800_00000_800_00000; //Don't zero the buffer regions to prevent underflows
 
         //Get piece bitboards
         Span<BitBoard> whitePieces = stackalloc BitBoard[6], blackPieces = stackalloc BitBoard[6];
@@ -37,8 +37,8 @@ public static partial class Evaluator {
         }
 
         //Evaluate bishop pairs
-        if((whitePieces[2] & DarkSquares) != 0) eval += BishopPairEval;
-        if((blackPieces[2] & DarkSquares) != 0) eval -= BishopPairEval;
+        if((whitePieces[2] & DarkSquares) != 0 && (whitePieces[2] & LightSquares) != 0) eval += BishopPairEval;
+        if((blackPieces[2] & DarkSquares) != 0 && (blackPieces[2] & LightSquares) != 0) eval -= BishopPairEval;
 
         //Evaluate the board
         static BitBoard FlipRows(BitBoard board) {
@@ -65,20 +65,20 @@ public static partial class Evaluator {
         for(int i = 0; i < 4; i++) phase += PiecePhaseWeights[i] * (pieces[i+1].Count + pieces[i+1 + 6].Count);
 
         //Determine the resolved evaluation score
-        int mgEval = (int) ((eval >> 32) & 0xffffff), egEval = (int) (eval & 0xffffff);
-        if((mgEval & 0x800000) != 0) mgEval -= 0x1000000;
-        if((egEval & 0x800000) != 0) egEval -= 0x1000000;
+        int mgEval = (int) (eval >> 32), egEval = (int) eval;
+        mgEval = (mgEval & 0x0ffff) - (mgEval & 0x10000);
+        egEval = (egEval & 0x0ffff) - (egEval & 0x10000);
 
         int score = (mgEval * phase + egEval * (24 - phase)) / 24;
         return board.IsWhiteToMove ? score : -score;
     }
 
     public static readonly Eval[] MaterialEval = {
-        /* Pawns   */ 0x00_00013e_00_000137,
-        /* Knights */ 0x00_00029a_00_000297,
-        /* Bishops */ 0x00_000302_00_0002d3,
-        /* Rooks   */ 0x00_00047a_00_000539,
-        /* Queens  */ 0x00_00098f_00_000956,
+        /* Pawns   */ 0x000_0013e_000_00137,
+        /* Knights */ 0x000_0029a_000_00297,
+        /* Bishops */ 0x000_00302_000_002d3,
+        /* Rooks   */ 0x000_0047a_000_00539,
+        /* Queens  */ 0x000_0098f_000_00956,
     };
 
     public static readonly int[] PiecePhaseWeights = {

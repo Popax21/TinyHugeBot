@@ -71,8 +71,8 @@ static partial class Evaluator {
         Eval[,] pst = new Eval[6, 4*4];
         for(int i = 0; i < 6*4*4; i++) {
             ushort comprVal = comprPST[i];
-            sbyte mgVal = (sbyte) (comprVal >> 8), egVal = (sbyte) comprVal;
-            pst[i >> 4, i & 0xf] = (((ulong) (int) mgVal) << 32 | (uint) (int) egVal) & 0x00_ffffff_00_ffffff;
+            int mgVal = (sbyte) (comprVal >> 8), egVal = (sbyte) comprVal;
+            pst[i >> 4, i & 0xf] = (((ulong) mgVal) << 32 | (uint) egVal) & 0x000_fffff_000_fffff;
         }
         return pst;
     }

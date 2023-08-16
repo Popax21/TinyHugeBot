@@ -42,7 +42,7 @@ public static class TranspositionTable {
         eval = (short) (ttData >> 16);
         bound = (byte) ((ttData >> 32) & 0b11);
         depth = (int) (ttData >> 34) & TTDepthMask;
-        depth = (depth & TTDepthSignBit) - (depth & ~TTDepthSignBit);
+        depth = (depth & ~TTDepthSignBit) - (depth & TTDepthSignBit);
         return true;
     }
 }

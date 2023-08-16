@@ -58,9 +58,9 @@ public static partial class Evaluator {
     }    
 
     public static readonly Eval[] MobilityEval = {
-        /* Knight */ 0x00_000025_00_000015,
-        /* Bishop */ 0x00_000018_00_00000a,
-        /* Rook   */ 0x00_000011_00_000001,
-        /* Queen  */ 0X00_00000c_00_000004,
+        /* Knight */ 0x000_00025_000_00015,
+        /* Bishop */ 0x000_00018_000_0000a,
+        /* Rook   */ 0x000_00011_000_00001,
+        /* Queen  */ 0X000_0000c_000_00004,
     };
 }
