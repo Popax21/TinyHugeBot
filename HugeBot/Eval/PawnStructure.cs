@@ -6,7 +6,7 @@ namespace HugeBot;
 
 public static partial class Evaluator {
     public static Eval EvalPawnStructure(BitBoard pawns) {
-        Eval eval = 0;
+        Eval eval = 0x800_00000_800_00000;
         BitBoard file = AFile;
         for(int i = 0; i < 8; i++, file <<= 1) {
             //Get the number of pawns on this file
@@ -20,7 +20,7 @@ public static partial class Evaluator {
             BitBoard adjacentFiles = ((file << 1) & ~AFile) | ((file & ~AFile) >> 1);
             if((pawns & adjacentFiles) == 0) eval -= IsolatedPawnPenalty[i] * pawnCount;
         }
-        return eval;
+        return eval & 0x000_fffff_000_fffff;
     }
 
     public static readonly Eval[] DoubledPawnPenalty = DecompressEvals(new ushort[] {
