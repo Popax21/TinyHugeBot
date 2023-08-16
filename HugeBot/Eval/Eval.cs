@@ -64,6 +64,16 @@ public static partial class Evaluator {
         PieceList[] pieces = board.GetAllPieceLists();
         for(int i = 0; i < 4; i++) phase += PiecePhaseWeights[i] * (pieces[i+1].Count + pieces[i+1 + 6].Count);
 
+#if DEBUG
+        //Check that there are no overflows
+        if(
+            (eval & 0x000_00000_f00_00000) < 0x000_00000_400_00000 ||
+            (eval & 0x000_00000_f00_00000) > 0x000_00000_c00_00000 ||
+            (eval & 0xf00_00000_000_00000) < 0x400_00000_000_00000 ||
+            (eval & 0xf00_00000_000_00000) > 0xc00_00000_000_00000
+        ) throw new Exception("Potential eval overflow!");
+#endif
+
         //Determine the resolved evaluation score
         int mgEval = (int) (eval >> 32), egEval = (int) eval;
         mgEval = (mgEval & 0x0ffff) - (mgEval & 0x10000);
