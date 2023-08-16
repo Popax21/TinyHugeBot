@@ -1,8 +1,8 @@
 using System;
 using ChessChallenge.API;
 
-public class MyBot : IChessBot {
-    private static IChessBot TinyBot;
+class MyBot : IChessBot {
+    IChessBot TinyBot;
 
     public Move Think(Board board, Timer timer) {
         if(TinyBot == null) {
@@ -40,7 +40,7 @@ public class MyBot : IChessBot {
     }
 
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> BEGIN ENCODED ASSEMBLY <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-    private decimal[] TinyBotAsmEncodedData = {
+    decimal[] TinyBotAsmEncodedData = {
         <TINYASMENCDAT>
     };
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> END ENCODED ASSEMBLY <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
