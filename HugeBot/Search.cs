@@ -4,10 +4,12 @@ using System;
 namespace HugeBot;
 
 public class Searcher {
-    //Use these to prevent integer overlow
+    //Use these values to prevent integer overlow
     public const int MinEval = -2000000, MaxEval = +2000000;
 
     public const int MaxPly = 6144, MoveBufSize = 256;
+
+    private static readonly int[] DeltaPruningPieceValues = { 256, 832, 832, 1344, 2496 };
 
     private readonly int[] moveEvalBuf = new int[MoveBufSize];
     private readonly Move[][] moveBufs = new Move[MaxPly][];
@@ -17,8 +19,6 @@ public class Searcher {
     private readonly ulong[] transpositionTable = new ulong[TranspositionTable.TableSize];
 
     private int searchCallIndex = 0;
-
-    private readonly int[] DeltaPruningPieceValues = { 256, 832, 832, 1344, 2496 };
 
     public Searcher() {
         //Initialize the move buffers
@@ -102,21 +102,25 @@ public class Searcher {
         if(searchCallIndex % 4096 == 0 && timer.MillisecondsElapsedThisTurn >= maxSearchTime) return null;
         searchCallIndex++;
 
-        //Check if we're in checkmate or have drawn
-        if(board.IsInCheckmate()) return MinEval;
-        if(board.IsDraw()) return 0;
+        //Check if this is triggers the repetition rule
+        if(board.IsRepeatedPosition()) return 0;
+
+        //Generate the legal moves we can make
+        Span<Move> moves = moveBufs[plyIdx];
+        board.GetLegalMovesNonAlloc(ref moves);        
+        int numOrderedMoves = 0;
+
+        //Check if we're in checkmate or stalemate
+        if(moves.Length == 0) return board.IsInCheck() ? MinEval : 0;
+
+        //Check if the 50 move rule triggered
+        if(board.IsFiftyMoveDraw()) return 0;
 
         //Search one move more if we're in check
         if(board.IsInCheck()) depth++;
 
         //Check if this is a PV (Principal Variation) node in the search tree
         bool isPVNode = alpha + 1 != beta;
-
-        //Generate the legal moves we can make
-        Span<Move> moves = moveBufs[plyIdx];
-        board.GetLegalMovesNonAlloc(ref moves);
-        
-        int numOrderedMoves = 0;
 
         //Check the transposition table
         if(depth > 0 && TranspositionTable.Lookup(transpositionTable, board.ZobristKey, out ushort ttRawMove, out int ttEval, out int ttDepth, out byte bound)) {
@@ -162,14 +166,18 @@ public class Searcher {
 
             //Non-static null move pruning
             if(depth >= 3) {
+#if DEBUG
+                if(!board.TrySkipTurn()) throw new Exception("Failed to skip turn for null move pruning!");
+#else
                 board.ForceSkipTurn();
+#endif
 
                 int r = 2 + (depth - 2) / 4;
                 int? eval = -AlphaBeta(board, depth - r - (improving ? 1 : 2), -beta, -beta + 1, plyIdx + 1, timer, maxSearchTime);
 
                 board.UndoSkipTurn();
 
-                if(eval >= beta) return eval;
+                if(eval.HasValue && eval >= beta) return eval;
             }
         }
 
@@ -178,9 +186,9 @@ public class Searcher {
         int firstQuietMoveIdx = numOrderedMoves;
 
         //Determine if we should apply futility pruning to this node
-        const int FutilityPruningMarging = 256;
+        const int FutilityPruningMargin = 256;
         bool doFutilityPruning = depth <= 5 && !board.IsInCheck() && !isPVNode;
-        doFutilityPruning &= staticEval + Math.Max(1, depth + (improving ? 1 : 0)) * FutilityPruningMarging <= alpha;
+        doFutilityPruning &= staticEval + Math.Max(1, depth + (improving ? 1 : 0)) * FutilityPruningMargin <= alpha;
 
         //Search moves we could make from here
         Move bestMove = default;
@@ -193,6 +201,7 @@ public class Searcher {
             evalBound = TTBound.Exact;
         }
 
+        bool wasInCheck = board.IsInCheck();
         for(int i = 0; i < moves.Length; i++) {
             //Check if we've entered the unordered moves
             if(i >= numOrderedMoves) {
@@ -223,7 +232,6 @@ public class Searcher {
             }
 
             //Temporarily make the move to evaluate it
-            bool wasInCheck = board.IsInCheck();
             board.MakeMove(move);
 
             //Eliminate futile moves that don't check and aren't noisy
