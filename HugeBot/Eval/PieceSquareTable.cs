@@ -21,13 +21,13 @@ static partial class Evaluator {
                 pstIndex ^= pstIdxFlip; //Flip the row bits for the opposite side
 
                 //Update the evaluation
-                eval += PieceSquareTable[pieceType, pstIndex];
+                eval += PieceSquareTable[pieceType << 4 | pstIndex];
             }
         }
         return eval;
     }
 
-    private static ushort[] ComprPieceSquareTable = {
+    public static readonly Eval[] PieceSquareTable = DecompressEvals(new ushort[] {
         //Pawns
         0xcb_02, 0xb6_13, 0x00_06, 0xf9_d8,
         0xc9_f2, 0xed_e1, 0xfd_e6, 0xf7_c8,
@@ -63,17 +63,5 @@ static partial class Evaluator {
         0x05_fa, 0xfc_06, 0xf0_fd, 0xef_eb,
         0x0b_16, 0x0c_28, 0x09_2a, 0x06_17,
         0x06_07, 0x09_16, 0x0b_1c, 0x05_0e,
-    };
-
-    public static readonly Eval[,] PieceSquareTable = DecompressPieceSquareTable(ComprPieceSquareTable);
-
-    private static Eval[,] DecompressPieceSquareTable(ushort[] comprPST) {
-        Eval[,] pst = new Eval[6, 4*4];
-        for(int i = 0; i < 6*4*4; i++) {
-            ushort comprVal = comprPST[i];
-            int mgVal = (sbyte) (comprVal >> 8), egVal = (sbyte) comprVal;
-            pst[i >> 4, i & 0xf] = (((ulong) mgVal) << 32 | (uint) egVal) & 0x000_fffff_000_fffff;
-        }
-        return pst;
-    }
+    });
 }

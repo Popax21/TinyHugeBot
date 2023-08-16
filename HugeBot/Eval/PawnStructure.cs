@@ -23,25 +23,25 @@ public static partial class Evaluator {
         return eval;
     }
 
-    public static readonly Eval[] DoubledPawnPenalty = {
-        0x000_0003b_000_00035,
-        0x000_00022_000_00029,
-        0x000_0003d_000_0001e,
-        0x000_00026_000_00010,
-        0x000_0003d_000_00019,
-        0x000_00033_000_0002f,
-        0x000_00013_000_00024,
-        0x000_00029_000_00030,
-    };
+    public static readonly Eval[] DoubledPawnPenalty = DecompressEvals(new ushort[] {
+        0x3b_35,
+        0x22_29,
+        0x3d_1e,
+        0x26_10,
+        0x3d_19,
+        0x33_2f,
+        0x13_24,
+        0x29_30,
+    });
 
-    public static readonly Eval[] IsolatedPawnPenalty = {
-        0x000_00021_000_00014,
-        0x000_00016_000_00016,
-        0x000_0003a_000_0001d,
-        0x000_00040_000_00029,
-        0x000_00057_000_0002d,
-        0x000_00029_000_00027,
-        0x000_0001b_000_00015,
-        0x000_00058_000_0001f,
-    };
+    public static readonly Eval[] IsolatedPawnPenalty = DecompressEvals(new ushort[] {
+        0x21_14,
+        0x16_16,
+        0x3a_1d,
+        0x40_29,
+        0x57_2d,
+        0x29_27,
+        0x1b_15,
+        0x58_1f,
+    });
 }

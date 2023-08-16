@@ -57,10 +57,10 @@ public static partial class Evaluator {
         return eval;
     }    
 
-    public static readonly Eval[] MobilityEval = {
-        /* Knight */ 0x000_00025_000_00015,
-        /* Bishop */ 0x000_00018_000_0000a,
-        /* Rook   */ 0x000_00011_000_00001,
-        /* Queen  */ 0X000_0000c_000_00004,
-    };
+    public static readonly Eval[] MobilityEval = DecompressEvals(new ushort[] {
+        /* Knight */ 0x25_15,
+        /* Bishop */ 0x18_0a,
+        /* Rook   */ 0x11_01,
+        /* Queen  */ 0X0c_04,
+    });
 }

@@ -87,4 +87,14 @@ public static partial class Evaluator {
         /* Rooks   */ 2,
         /* Queens  */ 4,
     };
+
+    private static Eval[] DecompressEvals(ushort[] comprEvals) {
+        Eval[] evals = new Eval[comprEvals.Length];
+        for(int i = comprEvals.Length-1; i >= 0; i--) {
+            ushort comprVal = comprEvals[i];
+            int mgVal = (sbyte) (comprVal >> 8), egVal = (sbyte) comprVal;
+            evals[i] = (((ulong) mgVal) << 32 | (uint) egVal) & 0x000_fffff_000_fffff;
+        }
+        return evals;
+    }
 }
