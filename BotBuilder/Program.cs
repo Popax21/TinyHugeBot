@@ -153,8 +153,6 @@ if(!DEBUG) {
     //Build the tiny bot DLL by modifying some other parameters
     PEImageBuildResult tinyBotBuildRes = new ManagedPEImageBuilder().CreateImage(botMod);
     IPEImage tinyBotImg = tinyBotBuildRes.ConstructedImage ?? throw new Exception("No tiny bot PEImage was built!");
-    tinyBotImg.PEKind = OptionalHeaderMagic.PE64;
-    tinyBotImg.MachineType = MachineType.Amd64;
     tinyBotImg.Resources = null;
 
     PEFile tinyBot = new ManagedPEFileBuilder().CreateFile(tinyBotImg);
