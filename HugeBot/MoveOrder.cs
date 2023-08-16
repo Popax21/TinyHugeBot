@@ -26,8 +26,8 @@ public static class HistoryTable {
 public static class MoveOrder {
     public static int OrderNoisyMoves(Span<Move> moves) {
         //Sort by move group
-        static int GetMoveGroup(Move move) => (move.IsPromotion ? 0 : 0b100) | (move.IsCapture ? 0 : 0b010) | (move.IsCastles ? 0 : 0b001);
-        moves.Sort(static (a, b) => GetMoveGroup(a).CompareTo(GetMoveGroup(b)));
+        static int GetMoveGroup(Move move) => ((int) move.PromotionPieceType << 3) | (move.IsPromotion ? 0b100 : 0b000) | (move.IsCapture ? 0b010 : 0) | (move.IsCastles ? 0b001 : 0);
+        moves.Sort(static (a, b) => -GetMoveGroup(a).CompareTo(GetMoveGroup(b)));
 
         //Find the first non-promo and quiet move
         int nonPromoMovesIdx = 0;

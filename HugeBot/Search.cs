@@ -5,7 +5,7 @@ namespace HugeBot;
 
 public class Searcher {
     //Use these values to prevent integer overlow
-    public const int MinEval = -2000000, MaxEval = +2000000;
+    public const int MinEval = -1000000, MaxEval = +1000000;
 
     public const int MaxPly = 6144, MoveBufSize = 256;
 
@@ -30,7 +30,7 @@ public class Searcher {
 
     public Move SearchMoves(Board board, Timer timer) {
         //Determine the amount of time to search for
-        int minSearchTime = timer.MillisecondsRemaining / 80;
+        int minSearchTime = timer.MillisecondsRemaining / 40;
         int maxSearchTime = 2*minSearchTime + timer.IncrementMilliseconds / 2;
 
         //Determine the initial ply static evaluation
@@ -83,7 +83,7 @@ public class Searcher {
 
 #if DEBUG
             //Some stats, having these lines takes up ~400 bytes though
-            Console.WriteLine($"Searched to depth {depth} in {timer.MillisecondsElapsedThisTurn:d4}ms, best move eval: {bestEval}");
+            Console.WriteLine($"Searched to depth {depth} in {timer.MillisecondsElapsedThisTurn:d4}ms, best {bestMove.ToString().ToLower()} with eval: {bestEval}");
 #endif
 
             return bestMove;
@@ -100,7 +100,7 @@ public class Searcher {
 
         //Generate the legal moves we can make
         Span<Move> moves = moveBufs[plyIdx];
-        board.GetLegalMovesNonAlloc(ref moves);        
+        board.GetLegalMovesNonAlloc(ref moves);
         int numOrderedMoves = 0;
 
         //Check if we're in checkmate or stalemate
@@ -116,7 +116,7 @@ public class Searcher {
         bool isPVNode = alpha + 1 != beta;
 
         //Check the transposition table
-        if(depth > 0 && TranspositionTable.Lookup(transpositionTable, board.ZobristKey, out ushort ttRawMove, out int ttEval, out int ttDepth, out byte bound)) {
+        if(depth > 0 && TranspositionTable.Lookup(transpositionTable, board.ZobristKey, out ushort ttRawMove, out int ttEval, out int ttDepth, out byte ttBound)) {
             //Lookup the move stored in the transposition table in the current legal moves list
             for(int i = 0; i < moves.Length; i++) {
                 if(moves[i].RawValue == ttRawMove) {
@@ -126,7 +126,7 @@ public class Searcher {
 
                     //Check if there's a TT bound which applies here
                     if(!isPVNode && ttDepth >= depth) {
-                        switch(bound) {
+                        switch(ttBound) {
                             case TTBound.Lower:
                                 if(ttEval >= beta) return ttEval;
                                 break;
@@ -197,7 +197,7 @@ public class Searcher {
         bool wasInCheck = board.IsInCheck();
         for(int i = 0; i < moves.Length; i++) {
             //Check if we've entered the unordered moves
-            if(i >= numOrderedMoves) {
+            if(i == numOrderedMoves) {
                 if(depth <= 0) break;
 
                 //Sort the moves before proceeding
@@ -217,8 +217,8 @@ public class Searcher {
                 const int DeltaPruningBaseBonus = 224, DeltaPruningImprovingBonus = 64;
 
                 //Get piece values for captures and promotions (if applicable)
-                int capture = move.IsCapture ? DeltaPruningPieceValues[(int) (move.CapturePieceType - 1)] : 0;
-                int promotion = move.IsPromotion ? DeltaPruningPieceValues[(int) (move.PromotionPieceType - 1)] : 0;
+                int capture = move.IsCapture ? DeltaPruningPieceValues[(int) move.CapturePieceType - 1] : 0;
+                int promotion = move.IsPromotion ? DeltaPruningPieceValues[(int) move.PromotionPieceType - 1] : 0;
 
                 //Ignore move if this new eval is below or equal to alpha
                 if(staticEval + capture + promotion + DeltaPruningBaseBonus + (improving ? DeltaPruningImprovingBonus : 0) <= alpha) continue;
