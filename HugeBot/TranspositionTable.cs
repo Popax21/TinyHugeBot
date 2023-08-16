@@ -8,7 +8,7 @@ public static class TTBound {
 };
 
 public static class TranspositionTable {
-    public const int TableSize = 128*1024*1024 / 8; //For a ~128MB transposition table
+    public const int TableSize = 224*1024*1024 / 8; //For a ~224MB transposition table
 
     private const int TTDepthMask = 0x3fff, TTDepthSignBit = 0x2000;
 
