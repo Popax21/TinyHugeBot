@@ -130,7 +130,7 @@ if(!DEBUG) {
             cctors.Add(method);
         }
 
-        if(cctors.Count > 0) {
+        if(cctors.Count >= 2) {
             MethodDefinition mergedCctor = new MethodDefinition(".cctor", MethodAttributes.Private | MethodAttributes.Static | MethodAttributes.SpecialName | MethodAttributes.RuntimeSpecialName, MethodSignature.CreateStatic(botMod.CorLibTypeFactory.Void));
             mergedCctor.CilMethodBody = new CilMethodBody(mergedCctor);
             
@@ -140,6 +140,10 @@ if(!DEBUG) {
             mergedCctor.CilMethodBody.Instructions.Add(new CilInstruction(CilOpCodes.Ret));
             
             staticType.Methods.Add(mergedCctor);
+        } else if(cctors.Count == 1) {
+            MethodDefinition cctor = cctors[0];
+            cctor.Name = ".cctor";
+            cctor.IsSpecialName = cctor.IsRuntimeSpecialName = true;
         }
 
         //Tinfy the type
@@ -192,19 +196,53 @@ byte GetTinyBotNibble(long idx) => (byte) (idx < tinyBotData.Length*2 ? (tinyBot
 byte GetTinyBotByte(long nibbleIdx) => (byte) (GetTinyBotNibble(nibbleIdx) + (GetTinyBotNibble(nibbleIdx+1) << 4));
 int GetTinyBotInt(long nibbleIdx) => GetTinyBotByte(nibbleIdx) + (GetTinyBotByte(nibbleIdx+2) << 8) + (GetTinyBotByte(nibbleIdx+4) << 16) + (GetTinyBotByte(nibbleIdx+6) << 24);
 
-long tinyBotNonZeroNibbles = tinyBotData.Length*2;
-while(tinyBotNonZeroNibbles > 0 && GetTinyBotNibble(tinyBotNonZeroNibbles-1) == 0) tinyBotNonZeroNibbles--;
+List<decimal> tinyBotEncDecs = new List<decimal>();
+
+int curBufOff = 0;
+int headerDecIdx = -1;
+void EndHeader() {
+    if(headerDecIdx < 0) return;
+    int numDecs = tinyBotEncDecs.Count - (headerDecIdx+1);
+
+    int[] headerDecBits = decimal.GetBits(tinyBotEncDecs[headerDecIdx]);
+    headerDecBits[1] = numDecs;
+    tinyBotEncDecs[headerDecIdx] = new decimal(headerDecBits);
+
+    headerDecIdx = -1;
+}
+
+for(int i = 0; i < tinyBotData.Length;) {
+    //Determine the number of zero bytes
+    int numZeroBytes = 0;
+    while(i+numZeroBytes < tinyBotData.Length && tinyBotData[i+numZeroBytes] == 0) numZeroBytes++;
+
+    //Check if it would be more efficient to start a new block
+    if(numZeroBytes > 12) {
+        EndHeader();
+        i += numZeroBytes;
+    }
+    if(i >= tinyBotData.Length) break;
+
+    //Start a new header if we don't have one
+    if(headerDecIdx < 0) {
+        ushort skip = (ushort) (i - curBufOff);
+        curBufOff = i;
+
+        headerDecIdx = tinyBotEncDecs.Count;
+        tinyBotEncDecs.Add(new decimal(skip, 0, 0, false, 0));
+    }
+
+    //Encode the data block
+    tinyBotEncDecs.Add(new decimal(GetTinyBotInt(2*i+00), GetTinyBotInt(2*i+08), GetTinyBotInt(2*i+16), false, GetTinyBotNibble(2*i+49)));
+    tinyBotEncDecs.Add(new decimal(GetTinyBotInt(2*i+24), GetTinyBotInt(2*i+32), GetTinyBotInt(2*i+40), false, GetTinyBotNibble(2*i+48)));
+    curBufOff = i += 25;
+}
+EndHeader();
 
 StringBuilder tinyBotEncData = new StringBuilder();
-for(long i = 0; i < tinyBotNonZeroNibbles; i += 50) {
-    decimal decA = new decimal(GetTinyBotInt(i+00), GetTinyBotInt(i+08), GetTinyBotInt(i+16), false, GetTinyBotNibble(i+49));
-    decimal decB = new decimal(GetTinyBotInt(i+24), GetTinyBotInt(i+32), GetTinyBotInt(i+40), false, GetTinyBotNibble(i+48));
-
+foreach(decimal dec in tinyBotEncDecs) {
     if(tinyBotEncData.Length > 0) tinyBotEncData.Append(',');
-    tinyBotEncData.Append(decA.ToString(CultureInfo.InvariantCulture));
-    tinyBotEncData.Append('M');
-    tinyBotEncData.Append(',');
-    tinyBotEncData.Append(decB.ToString(CultureInfo.InvariantCulture));
+    tinyBotEncData.Append(dec.ToString(CultureInfo.InvariantCulture));
     tinyBotEncData.Append('M');
 }
 

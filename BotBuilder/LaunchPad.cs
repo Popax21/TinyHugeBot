@@ -8,9 +8,16 @@ public class MyBot : IChessBot {
         if(TinyBot == null) {
             //Decode the assembly
             var asmDataBuf = new byte[<TINYASMSIZE>];
-            int asmDataBufOff = 0, accum = 0, parity = 1;
+            int asmDataBufOff = 0, accum = 0, parity = 1, remVals = 0;
             foreach(decimal dec in TinyBotAsmEncodedData) {
                 var bits = decimal.GetBits(dec);
+
+                //Check if we reached the end of the block
+                if(remVals-- == 0) {
+                    asmDataBufOff += bits[0];
+                    remVals = bits[1];
+                    continue;
+                }
 
                 //Add the 96 bit integer to the buffer
                 for(int i = 0; i < 12; bits[i++ / 4] >>= 8)
