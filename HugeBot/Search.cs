@@ -24,15 +24,8 @@ public class Searcher {
         //Initialize the move buffers
         for(int i = 0; i < MaxPly; i++) moveBufs[i] = new Move[MoveBufSize];
 
-        //Reset the history tables
-        HistoryTable.Reset(whiteHistoryTable);
-        HistoryTable.Reset(blackHistoryTable);
-
         //Initialize the killer tables
-        for(int i = 0; i < MaxPly; i++) KillerTable.Reset(killerTables[i] = new Move[KillerTable.TableSize]);
-
-        //Reset the transposition table
-        TranspositionTable.Reset(transpositionTable);
+        for(int i = 0; i < MaxPly; i++) killerTables[i] = new Move[KillerTable.TableSize];
     }
 
     public Move SearchMoves(Board board, Timer timer) {

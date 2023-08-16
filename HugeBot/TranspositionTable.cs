@@ -12,8 +12,6 @@ public static class TranspositionTable {
 
     private const int TTDepthMask = 0x3fff, TTDepthSignBit = 0x2000;
 
-    public static void Reset(ulong[] table) => Array.Clear(table);
-
     public static void Store(ulong[] table, ulong hash, Move move, int eval, int depth, byte bound) {
         depth = Math.Clamp(depth, -(1 << 13), +(1 << 13) - 1);
         table[hash % TableSize] =
@@ -29,7 +27,7 @@ public static class TranspositionTable {
         ulong ttData = table[hash % TableSize];
     
         //Check if the upper bits of the hash match
-        if((ttData & 0xffff_0000_0000_0000) != (hash & 0xffff_0000_0000_0000)) {
+        if(ttData == 0 || (ttData >> 48) != (hash >> 48)) {
             rawMove = default;
             eval = default;
             bound = default;

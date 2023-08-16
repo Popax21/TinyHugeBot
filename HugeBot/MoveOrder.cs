@@ -8,8 +8,6 @@ namespace HugeBot;
 public static class KillerTable {
     public const int TableSize = 2;
 
-    public static void Reset(Move[] table) => Array.Clear(table);
-
     public static void OnBetaCutoff(Move[] table, Move move) {
         //Insert into the killer table
         for(int i = 1; i < TableSize; i++) table[i] = table[i - 1];
@@ -19,8 +17,6 @@ public static class KillerTable {
 
 public static class HistoryTable {
     public const int TableSize = 64*64;
-
-    public static void Reset(long[] table) => Array.Clear(table);
 
     public static long Get(long[] table, Move move) => table[move.RawValue & 0xfff];
     public static void OnBetaCutoff(long[] table, Move move, int depth) => table[move.RawValue & 0xfff] += (long) depth * depth;
