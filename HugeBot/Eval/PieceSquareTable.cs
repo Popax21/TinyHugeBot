@@ -8,7 +8,7 @@ namespace HugeBot;
 
 static partial class Evaluator {
     public static Eval EvalPieceSquareTable(Span<BitBoard> pieces, byte pstIdxFlip) {
-        Eval eval = 0;
+        Eval eval = 0x800_00000_800_00000;
         for(int pieceType = 0; pieceType < 6; pieceType++) {
             BitBoard pieceBoard = pieces[pieceType];
             while(pieceBoard != 0) {
@@ -24,7 +24,7 @@ static partial class Evaluator {
                 eval += PieceSquareTable[pieceType << 4 | pstIndex];
             }
         }
-        return eval;
+        return eval & 0x000_fffff_000_fffff;
     }
 
     public static readonly Eval[] PieceSquareTable = DecompressEvals(new ushort[] {
