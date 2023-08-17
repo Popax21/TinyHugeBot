@@ -24,13 +24,10 @@ public static class HistoryTable {
 }
 
 public static class MoveOrder {
-    public static int OrderNoisyMoves(Span<Move> moves, ushort ttMove) {
+    public static int OrderNoisyMoves(Span<Move> moves) {
         //Sort by move group
-        int GetMoveGroup(Move move) {
-            if(move.RawValue == ttMove) return 1000000;
-            return ((int) move.PromotionPieceType << 3) | (move.IsPromotion ? 0b100 : 0b000) | (move.IsCapture ? 0b010 : 0) | (move.IsCastles ? 0b001 : 0);
-        }
-        moves.Sort((a, b) => -GetMoveGroup(a).CompareTo(GetMoveGroup(b)));
+        static int GetMoveGroup(Move move) => ((int) move.PromotionPieceType << 3) | (move.IsPromotion ? 0b100 : 0b000) | (move.IsCapture ? 0b010 : 0) | (move.IsCastles ? 0b001 : 0);
+        moves.Sort(static (a, b) => -GetMoveGroup(a).CompareTo(GetMoveGroup(b)));
 
         //Find the first non-promo and quiet move
         int nonPromoMovesIdx = 0;

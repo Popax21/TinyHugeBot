@@ -5,7 +5,7 @@ namespace HugeBot;
 
 public class Searcher {
     //Use these values to prevent integer overlow
-    public const int MinEval = short.MinValue, MaxEval = short.MaxValue, CheckmateThreshold = MaxEval / 2;
+    public const int MinEval = -1000000, MaxEval = +1000000;
 
     public const int MaxPly = 6144, MoveBufSize = 256;
 
@@ -19,6 +19,7 @@ public class Searcher {
     private readonly ulong[] transpositionTable = new ulong[TranspositionTable.TableSize];
 
     private int searchCallIndex = 0;
+
     public Searcher() {
         //Initialize the move buffers
         for(int i = 0; i < MaxPly; i++) moveBufs[i] = new Move[MoveBufSize];
@@ -29,7 +30,7 @@ public class Searcher {
 
     public Move SearchMoves(Board board, Timer timer) {
         //Determine the amount of time to search for
-        int minSearchTime = timer.MillisecondsRemaining / 50;
+        int minSearchTime = timer.MillisecondsRemaining / 40;
         int maxSearchTime = 2*minSearchTime + timer.IncrementMilliseconds / 2;
 
         //Determine the initial ply static evaluation
@@ -40,8 +41,7 @@ public class Searcher {
         board.GetLegalMovesNonAlloc(ref moves);
 
         //Iteratively search to deeper depths for the best move
-        int alpha = MinEval, beta = MaxEval;
-        for(int depth = 1;;) {
+        for(int depth = 0;; depth++) {
             Move bestMove = Move.NullMove;
             int bestEval = MinEval;
 
@@ -50,7 +50,7 @@ public class Searcher {
 
                 //Use alpha-beta pruning to evaluate the move
                 board.MakeMove(move);
-                int? moveEval = -AlphaBeta(board, depth, MinEval, -bestEval, 1, timer, depth > 0 ? maxSearchTime : int.MaxValue, true);
+                int? moveEval = -AlphaBeta(board, depth, MinEval, -bestEval, 1, timer, depth > 0 ? maxSearchTime : int.MaxValue);
                 board.UndoMove(move);
 
                 //Check if we ran out of time
@@ -76,16 +76,6 @@ public class Searcher {
             if(timer.MillisecondsElapsedThisTurn < minSearchTime) {
                 //We didn't - sort the moves by their evaluation and do another pass
                 moveEvalBuf.AsSpan(0, moves.Length).Sort(moves, static (a, b) => -a.CompareTo(b));
-
-                //Update alpha / beta
-                if(bestEval < alpha) alpha -= 200;
-                else if(bestEval > beta) beta += 200;
-                else {
-                    alpha = bestEval - 40;
-                    beta = bestEval + 40;
-                    depth++;
-                }
-
                 continue;
             }
 
@@ -100,7 +90,7 @@ public class Searcher {
         }
     }
 
-    public int? AlphaBeta(Board board, int depth, int alpha, int beta, int plyIdx, Timer timer, int maxSearchTime, bool doNullPruning) {
+    public int? AlphaBeta(Board board, int depth, int alpha, int beta, int plyIdx, Timer timer, int maxSearchTime) {
         //Check if we ran out of time
         if(searchCallIndex % 4096 == 0 && timer.MillisecondsElapsedThisTurn >= maxSearchTime) return null;
         searchCallIndex++;
@@ -108,91 +98,103 @@ public class Searcher {
         //Check if this is triggers the repetition rule
         if(board.IsRepeatedPosition()) return 0;
 
+        //Generate the legal moves we can make
+        Span<Move> moves = moveBufs[plyIdx];
+        board.GetLegalMovesNonAlloc(ref moves);
+        int numOrderedMoves = 0;
+
+        //Check if we're in checkmate or stalemate
+        if(moves.Length == 0) return board.IsInCheck() ? MinEval : 0;
+
+        //Check if the 50 move rule triggered
+        if(board.IsFiftyMoveDraw()) return 0;
+
         //Search one move more if we're in check
-        bool isInCheck = board.IsInCheck();
-        if(isInCheck) depth++;
+        if(board.IsInCheck()) depth++;
+
+        //Check if this is a PV (Principal Variation) node in the search tree
+        bool isPVNode = alpha + 1 != beta;
 
         //Check the transposition table
-        if(TranspositionTable.Lookup(transpositionTable, board.ZobristKey, out ushort ttMove, out int ttEval, out int ttDepth, out byte ttBound)) {
-            //Check if there's a TT bound which applies here
-            if(ttDepth >= depth) {
-                switch(ttBound) {
-                    case TTBound.Lower:
-                        if(ttEval >= beta) return ttEval;
-                        break;
-                    case TTBound.Upper:
-                        if(ttEval <= alpha) return ttEval;
-                        break;
-                    case TTBound.Exact: return ttEval;
+        if(depth > 0 && TranspositionTable.Lookup(transpositionTable, board.ZobristKey, out ushort ttRawMove, out int ttEval, out int ttDepth, out byte ttBound)) {
+            //Lookup the move stored in the transposition table in the current legal moves list
+            for(int i = 0; i < moves.Length; i++) {
+                if(moves[i].RawValue == ttRawMove) {
+                    //Swap the move to the front
+                    (moves[0], moves[i]) = (moves[i], moves[0]);
+                    numOrderedMoves = 1;
+
+                    //Check if there's a TT bound which applies here
+                    if(!isPVNode && ttDepth >= depth) {
+                        switch(ttBound) {
+                            case TTBound.Lower:
+                                if(ttEval >= beta) return ttEval;
+                                break;
+                            case TTBound.Upper:
+                                if(ttEval <= alpha) return ttEval;
+                                break;
+                            case TTBound.Exact: return ttEval;
+                        }
+                    }
+
+                    break;
                 }
             }
-        } else {
+
             //If we failed to look up the move in the table, decrease the depth if it's high enough
-            if(depth > 5) depth--;
+            if(numOrderedMoves < 1 && depth > 5) depth--;
         }
-        ttBound = TTBound.Upper;
 
         //Determine the static evaluation of the ply and check if we're improving
         int staticEval = Evaluator.Evaluate(board);
-
-        if(depth <= 0) {
-            //Special logic for q-search static evals
-            if(staticEval >= beta) return beta;
-            if(staticEval > alpha) {
-                alpha = staticEval;
-                // ttBound = TTBound.Exact;
-            }
-        }
-
-        bool improving = plyIdx >= 2 && staticEval > plyStaticEvals[plyIdx-2];
         plyStaticEvals[plyIdx] = staticEval;
 
-        //Check if this is a PV (Principal Variation) node in the search tree
-        bool isPVNode = alpha + 1 < beta;
+        bool improving = plyIdx >= 2 && staticEval > plyStaticEvals[plyIdx-2];
 
         //Do null move pruning
-        if(depth > 0 && !isPVNode && !isInCheck && staticEval >= beta && beta < CheckmateThreshold) {
+        if(depth > 0 && !isPVNode && !board.IsInCheck() && staticEval >= beta) {
             //Static null move pruning
-            const int StaticNullMovePruningMargin = 300;
-            if(depth < 7 && staticEval >= beta + depth * StaticNullMovePruningMargin) return staticEval;
+            const int StaticNullMovePruningMargin = 256;
+            if(depth <= 5 && staticEval >= beta + depth * StaticNullMovePruningMargin) return beta;
 
             //Non-static null move pruning
-            if(depth >= 3 && doNullPruning) {
+            if(depth >= 3) {
 #if DEBUG
                 if(!board.TrySkipTurn()) throw new Exception("Failed to skip turn for null move pruning!");
 #else
                 board.ForceSkipTurn();
 #endif
 
-                int r = 2;// + (depth - 2) / 4;
-                int? eval = -AlphaBeta(board, depth - r - (improving ? 1 : 2), -beta, -alpha, plyIdx + 1, timer, maxSearchTime, false);
+                int r = 2 + (depth - 2) / 4;
+                int? eval = -AlphaBeta(board, depth - r - (improving ? 1 : 2), -beta, -beta + 1, plyIdx + 1, timer, maxSearchTime);
 
                 board.UndoSkipTurn();
 
-                if(!eval.HasValue || eval >= beta) return eval;
+                if(eval.HasValue && eval >= beta) return eval;
             }
         }
 
-        //Determine if we should apply futility pruning to this node
-        const int FutilityPruningMargin = 300;
-        bool doFutilityPruning = depth <= 5 && !isPVNode && !isInCheck;
-        doFutilityPruning &= staticEval + (Math.Max(depth, 1) + (improving ? 1 : 0)) * FutilityPruningMargin <= alpha;
-
-        //Generate the legal moves we can make
-        Span<Move> moves = moveBufs[plyIdx];
-        board.GetLegalMovesNonAlloc(ref moves, depth <= 0 && !board.IsInCheck());
-
-        //Check for checkmate or draw (except for when in q-search)
-        if(depth > 0 && moves.Length == 0) return isInCheck ? MinEval + plyIdx : 0;
-
         //Order noisy moves
-        int numOrderedMoves = MoveOrder.OrderNoisyMoves(moves, ttMove);
+        numOrderedMoves += MoveOrder.OrderNoisyMoves(moves[numOrderedMoves..]);
         int firstQuietMoveIdx = numOrderedMoves;
+
+        //Determine if we should apply futility pruning to this node
+        const int FutilityPruningMargin = 256;
+        bool doFutilityPruning = depth <= 5 && !board.IsInCheck() && !isPVNode;
+        doFutilityPruning &= staticEval + Math.Max(1, depth + (improving ? 1 : 0)) * FutilityPruningMargin <= alpha;
 
         //Search moves we could make from here
         Move bestMove = default;
         int bestEval = depth <= 0 ? staticEval : MinEval;
+        byte evalBound = TTBound.Upper;
 
+        if(bestEval >= beta) return bestEval;
+        if(bestEval > alpha) {
+            alpha = bestEval;
+            evalBound = TTBound.Exact;
+        }
+
+        bool wasInCheck = board.IsInCheck();
         for(int i = 0; i < moves.Length; i++) {
             //Check if we've entered the unordered moves
             if(i == numOrderedMoves) {
@@ -207,10 +209,10 @@ public class Searcher {
 
 #if DEBUG
             //We only consider captures or promotions as our last moves
-            if(depth <= 0 && !isNoisyMove) throw new Exception($"Encountered quiet move at depth 0! (i={i} numOrderedMoves={numOrderedMoves})");
+            if(depth <= 0 && !isNoisyMove) throw new Exception("Encountered quiet move at depth 0!");
 #endif
 
-            //Do delta pruning for q-search nodes
+            //Do delta pruning
             if(doFutilityPruning && depth <= 0) {
                 const int DeltaPruningBaseBonus = 224, DeltaPruningImprovingBonus = 64;
 
@@ -224,10 +226,9 @@ public class Searcher {
 
             //Temporarily make the move to evaluate it
             board.MakeMove(move);
-            bool givesCheck = board.IsInCheck();
 
             //Eliminate futile moves that don't check and aren't noisy
-            if(doFutilityPruning && !isNoisyMove && !givesCheck && !bestMove.IsNull) {
+            if(doFutilityPruning && !isNoisyMove && !board.IsInCheck()) {
                 board.UndoMove(move);
                 continue;
             }
@@ -237,8 +238,8 @@ public class Searcher {
             if(depth > 0 && !bestMove.IsNull) {
                 //Determine the LMR (Late Move Reduction) depth
                 int lmrDepth = depth - 1;
-                if(depth >= 3 && i >= 6 && !isPVNode && !isNoisyMove && !isInCheck && !givesCheck) {
-                    lmrDepth = depth - 3; //(2 * depth + i) / 8 - (improving ? 0 : 1);
+                if(depth >= 3 && i >= 3 && !isPVNode && !isNoisyMove && !wasInCheck && !board.IsInCheck()) {
+                    lmrDepth = depth - (2 * depth + i) / 8 - (improving ? 0 : 1);
                     if(lmrDepth < 1) {
                         lmrDepth = 1;
 
@@ -246,16 +247,16 @@ public class Searcher {
                         if(HistoryTable.Get(board.IsWhiteToMove ? blackHistoryTable : whiteHistoryTable, move) < 0) {
                             board.UndoMove(move);
                             continue;
-                        }
+                        }                        
                     }
                 }
 
                 //Do the LMR search
-                int? eval = -AlphaBeta(board, lmrDepth, -alpha - 1, -alpha, plyIdx+1, timer, maxSearchTime, doNullPruning);
+                int? eval = -AlphaBeta(board, lmrDepth, -alpha - 1, -alpha, plyIdx+1, timer, maxSearchTime);
 
-                if(eval > alpha && (eval < beta || lmrDepth != depth-1)) {
+                if(eval.HasValue && eval > alpha && (eval < beta || lmrDepth != depth-1)) {
                     //Re-search using regular alpha-beta pruning
-                    eval = -AlphaBeta(board, depth-1, -beta, -alpha, plyIdx+1, timer, maxSearchTime, doNullPruning);
+                    eval = -AlphaBeta(board, depth-1, -beta, -alpha, plyIdx+1, timer, maxSearchTime);
                 }
 
                 if(!eval.HasValue) {
@@ -265,7 +266,7 @@ public class Searcher {
                 moveEval = eval.Value;
             } else {
                 //Fall back to simple alpha-beta pruning
-                int? eval = -AlphaBeta(board, depth-1, -beta, -alpha, plyIdx+1, timer, maxSearchTime, doNullPruning);
+                int? eval = -AlphaBeta(board, depth-1, -beta, -alpha, plyIdx+1, timer, maxSearchTime);
                 if(!eval.HasValue) {
                     board.UndoMove(move);
                     return null;
@@ -279,16 +280,11 @@ public class Searcher {
             //Update search variables
             if(moveEval > bestEval) (bestMove, bestEval) = (move, moveEval);
 
-            if(moveEval > alpha) {
-                alpha = moveEval;
-                ttBound = TTBound.Exact;
-            }
-
             if(moveEval >= beta) {
-                ttBound = TTBound.Lower;
+                evalBound = TTBound.Lower;
 
                 //Update the history and killer tables if this was a quiet move
-                if(depth <= 0 || isNoisyMove) break;
+                if(isNoisyMove) break;
 
                 long[] historyTable = board.IsWhiteToMove ? whiteHistoryTable : blackHistoryTable;
                 KillerTable.OnBetaCutoff(killerTables[plyIdx], move);
@@ -299,10 +295,15 @@ public class Searcher {
 
                 break;
             }
+
+            if(moveEval > alpha) {
+                alpha = moveEval;
+                evalBound = TTBound.Exact;
+            }
         }
 
         //Insert the best move into the TT
-        if(!bestMove.IsNull) TranspositionTable.Store(transpositionTable, board.ZobristKey, bestMove, bestEval, depth, ttBound);
+        if(!bestMove.IsNull && depth > 0) TranspositionTable.Store(transpositionTable, board.ZobristKey, bestMove, bestEval, depth, evalBound);
 
         return bestEval;
     }

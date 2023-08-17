@@ -80,11 +80,6 @@ public static partial class Evaluator {
         egEval = (egEval & 0x0ffff) - (egEval & 0x10000);
 
         int score = (mgEval * phase + egEval * (24 - phase)) / 24;
-
-#if DEBUG
-        if(score < short.MinValue/2 || score > short.MaxValue/2) throw new Exception("Invalid board evaluation!");
-#endif
-
         return board.IsWhiteToMove ? score : -score;
     }
 

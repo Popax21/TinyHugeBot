@@ -17,7 +17,6 @@ class MyBot : IChessBot {
     public string ReadUntil(string cmd) {
         while(proc.StandardOutput.ReadLine() is string msg) {
             if(msg.StartsWith(cmd)) return msg;
-            if(msg.StartsWith("info ")) Console.WriteLine(msg[5..]);
         }
         throw new Exception();
     }
