@@ -5,7 +5,7 @@ namespace HugeBot;
 
 public class Searcher {
     //Use these values to prevent integer overlow
-    public const int MinEval = -1000000, MaxEval = +1000000;
+    public const int MinEval = -short.MaxValue, MaxEval = +short.MaxValue;
 
     public const int MaxPly = 6144, MoveBufSize = 256;
 
@@ -104,7 +104,7 @@ public class Searcher {
         int numOrderedMoves = 0;
 
         //Check if we're in checkmate or stalemate
-        if(moves.Length == 0) return board.IsInCheck() ? MinEval : 0;
+        if(moves.Length == 0) return board.IsInCheck() ? MinEval + plyIdx : 0;
 
         //Check if the 50 move rule triggered
         if(board.IsFiftyMoveDraw()) return 0;

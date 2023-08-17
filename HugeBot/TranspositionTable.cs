@@ -13,7 +13,12 @@ public static class TranspositionTable {
     private const int TTDepthMask = 0x3fff, TTDepthSignBit = 0x2000;
 
     public static void Store(ulong[] table, ulong hash, Move move, int eval, int depth, byte bound) {
+#if DEBUG
+        if(eval < short.MinValue || eval > short.MaxValue) throw new Exception("TT store eval overflow!");
+#endif
+
         depth = Math.Clamp(depth, -(1 << 13), +(1 << 13) - 1);
+
         table[hash % TableSize] =
             move.RawValue |
             ((ulong) (short) eval) << 16 |
