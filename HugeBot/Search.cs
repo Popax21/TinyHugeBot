@@ -18,8 +18,6 @@ public class Searcher {
     private readonly Move[][] killerTables = new Move[MaxPly][];
     private readonly ulong[] transpositionTable = new ulong[TranspositionTable.TableSize];
 
-    private int searchCallIndex = 0;
-
     public Searcher() {
         //Initialize the move buffers
         for(int i = 0; i < MaxPly; i++) moveBufs[i] = new Move[MoveBufSize];
@@ -30,8 +28,8 @@ public class Searcher {
 
     public Move SearchMoves(Board board, Timer timer) {
         //Determine the amount of time to search for
-        int minSearchTime = timer.MillisecondsRemaining / 40;
-        int maxSearchTime = 2*minSearchTime + timer.IncrementMilliseconds / 2;
+        int minSearchTime = timer.MillisecondsRemaining / 30;
+        int maxSearchTime = minSearchTime + (minSearchTime + timer.IncrementMilliseconds) / 2;
 
         //Determine the initial ply static evaluation
         plyStaticEvals[0] = Evaluator.Evaluate(board);
@@ -50,11 +48,11 @@ public class Searcher {
 
                 //Use alpha-beta pruning to evaluate the move
                 board.MakeMove(move);
-                int? moveEval = -AlphaBeta(board, depth, MinEval, -bestEval, 1, timer, depth > 0 ? maxSearchTime : int.MaxValue);
+                int moveEval = -AlphaBeta(board, depth, MinEval, -bestEval, 1, timer, depth > 0 ? maxSearchTime : int.MaxValue);
                 board.UndoMove(move);
 
                 //Check if we ran out of time
-                if(!moveEval.HasValue) {
+                if(moveEval < short.MinValue || moveEval > short.MaxValue) {
                     if(i == 0) {
                         //Get the best move from the previous depth search
                         bestMove = moves[0];
@@ -63,10 +61,10 @@ public class Searcher {
                     goto EndSearch;
                 }
 
-                moveEvalBuf[i] = moveEval.Value;
+                moveEvalBuf[i] = moveEval;
 
                 //Update the best move
-                if(bestMove.IsNull || bestEval < moveEval) (bestMove, bestEval) = (move, moveEval.Value);
+                if(bestMove.IsNull || bestEval < moveEval) (bestMove, bestEval) = (move, moveEval);
             }
 
             //Check if we only have one move
@@ -90,10 +88,9 @@ public class Searcher {
         }
     }
 
-    public int? AlphaBeta(Board board, int depth, int alpha, int beta, int plyIdx, Timer timer, int maxSearchTime) {
+    public int AlphaBeta(Board board, int depth, int alpha, int beta, int plyIdx, Timer timer, int maxSearchTime) {
         //Check if we ran out of time
-        if(searchCallIndex % 4096 == 0 && timer.MillisecondsElapsedThisTurn >= maxSearchTime) return null;
-        searchCallIndex++;
+        if(timer.MillisecondsElapsedThisTurn >= maxSearchTime) return 1000000;
 
         //Check if this is triggers the repetition rule
         if(board.IsRepeatedPosition()) return 0;
@@ -166,11 +163,11 @@ public class Searcher {
 #endif
 
                 int r = 2 + (depth - 2) / 4;
-                int? eval = -AlphaBeta(board, depth - r - (improving ? 1 : 2), -beta, -beta + 1, plyIdx + 1, timer, maxSearchTime);
+                int eval = -AlphaBeta(board, depth - r - (improving ? 1 : 2), -beta, -beta + 1, plyIdx + 1, timer, maxSearchTime);
 
                 board.UndoSkipTurn();
 
-                if(eval.HasValue && eval >= beta) return eval;
+                if(eval >= beta) return eval;
             }
         }
 
@@ -252,30 +249,22 @@ public class Searcher {
                 }
 
                 //Do the LMR search
-                int? eval = -AlphaBeta(board, lmrDepth, -alpha - 1, -alpha, plyIdx+1, timer, maxSearchTime);
+                moveEval = -AlphaBeta(board, lmrDepth, -alpha - 1, -alpha, plyIdx+1, timer, maxSearchTime);
 
-                if(eval.HasValue && eval > alpha && (eval < beta || lmrDepth != depth-1)) {
+                if(moveEval > alpha && (moveEval < beta || lmrDepth != depth-1)) {
                     //Re-search using regular alpha-beta pruning
-                    eval = -AlphaBeta(board, depth-1, -beta, -alpha, plyIdx+1, timer, maxSearchTime);
+                    moveEval = -AlphaBeta(board, depth-1, -beta, -alpha, plyIdx+1, timer, maxSearchTime);
                 }
-
-                if(!eval.HasValue) {
-                    board.UndoMove(move);
-                    return null;
-                }
-                moveEval = eval.Value;
             } else {
                 //Fall back to simple alpha-beta pruning
-                int? eval = -AlphaBeta(board, depth-1, -beta, -alpha, plyIdx+1, timer, maxSearchTime);
-                if(!eval.HasValue) {
-                    board.UndoMove(move);
-                    return null;
-                }
-                moveEval = eval.Value;
+                moveEval = -AlphaBeta(board, depth-1, -beta, -alpha, plyIdx+1, timer, maxSearchTime);
             }
 
             //Undo the temporary move
             board.UndoMove(move);
+
+            //Check if we ran out of time
+            if(moveEval < short.MinValue || moveEval > short.MaxValue) return moveEval;
 
             //Update search variables
             if(moveEval > bestEval) (bestMove, bestEval) = (move, moveEval);
