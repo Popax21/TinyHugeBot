@@ -14,6 +14,8 @@ class MyBot : IChessBot {
         proc.StandardInput.WriteLine("ucinewgame");
     }
 
+    ~MyBot() => proc.Kill(true);
+
     public string ReadUntil(string cmd) {
         while(proc.StandardOutput.ReadLine() is string msg) {
             if(msg.StartsWith(cmd)) return msg;
@@ -23,8 +25,10 @@ class MyBot : IChessBot {
 
     public Move Think(Board board, Timer timer) {
         proc.StandardInput.WriteLine($"position fen {board.GetFenString()}");
-        if(board.IsWhiteToMove) proc.StandardInput.WriteLine($"go wtime {timer.MillisecondsRemaining} winc {timer.IncrementMilliseconds}");
-        else proc.StandardInput.WriteLine($"go btime {timer.MillisecondsRemaining} binc {timer.IncrementMilliseconds}");
+
+        int wtime, btime;
+        (wtime, btime) = board.IsWhiteToMove ? (timer.MillisecondsRemaining, timer.OpponentMillisecondsRemaining) : (timer.OpponentMillisecondsRemaining, timer.MillisecondsRemaining);
+        proc.StandardInput.WriteLine($"go wtime {wtime} winc {timer.IncrementMilliseconds} btime {btime} binc {timer.IncrementMilliseconds}");
 
         string bestMove = ReadUntil("bestmove")[8..].Trim();
         Console.WriteLine($"BEST MOVE: {bestMove}");
