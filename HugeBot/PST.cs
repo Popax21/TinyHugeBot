@@ -6,14 +6,14 @@ namespace HugeBot;
 //All credits belong to Mark Carlson (MinusKelvin) for their amazing engine!
 
 public static class PSTTable {
-    public const int BlackPiece = 8;
+    public const int WhitePiece = 0, BlackPiece = 8;
     public static readonly ulong[][] PieceSquareTable;
 
     //NOTE: The bleed between MG -> EG phases is intentional (I think)
 
     private static void UnpackPSTFull(int piece, ulong phase, double scale, short off) {
         unchecked {
-            ulong[] whiteTable = PieceSquareTable[piece], blackTable = PieceSquareTable[piece | BlackPiece];
+            ulong[] whiteTable = PieceSquareTable[piece | WhitePiece], blackTable = PieceSquareTable[piece | BlackPiece];
             for(int rank = 1; rank < 7; rank++) {
                 for(int file = 0; file < 8; file++) {
                     long val = checked((short) (CompressedPSTData[CompressedPSTDataOff++] * scale + off));
@@ -26,7 +26,7 @@ public static class PSTTable {
 
     private static void UnpackPSTHalf(int piece, ulong phase, double scale, short offQuadLL, short offQuadLR, short offQuadRL, short offQuadRR) {
         unchecked {
-            ulong[] whiteTable = PieceSquareTable[piece], blackTable = PieceSquareTable[piece | BlackPiece];
+            ulong[] whiteTable = PieceSquareTable[piece | WhitePiece], blackTable = PieceSquareTable[piece | BlackPiece];
             for(int rank = 0; rank < 4; rank++) {
                 for(int file = 0; file < 4; file++) {
                     short val = checked((short) (CompressedPSTData[CompressedPSTDataOff++] * scale));
@@ -47,7 +47,7 @@ public static class PSTTable {
 
     private static void UnpackPSTSmol(int piece, ulong phase, double scale, short off) {
         unchecked {
-            ulong[] whiteTable = PieceSquareTable[piece], blackTable = PieceSquareTable[piece | BlackPiece];
+            ulong[] whiteTable = PieceSquareTable[piece | WhitePiece], blackTable = PieceSquareTable[piece | BlackPiece];
             for(int rank = 0; rank < 8; rank += 2) {
                 for(int file = 0; file < 8; file += 2) {
                     long val = checked((short) (CompressedPSTData[CompressedPSTDataOff++] * scale + off));

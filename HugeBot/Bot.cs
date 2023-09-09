@@ -8,7 +8,7 @@ public class MyBot : IChessBot {
     private Timer searchTimer = null!;
     private int searchAbortTime;
 
-    private Move bestMove;
+    private Move rootBestMove;
 
     public Move Think(Board board, Timer timer) {
         //Determine search times
@@ -19,17 +19,18 @@ public class MyBot : IChessBot {
 
         //Do a NegaMax search with iterative deepening
         Move curBestMove = default;
+        int curBestEval = 0;
         for(int depth = 1;; depth++) {
             //Do a NegaMax search with the current depth
             try {
-                NegaMax(board, MinEval, MaxEval, depth, 0);
-                curBestMove = bestMove; //Update the best move
+                curBestEval = NegaMax(board, MinEval, MaxEval, depth, 0);
+                curBestMove = rootBestMove; //Update the best move
             } catch {}
 
             //Check if time is up
             if(timer.MillisecondsElapsedThisTurn >= deepeningSearchTime) {
 #if DEBUG
-                Console.WriteLine($"Searched to depth {depth} in {timer.MillisecondsElapsedThisTurn:d5}ms: best {curBestMove.ToString().ToLower()}");
+                Console.WriteLine($"Searched to depth {depth} in {timer.MillisecondsElapsedThisTurn:d5}ms: best {curBestMove.ToString().ToLower()} eval {curBestEval}");
 #endif
                 return curBestMove;
             }
@@ -42,7 +43,7 @@ public class MyBot : IChessBot {
 
         //Check if we reached the bottom of the search tree
         //TODO Quiescence search
-        if(remDepth <= 0) return 0; //Evaluate(board);
+        if(remDepth <= 0) return Eval.Evaluate(board);
 
         //Generate legal moves
         Span<Move> moves = stackalloc Move[256];
@@ -59,7 +60,7 @@ public class MyBot : IChessBot {
             //Update the best score
             if(score > bestScore) {
                 bestScore = score;
-                if(ply == 0) bestMove = moves[i];
+                if(ply == 0) rootBestMove = moves[i];
             }
 
             //Update alpha/beta bounds
