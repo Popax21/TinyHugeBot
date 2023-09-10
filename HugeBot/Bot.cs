@@ -41,6 +41,9 @@ public class MyBot : IChessBot {
         //Check if time is up
         if(searchTimer.MillisecondsElapsedThisTurn >= searchAbortTime) throw new TimeoutException();
 
+        //Handle repetition
+        if(board.IsRepeatedPosition()) return 0;
+
         //Check if we reached the bottom of the search tree
         //TODO Quiescence search
         if(remDepth <= 0) return Eval.Evaluate(board);
@@ -48,6 +51,11 @@ public class MyBot : IChessBot {
         //Generate legal moves
         Span<Move> moves = stackalloc Move[256];
         board.GetLegalMovesNonAlloc(ref moves);
+
+        if(moves.Length == 0) {
+            //Handle checkmate / stalemate
+            return board.IsInCheck() ? MinEval + ply : 0;
+        }
 
         //Search for the best move
         int bestScore = MinEval;
