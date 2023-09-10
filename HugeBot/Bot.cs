@@ -13,7 +13,7 @@ public class MyBot : IChessBot {
     public Move Think(Board board, Timer timer) {
         //Determine search times
         searchTimer = timer;
-        searchAbortTime = timer.MillisecondsRemaining / 2;
+        searchAbortTime = timer.MillisecondsRemaining / 8;
 
         int deepeningSearchTime = timer.MillisecondsRemaining / 20;
 
@@ -25,7 +25,7 @@ public class MyBot : IChessBot {
             try {
                 curBestEval = NegaMax(board, MinEval, MaxEval, depth, 0);
                 curBestMove = rootBestMove; //Update the best move
-            } catch {}
+            } catch(TimeoutException) {}
 
             //Check if time is up
             if(timer.MillisecondsElapsedThisTurn >= deepeningSearchTime) {
@@ -39,7 +39,7 @@ public class MyBot : IChessBot {
 
     public int NegaMax(Board board, int alpha, int beta, int remDepth, int ply) {
         //Check if time is up
-        if(searchTimer.MillisecondsElapsedThisTurn >= searchAbortTime) throw new Exception();
+        if(searchTimer.MillisecondsElapsedThisTurn >= searchAbortTime) throw new TimeoutException();
 
         //Check if we reached the bottom of the search tree
         //TODO Quiescence search
