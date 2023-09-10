@@ -9,7 +9,7 @@ namespace HugeBot;
 
 public static class Eval {
     private static readonly int[] PSTIndices = { 0, 2, 3, 4, 5, 6 };
-    private static readonly int[] PhaseContributions = { 0, 1, 1, 2, 4, 0, };
+    private static readonly int[] PhaseContributions = { 0, 1, 1, 2, 4, 0 };
 
     public static int Evaluate(Board board) {
         //TODO Incremental evaluation
@@ -33,8 +33,11 @@ public static class Eval {
 
 #if DEBUG
         //Check that the phase is in-range
-        if(phase < 0 || phase > 24) throw new Exception($"Unexpected evaluation phase value: {phase}");
+        if(phase < 0) throw new Exception($"Unexpected evaluation phase value: {phase}");
 #endif
+
+        //Handle early promotion
+        if(phase > 24) phase = 24;
 
         //Resolve the evaluation
         short mgEval = unchecked((short) pstEval), egEval = unchecked((short) (pstEval >> 32));
