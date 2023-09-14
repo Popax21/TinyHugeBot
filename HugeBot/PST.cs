@@ -92,7 +92,7 @@ public static class PSTTable {
 
         //Mask of extra PST bits
         for(int i = 0; i < 16; i++) {
-            for(int j = 0; j < 64; j++) PieceSquareTable[i][j] &= 0x0000_ffff_0000_ffffUL;
+            for(int j = 0; j < 64; j++) PieceSquareTable[i][j] &= Eval.EvalMask;
         }
     }
 
