@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -13,11 +12,11 @@ using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.DotNet.Collections;
 using AsmResolver.DotNet.Serialized;
 using AsmResolver.DotNet.Signatures;
+using AsmResolver.DotNet.Signatures.Types;
 using AsmResolver.PE;
 using AsmResolver.PE.DotNet.Builder;
 using AsmResolver.PE.DotNet.Cil;
 using AsmResolver.PE.File;
-using AsmResolver.PE.File.Headers;
 using MethodAttributes = AsmResolver.PE.DotNet.Metadata.Tables.Rows.MethodAttributes;
 
 if(args.Length < 2) throw new ArgumentException("Usage: <huge bot DLL> <tiny bot DLL> [tiny bot CS] [--debug]");
@@ -29,6 +28,9 @@ if(!DEBUG) {
     //Read the huge bot DLL
     ModuleDefinition botMod = ModuleDefinition.FromFile(args[0], new ModuleReaderParameters(AppDomain.CurrentDomain.BaseDirectory));
     if(botMod.Assembly == null) throw new Exception("No assembly in huge bot DLL!");
+
+    TypeDefinition botType = botMod.TopLevelTypes.First(t => t.FullName == "MyBot");
+    TypeDefinition? privImplType = botMod.TopLevelTypes.FirstOrDefault(t => t.FullName == "<PrivateImplementationDetails>");
 
     //Tiny-fy module and assembly metadata
     botMod.Name = null;
@@ -48,10 +50,34 @@ if(!DEBUG) {
     botMod.Assembly.CustomAttributes.Clear();
 
     //Tiny-fy types
-    void TinyfyType(TypeDefinition type, ref char nextName) {
+    HashSet<TypeDefinition> tinyfyedTypes = new HashSet<TypeDefinition>();
+    bool ShouldTinyfy(TypeDefinition type) {
+        if(type == botType || type == privImplType || (type.Namespace?.Value?.StartsWith("HugeBot") ?? false)) return true;
+        if(tinyfyedTypes.Contains(type)) return true;
+        if(type.DeclaringType != null) return ShouldTinyfy(type.DeclaringType);
+        return false;
+    }
+
+    TypeSignature RelinkType(TypeSignature typeSig) {
+        if(!(typeSig is TypeDefOrRefSignature)) return typeSig;
+
+        //Handle bot types
+        if(typeSig.Resolve() is TypeDefinition typeDef && ShouldTinyfy(typeDef)) {
+            //Inline enum types
+            if(typeDef.IsEnum) return botMod.CorLibTypeFactory.Int32;
+        }
+
+        return typeSig;
+    }
+
+    bool TinyfyType(TypeDefinition type, ref char nextName) {
+        //Enum types are inlined
+        if(type.IsEnum) return false;
+
         //Tiny-fy the name
         type.Namespace = null;
         type.Name = (nextName++).ToString();
+        tinyfyedTypes.Add(type);
 
         //Clear attributes
         type.CustomAttributes.Clear();
@@ -64,10 +90,26 @@ if(!DEBUG) {
         }
 
         //Trim out parameter names
-        foreach(MethodDefinition meth in type.Methods.ToArray()) {
+        foreach(MethodDefinition meth in type.Methods) {
             foreach(Parameter param in meth.Parameters) {
                 if(param.Definition != null) param.Definition!.Name = null;
             }
+        }
+
+        //Trim out properties (the underlying getter/setter methods are kept, but we don't need the metadata)
+        type.Properties.Clear();
+
+        //Relink type references
+        foreach(MethodDefinition meth in type.Methods) {
+            foreach(Parameter param in meth.Parameters) param.ParameterType = RelinkType(param.ParameterType); 
+        }
+        foreach(FieldDefinition field in type.Fields) {
+            if(field.Signature is FieldSignature fieldSig) fieldSig.FieldType = RelinkType(fieldSig.FieldType);
+        }
+
+        //Tiny-fy and relink method bodies
+        foreach(MethodDefinition meth in type.Methods) {
+            if(meth.CilMethodBody != null) TinyfyMethodBody(meth.CilMethodBody);
         }
 
         //Tiny-fy member names
@@ -79,44 +121,56 @@ if(!DEBUG) {
         foreach(FieldDefinition field in type.Fields) field.Name = null;
         
         char nextNestedName = 'a';
-        foreach(TypeDefinition nestedType in type.NestedTypes.ToArray()) TinyfyType(nestedType, ref nextNestedName);
+        foreach(TypeDefinition nestedType in type.NestedTypes.ToArray()) {
+            if(!TinyfyType(nestedType, ref nextNestedName)) type.NestedTypes.Remove(nestedType);
+        }
+
+        return true;
     }
 
-    TypeDefinition botType = botMod.TopLevelTypes.First(t => t.FullName == "MyBot");
-    TypeDefinition? privImplType = botMod.TopLevelTypes.FirstOrDefault(t => t.FullName == "<PrivateImplementationDetails>");
-    TypeDefinition? staticType = null;
+    void TinyfyMethodBody(CilMethodBody body) {
+        //Relink locals
+        foreach(CilLocalVariable local in body.LocalVariables) local.VariableType = RelinkType(local.VariableType);
 
+        foreach(CilInstruction instr in body.Instructions) {
+            //Relink type reference
+            if(instr.Operand is MethodSignature methodSig) {
+                methodSig.ReturnType = RelinkType(methodSig.ReturnType);
+                for(int i = 0; i < methodSig.ParameterTypes.Count; i++) methodSig.ParameterTypes[i] = RelinkType(methodSig.ParameterTypes[i]);
+            }
+            if(instr.Operand is FieldSignature fieldSig) fieldSig.FieldType = RelinkType(fieldSig.FieldType);
+        }
+    }
+
+    TypeDefinition staticType = botMod.GetOrCreateModuleType(); //We need a static type anyway, so why not .-.
     char nextName = 'a';
     foreach(TypeDefinition type in botMod.TopLevelTypes.ToArray()) {
         bool keepType = false;
 
-        if(type == botType || type == privImplType || (type.Namespace?.Value?.StartsWith("HugeBot") ?? false)) {
+        if(ShouldTinyfy(type)) {
             //Merge static types (there's no concept of "static classes" at the IL level, so we have to cheat a bit)
             if((type.IsSealed && type.IsAbstract) || type == privImplType) {
-                if(staticType != null) {
-                    //Merge the types by transfering over fields, methods and properties
-                    static T[] StealElements<T>(IList<T> list) {
-                        T[] elems = list.ToArray();
-                        list.Clear();
-                        return elems;
-                    }
-                    foreach(FieldDefinition field in StealElements(type.Fields)) staticType.Fields.Add(field);
-                    foreach(MethodDefinition method in StealElements(type.Methods)) staticType.Methods.Add(method);
-                    foreach(PropertyDefinition prop in StealElements(type.Properties)) staticType.Properties.Add(prop);
-                    foreach(TypeDefinition nestedType in StealElements(type.NestedTypes)) staticType.NestedTypes.Add(nestedType);
-                } else {
-                    staticType = type;
-                    keepType = true;
+                //Merge the types by transfering over fields, methods and properties
+                static T[] StealElements<T>(IList<T> list) {
+                    T[] elems = list.ToArray();
+                    list.Clear();
+                    return elems;
                 }
+                foreach(FieldDefinition field in StealElements(type.Fields)) staticType.Fields.Add(field);
+                foreach(MethodDefinition method in StealElements(type.Methods)) staticType.Methods.Add(method);
+                foreach(PropertyDefinition prop in StealElements(type.Properties)) staticType.Properties.Add(prop);
+                foreach(TypeDefinition nestedType in StealElements(type.NestedTypes)) staticType.NestedTypes.Add(nestedType);
             } else {
                 //Tinfy other types
-                TinyfyType(type, ref nextName);
-                keepType = true;
+                keepType = TinyfyType(type, ref nextName);
             }
+
+            //Enum types are inlined
+            if(type.IsEnum) keepType = false;
         }
 
         //Remove the type if we don't need it
-        if(!keepType) botMod.TopLevelTypes.Remove(type);
+        if(!keepType && type != staticType) botMod.TopLevelTypes.Remove(type);
     }
 
     if(staticType != null) {
@@ -150,9 +204,8 @@ if(!DEBUG) {
         TinyfyType(staticType, ref nextName);
     }
 
-    //Fixup the module
-    botMod.GetOrCreateModuleType();
-    botType.Name = botClass = "B"; //We need to expose the bot type
+    //We need to expose the bot type
+    botType.Name = botClass = "B"; 
 
     //Build the tiny bot DLL by modifying some other parameters
     PEImageBuildResult tinyBotBuildRes = new ManagedPEImageBuilder().CreateImage(botMod);
@@ -188,7 +241,7 @@ if(!DEBUG) {
     Console.WriteLine("Skipping tiny bot build as --debug flag was given");
 }
 
-if(args.Length <= 2) return;
+if (args.Length <= 2) return;
 
 //Encode the TinyBot DLL
 byte[] tinyBotData = File.ReadAllBytes(asmPath);
