@@ -62,8 +62,19 @@ public static class Eval {
         }
 
 #if DEBUG
+    try {
         //Check that the phase is in-range
         if(phase < 0) throw new Exception($"Unexpected evaluation phase value: {phase}");
+
+        //Check for potential overflows
+        if((eval & 0x0000_0000_ffff_0000) < 0x0000_0000_6000_0000 || (eval & 0x0000_0000_ffff_0000) > 0x0000_0000_afff_0000) throw new Exception($"Potential MG eval overflow: 0x{eval:x16}");
+        if((eval & 0xffff_0000_0000_0000) < 0x6000_0000_0000_0000 || (eval & 0xffff_0000_0000_0000) > 0xafff_0000_0000_0000) throw new Exception($"Potential EG eval overflow: 0x{eval:x16}");
+    } catch {
+        Console.WriteLine("Eval check tripped - dumping board state:");
+        Console.WriteLine(board.CreateDiagram());
+        Console.WriteLine();
+        throw;
+    }
 #endif
 
         //Handle early promotion
