@@ -2,9 +2,7 @@
 using ChessChallenge.API;
 using HugeBot;
 
-public class MyBot : IChessBot {
-    public const int MinEval = -30000, MaxEval = +30000;
-
+public partial class MyBot : IChessBot {
     private Timer searchTimer = null!;
     private int searchAbortTime;
 
@@ -23,7 +21,7 @@ public class MyBot : IChessBot {
         for(int depth = 1;; depth++) {
             //Do a NegaMax search with the current depth
             try {
-                curBestEval = NegaMax(board, MinEval, MaxEval, depth, 0);
+                curBestEval = NegaMax(board, Eval.MinEval, Eval.MaxEval, depth, 0);
                 curBestMove = rootBestMove; //Update the best move
             } catch(TimeoutException) {}
 
@@ -44,6 +42,12 @@ public class MyBot : IChessBot {
         //Handle repetition
         if(board.IsRepeatedPosition()) return 0;
 
+        //Check if the position is in the TT
+        if(CheckTTEntry(transposTable[board.ZobristKey & TTIdxMask], board.ZobristKey, alpha, beta, remDepth)) {
+            //The evaluation is stored in the lower 16 bits of the entry
+            return unchecked((short) transposTable[board.ZobristKey & TTIdxMask]);
+        }
+
         //Check if we reached the bottom of the search tree
         //TODO Quiescence search
         if(remDepth <= 0) return Eval.Evaluate(board);
@@ -54,11 +58,13 @@ public class MyBot : IChessBot {
 
         if(moves.Length == 0) {
             //Handle checkmate / stalemate
-            return board.IsInCheck() ? MinEval + ply : 0;
+            return board.IsInCheck() ? Eval.MinEval + ply : 0;
         }
 
         //Search for the best move
-        int bestScore = MinEval;
+        int bestScore = Eval.MinEval;
+        TTBoundType ttBound = TTBoundType.Upper; //Until we become a PV node we only have a lower-bound
+
         for(int i = 0; i < moves.Length; i++) {
             //Recursively evaluate the move
             board.MakeMove(moves[i]);
@@ -72,9 +78,21 @@ public class MyBot : IChessBot {
             }
 
             //Update alpha/beta bounds
-            if(score >= beta) break; //Do this after the best score update to implement a fail-soft alpha-beta search
-            if(score > alpha) alpha = score;
+            //Do this after the best score update to implement a fail-soft alpha-beta search
+            if(score >= beta) {
+                ttBound = TTBoundType.Lower; //We failed high; our score now only is a lower bound
+                break;
+            }
+
+            if(score >= alpha) {
+                alpha = score;
+                ttBound = TTBoundType.Exact; //We raised alpha and became a PV-node; our score is now exact
+            }
         }
+
+        //Insert the move into the transposition table
+        //TODO: Currently always replaces, investigate potential other strategies
+        transposTable[board.ZobristKey & TTIdxMask] = EncodeTTEntry((short) bestScore, ttBound, remDepth, board.ZobristKey);
 
         return bestScore;
     }

@@ -8,7 +8,9 @@ namespace HugeBot;
 //All credits belong to Mark Carlson (MinusKelvin) for their amazing engine!
 
 public static class Eval {
-    public const ulong EvalMask = 0x0000_ffff_0000_ffffUL;
+    public const short MinEval = -30000, MaxEval = +30000;
+
+    internal const ulong EvalMask = 0x0000_ffff_0000_ffffUL;
 
     private const ulong TempoEvalBoost = 0x0000_0002_0000_0006;
     private const ulong BishopPairEval = 0x0000_0029_0000_0017;
