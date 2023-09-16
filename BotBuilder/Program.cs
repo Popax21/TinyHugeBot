@@ -218,13 +218,7 @@ if(!DEBUG) {
     //Write the tiny bot DLL
     tinyBot.Write(args[1]);
 
-    static long GetDLLSize(string path) {
-        //Don't count trailing zeros
-        byte[] contents = File.ReadAllBytes(path);
-        long size = contents.Length;
-        while(size > 0 && contents[size-1] == 0) size--;
-        return size;
-    }
+    static long GetDLLSize(string path) => new FileInfo(path).Length;
     Console.WriteLine($"Built tiny bot: {args[0]} ({GetDLLSize(args[0])} bytes) -> {args[1]} ({GetDLLSize(args[1])} bytes)");
 
     //Ensure that the DLL can still be loaded
@@ -291,6 +285,8 @@ for(int i = 0; i < tinyBotData.Length;) {
     curBufOff = i += 25;
 }
 EndHeader();
+
+Console.WriteLine($"Encoded {tinyBotData.Length} bytes into {tinyBotEncDecs.Count} tokens");
 
 StringBuilder tinyBotEncData = new StringBuilder();
 foreach(decimal dec in tinyBotEncDecs) {
