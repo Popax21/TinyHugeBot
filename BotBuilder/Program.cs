@@ -16,6 +16,7 @@ using AsmResolver.DotNet.Signatures.Types;
 using AsmResolver.PE;
 using AsmResolver.PE.DotNet.Builder;
 using AsmResolver.PE.DotNet.Cil;
+using AsmResolver.PE.DotNet.Metadata.Guid;
 using AsmResolver.PE.File;
 using MethodAttributes = AsmResolver.PE.DotNet.Metadata.Tables.Rows.MethodAttributes;
 
@@ -435,9 +436,11 @@ if(!DEBUG) {
     botType.Name = botClass = "B"; 
 
     //Build the tiny bot DLL by modifying some other parameters
-    PEImageBuildResult tinyBotBuildRes = new ManagedPEImageBuilder().CreateImage(botMod);
-    IPEImage tinyBotImg = tinyBotBuildRes.ConstructedImage ?? throw new Exception("No tiny bot PEImage was built!");
+    IPEImage tinyBotImg = new ManagedPEImageBuilder().CreateImage(botMod).ConstructedImage ?? throw new Exception("No tiny bot PEImage was built!");
     tinyBotImg.Resources = null;
+    if(tinyBotImg.DotNetDirectory?.Metadata?.TryGetStream(out GuidStream? guidStream) ?? false) {
+        tinyBotImg.DotNetDirectory.Metadata.Streams.Remove(guidStream);
+    }
 
     PEFile tinyBot = new ManagedPEFileBuilder().CreateFile(tinyBotImg);
     tinyBot.OptionalHeader.FileAlignment = tinyBot.OptionalHeader.SectionAlignment = 512;
