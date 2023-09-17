@@ -594,66 +594,59 @@ if (args.Length <= 2) return;
 
 //Encode the TinyBot DLL
 byte[] tinyBotData = File.ReadAllBytes(asmPath);
-byte GetTinyBotNibble(long idx) => (byte) (idx < tinyBotData.Length*2 ? (tinyBotData[idx / 2] >> (int) (4 * (idx & 1))) & 0xf : 0);
-byte GetTinyBotByte(long nibbleIdx) => (byte) (GetTinyBotNibble(nibbleIdx) + (GetTinyBotNibble(nibbleIdx+1) << 4));
-int GetTinyBotInt(long nibbleIdx) => GetTinyBotByte(nibbleIdx) + (GetTinyBotByte(nibbleIdx+2) << 8) + (GetTinyBotByte(nibbleIdx+4) << 16) + (GetTinyBotByte(nibbleIdx+6) << 24);
+byte GetTinyBotByte(int idx) => idx < tinyBotData.Length ? tinyBotData[idx] : (byte) 0;
+ushort GetTinyBotShort(int idx) => (ushort) (GetTinyBotByte(idx+0) + (GetTinyBotByte(idx+1) << 8));
+int GetTinyBotInt(int idx) => GetTinyBotByte(idx+0) + (GetTinyBotByte(idx+1) << 8) + (GetTinyBotByte(idx+2) << 16) + (GetTinyBotByte(idx+3) << 24);
 
 List<decimal> tinyBotEncDecs = new List<decimal>();
 
 int curBufOff = 0;
-int headerDecIdx = -1;
-void EndHeader() {
-    if(headerDecIdx < 0) return;
-    int numDecs = tinyBotEncDecs.Count - (headerDecIdx+1);
-
-    int[] headerDecBits = decimal.GetBits(tinyBotEncDecs[headerDecIdx]);
-    headerDecBits[1] = numDecs + 1; //+1 to account for how LaunchPad deals with remVals 
-    tinyBotEncDecs[headerDecIdx] = new decimal(headerDecBits);
-
-    headerDecIdx = -1;
-}
-
-for(int i = 0; i < tinyBotData.Length;) {
+bool scalarParity = false;
+int lastScalarAccumToken = -1;
+while(curBufOff < tinyBotData.Length) {
     //Determine the number of zero bytes
-    int numZeroBytes = 0;
-    while(i+numZeroBytes < tinyBotData.Length && tinyBotData[i+numZeroBytes] == 0) numZeroBytes++;
+    int skipAmount = 0;
+    while(curBufOff+skipAmount < tinyBotData.Length && tinyBotData[curBufOff+skipAmount] == 0) skipAmount++;
 
-    //Check if it would be more efficient to start a new block
-    if(numZeroBytes > 12) {
-        EndHeader();
-        i += numZeroBytes;
+    if(curBufOff+skipAmount >= tinyBotData.Length) break;
+
+    //Check if it is more efficient to skip forward
+    if(skipAmount <= (scalarParity ? 2 : 1)) {
+        //Handle the scalar accumulator
+        byte scalarNibble = 0;
+        if(scalarParity) {
+            byte extraByte = GetTinyBotByte(curBufOff++);
+            scalarNibble = (byte) (extraByte & 0xf);
+
+            int[] prevDecBits = decimal.GetBits(tinyBotEncDecs[lastScalarAccumToken]);
+            prevDecBits[3] |= (extraByte >> 4) << 16;
+            tinyBotEncDecs[lastScalarAccumToken] = new decimal(prevDecBits);
+        }
+        scalarParity = !scalarParity;
+        lastScalarAccumToken = tinyBotEncDecs.Count;
+
+        //Encode a regular token
+        tinyBotEncDecs.Add(new decimal(GetTinyBotInt(curBufOff + 0), GetTinyBotInt(curBufOff + 4), GetTinyBotInt(curBufOff + 8), false, scalarNibble));
+        curBufOff += 12;
+    } else {
+        //Encode a skip token
+        if(skipAmount > byte.MaxValue) skipAmount = byte.MaxValue;
+        curBufOff += skipAmount;
+
+        tinyBotEncDecs.Add(new decimal(skipAmount | GetTinyBotByte(curBufOff + 0) << 8 | GetTinyBotShort(curBufOff + 1) << 16, GetTinyBotInt(curBufOff + 3), GetTinyBotInt(curBufOff + 7), false, 16));
+        curBufOff += 11;
     }
-    if(i >= tinyBotData.Length) break;
-
-    //Start a new header if we don't have one
-    if(headerDecIdx < 0) {
-        ushort skip = (ushort) (i - curBufOff);
-        curBufOff = i;
-
-        headerDecIdx = tinyBotEncDecs.Count;
-        tinyBotEncDecs.Add(new decimal(skip, 0, 0, false, 0));
-    }
-
-    //Encode the data block
-    tinyBotEncDecs.Add(new decimal(GetTinyBotInt(2*i+00), GetTinyBotInt(2*i+08), GetTinyBotInt(2*i+16), false, GetTinyBotNibble(2*i+49)));
-    tinyBotEncDecs.Add(new decimal(GetTinyBotInt(2*i+24), GetTinyBotInt(2*i+32), GetTinyBotInt(2*i+40), false, GetTinyBotNibble(2*i+48)));
-    curBufOff = i += 25;
 }
-EndHeader();
 
 Console.WriteLine($"Encoded {tinyBotData.Length} bytes into {tinyBotEncDecs.Count} tokens");
 
+int tinyBotBufSize = int.Max(curBufOff, tinyBotData.Length);
 StringBuilder tinyBotEncData = new StringBuilder();
 foreach(decimal dec in tinyBotEncDecs) {
     if(tinyBotEncData.Length > 0) tinyBotEncData.Append(',');
     tinyBotEncData.Append(dec.ToString(CultureInfo.InvariantCulture));
     tinyBotEncData.Append('M');
 }
-
-long tinyBotBufSize = tinyBotData.Length*8;
-if(tinyBotBufSize % 200 != 0) tinyBotBufSize += 200 - (tinyBotBufSize % 200);
-if(tinyBotBufSize % 8 != 0) tinyBotBufSize += 8 - (tinyBotBufSize % 8);
-tinyBotBufSize /= 8;
 
 //Format the launchpad
 using Stream launchPadStream = Assembly.GetEntryAssembly()!.GetManifestResourceStream("launchpad") ?? throw new Exception("Couldn't open launchpad resource!");
