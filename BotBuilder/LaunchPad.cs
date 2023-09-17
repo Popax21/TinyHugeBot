@@ -4,7 +4,7 @@ using static System.AppDomain;
 class MyBot : IChessBot {
     //TinyBot_asmBuf either holds the TinyBot IChessBot instance, or the assembly buffer during decoding
     //We declare all our other variables here as well to save tokens later
-    dynamic TinyBot_asmBuf = new byte[<TINYASMSIZE>], asmDataBufOff = 0, accum = 0, parity = 1, remVals = 0, bits;
+    dynamic TinyBot_asmBuf = new byte[<TINYASMSIZE>], asmDataBufOff = 0, accum = 0, parity = 1, remVals = 0, bits, i;
 
     public MyBot() {
         //Decode the assembly
@@ -24,7 +24,7 @@ class MyBot : IChessBot {
             }
 
             //Add the 96 bit integer to the buffer
-            for(int i = 0; i < 96; i += 8)
+            for(i = 0; i < 96; i += 8)
                 TinyBot_asmBuf[asmDataBufOff++] = (byte) (bits[i / 32] >> i);
 
             //Accumulate two 4 bit scales, then add to the buffer
