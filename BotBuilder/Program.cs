@@ -13,6 +13,7 @@ using AsmResolver.DotNet.Collections;
 using AsmResolver.DotNet.Serialized;
 using AsmResolver.DotNet.Signatures;
 using AsmResolver.DotNet.Signatures.Types;
+using AsmResolver.IO;
 using AsmResolver.PE;
 using AsmResolver.PE.Builder;
 using AsmResolver.PE.DotNet.Builder;
@@ -539,6 +540,12 @@ if(!DEBUG) {
     PEFile tinyBotPE = new ManagedPEFileBuilder().CreateFile(tinyBotImg);
     tinyBotPE.FileHeader.Machine = MachineType.I386;
     tinyBotPE.OptionalHeader.FileAlignment = tinyBotPE.OptionalHeader.SectionAlignment = 512;
+
+    //Compress the DOS header
+    tinyBotPE.DosHeader.NextHeaderOffset = DosHeader.MinimalDosHeaderLength;
+    byte[] dosHeader = tinyBotPE.DosHeader.WriteIntoArray();
+    BinaryStreamReader dosReader = new BinaryStreamReader(dosHeader);
+    tinyBotPE.DosHeader = DosHeader.FromReader(ref dosReader);
 
     //Write the tiny bot DLL
     tinyBotPE.Write(args[1]);
