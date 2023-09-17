@@ -3,7 +3,9 @@ using static System.AppDomain;
 
 class MyBot : IChessBot {
     //TinyBot_asmBuf either holds the TinyBot IChessBot instance, or the assembly buffer during decoding
-    //We declare all our other variables here as well to save tokens later
+    //We declare all our other variables here as well to save tokens later by either:
+    // - for bits: removing the need for a `var` token
+    // - for the rest: removing the need to zero-initialize
     dynamic TinyBot_asmBuf = new byte[<TINYASMSIZE>], bits;
     int asmDataBufOff, accum, remVals, parity;
 
