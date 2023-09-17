@@ -115,6 +115,7 @@ if(!DEBUG) {
             if(meth.CilMethodBody != null) {
                 InlineMethodCalls(meth.CilMethodBody);
                 RelinkMethodBody(meth.CilMethodBody);
+                TinfyMethodBody(meth.CilMethodBody);
             }
         }
 
@@ -311,7 +312,6 @@ if(!DEBUG) {
             }
 
             //Cleanup
-            body.Instructions.OptimizeMacros();
             body.VerifyLabels();
             body.ComputeMaxStack();
         } catch {
@@ -333,6 +333,36 @@ if(!DEBUG) {
                 for(int i = 0; i < methodSig.ParameterTypes.Count; i++) methodSig.ParameterTypes[i] = RelinkType(methodSig.ParameterTypes[i]);
             }
             if((instr.Operand as IFieldDescriptor)?.Signature is FieldSignature fieldSig) fieldSig.FieldType = RelinkType(fieldSig.FieldType);
+        }
+    }
+
+    void TinfyMethodBody(CilMethodBody body) {
+        //Optimize instructions
+        body.Instructions.OptimizeMacros();
+
+        //Trim out NOPs
+        CilInstructionLabel? nextInstrLabel = null;
+        foreach(CilInstruction instr in body.Instructions.ToArray()) {
+            if(instr.OpCode == CilOpCodes.Nop) {
+                //Fixup jumps
+                foreach(CilInstruction jumpInstr in body.Instructions) {
+                    if(jumpInstr.OpCode.OperandType is not CilOperandType.InlineBrTarget and not CilOperandType.ShortInlineBrTarget) continue;
+
+                    //Determine and check the jump target
+                    int jumpOff = jumpInstr.Operand switch {
+                        ICilLabel label => label.Offset,
+                        int off => off,
+                        sbyte off => off,
+                        _ => throw new Exception($"Invalid jump instruction operand: {jumpInstr}")
+                    };
+                    if(jumpOff != instr.Offset) continue;
+
+                    jumpInstr.Operand = nextInstrLabel ??= new CilInstructionLabel();
+                }
+            } else if(nextInstrLabel != null) {
+                nextInstrLabel.Instruction = instr;
+                nextInstrLabel = null;
+            }
         }
     }
 
