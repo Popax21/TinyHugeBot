@@ -23,7 +23,11 @@ public partial class MyBot : IChessBot {
             try {
                 curBestEval = NegaMax(board, Eval.MinEval, Eval.MaxEval, depth, 0);
                 curBestMove = rootBestMove; //Update the best move
+#if DEBUG
             } catch(TimeoutException) {}
+#else
+            } catch(Exception) {}
+#endif
 
             //Check if time is up
             if(timer.MillisecondsElapsedThisTurn >= deepeningSearchTime) {
@@ -37,7 +41,12 @@ public partial class MyBot : IChessBot {
 
     public int NegaMax(Board board, int alpha, int beta, int remDepth, int ply) {
         //Check if time is up
-        if(searchTimer.MillisecondsElapsedThisTurn >= searchAbortTime) throw new TimeoutException();
+        if(searchTimer.MillisecondsElapsedThisTurn >= searchAbortTime)
+#if DEBUG
+            throw new TimeoutException();
+#else
+            throw new Exception();
+#endif
 
         //Handle repetition
         if(board.IsRepeatedPosition()) return 0;
