@@ -146,14 +146,19 @@ if(!DEBUG) {
         return true;
     }
 
+    HashSet<CilMethodBody> tinyifedMethods = new HashSet<CilMethodBody>();
     void InlineMethodCalls(CilMethodBody body) {
+        if(!tinyifedMethods.Add(body)) return;
+
         try {
             foreach(CilInstruction instr in body.Instructions.ToArray()) {
                 //Check if this is a method call to be inlined
                 if(instr.OpCode != CilOpCodes.Call) continue;
                 if((instr.Operand as IMethodDescriptor)?.Resolve() is not MethodDefinition inlineMethod) continue;
                 if(!GetOrigName(inlineMethod).EndsWith("_I")) continue;
+
                 if(inlineMethod.CilMethodBody is not CilMethodBody inlineBody) continue;
+                InlineMethodCalls(inlineBody);
 
                 int idx = body.Instructions.IndexOf(instr);
 
