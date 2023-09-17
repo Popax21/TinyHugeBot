@@ -1,52 +1,47 @@
-using System;
 using ChessChallenge.API;
 using static System.AppDomain;
 
 class MyBot : IChessBot {
-    //Making this dynamic instead of IChessBot allows for reuse of this variable and removes a cast
-    dynamic TinyBot;
+    //TinyBot_asmBuf either holds the TinyBot IChessBot instance, or the assembly buffer during decoding
+    //We declare all our other variables here as well to save tokens later
+    dynamic TinyBot_asmBuf, asmDataBufOff = 0, accum = 0, parity = 1, remVals = 0, bits;
 
-    public Move Think(Board board, Timer timer) {
-        if(TinyBot == null) {
-            //Decode the assembly
-            //Here, TinyBot stores the decoded assembly
-            TinyBot = new byte[<TINYASMSIZE>];
-            int asmDataBufOff = 0, accum = 0, parity = 1, remVals = 0;
-            foreach(decimal dec in TinyBotAsmEncodedData) {
-                var bits = decimal.GetBits(dec);
+    public MyBot() {
+        //Decode the assembly
+        TinyBot_asmBuf = new byte[<TINYASMSIZE>];
+        foreach(decimal dec in new[] {
+//>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> BEGIN ENCODED ASSEMBLY <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+            <TINYASMENCDAT>
+//>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> END ENCODED ASSEMBLY <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        }) {
+            //Get the bits of the decimal
+            bits = decimal.GetBits(dec);
 
-                //Check if we reached the end of the block
-                if(remVals-- == 0) {
-                    asmDataBufOff += bits[0];
-                    remVals = bits[1];
-                    continue;
-                }
-
-                //Add the 96 bit integer to the buffer
-                for(int i = 0; i < 12; bits[i++ / 4] >>= 8)
-                    TinyBot[asmDataBufOff++] = (byte) bits[i / 4];
-
-                //Accumulate two 4 bit scales, then add to the buffer
-                TinyBot[asmDataBufOff] = (byte) (accum = accum << 4 | bits[3] >> 16);
-                asmDataBufOff += parity ^= 1;
+            //Check if we reached the end of the block
+            if(remVals-- == 0) {
+                asmDataBufOff += bits[0];
+                remVals = bits[1];
+                continue;
             }
 
-            //Load the tiny bot from the assembly
-            //We can't just load it and be done with it, because the byte[] overload doesn't add the assembly to the regular load path
-            //As such load it whenever any assembly fails to load >:)
-            ResolveEventHandler asmResolveCB = (_, _) => CurrentDomain.Load(TinyBot);
-            CurrentDomain.AssemblyResolve += asmResolveCB;
+            //Add the 96 bit integer to the buffer
+            for(int i = 0; i < 12; bits[i++ / 4] >>= 8)
+                TinyBot_asmBuf[asmDataBufOff++] = (byte) bits[i / 4];
 
-            //Here, TinyBot switches from storing the assembly to storing the actual chess bot instance
-            TinyBot = Activator.CreateInstance("B", "<TINYBOTCLASS>").Unwrap();
-            CurrentDomain.AssemblyResolve -= asmResolveCB;
+            //Accumulate two 4 bit scales, then add to the buffer
+            accum <<= 4;
+            TinyBot_asmBuf[asmDataBufOff] = (byte) (accum |= bits[3] >> 16);
+            asmDataBufOff += parity ^= 1;
         }
-        return TinyBot.Think(board, timer);
+
+        //Load the tiny bot from the assembly
+        //We can't just load it and be done with it, because the byte[] overload doesn't add the assembly to the regular load path
+        //As such load it whenever any assembly fails to load >:)
+        System.ResolveEventHandler asmResolveCB = (_, _) => CurrentDomain.Load(TinyBot_asmBuf); //We can't use a dynamic variable for this because we need it to be a delegate type
+        CurrentDomain.AssemblyResolve += asmResolveCB;
+        TinyBot_asmBuf = CurrentDomain.CreateInstanceAndUnwrap("B", "<TINYBOTCLASS>");
+        CurrentDomain.AssemblyResolve -= asmResolveCB;
     }
 
-//>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> BEGIN ENCODED ASSEMBLY <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-    decimal[] TinyBotAsmEncodedData = {
-        <TINYASMENCDAT>
-    };
-//>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> END ENCODED ASSEMBLY <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    public Move Think(Board board, Timer timer) => TinyBot_asmBuf.Think(board, timer);
 }
