@@ -20,6 +20,12 @@ using AsmResolver.PE.DotNet.Metadata.Guid;
 using AsmResolver.PE.File;
 using MethodAttributes = AsmResolver.PE.DotNet.Metadata.Tables.Rows.MethodAttributes;
 
+static T[] StealElements<T>(IList<T> list) {
+    T[] elems = list.ToArray();
+    list.Clear();
+    return elems;
+}
+
 if(args.Length < 2) throw new ArgumentException("Usage: <huge bot DLL> <tiny bot DLL> [tiny bot CS] [--debug]");
 
 bool DEBUG = args.Length >= 4 && args[3].Equals("--debug", StringComparison.InvariantCultureIgnoreCase);
@@ -65,15 +71,18 @@ if(!DEBUG) {
         if(!(typeSig is TypeDefOrRefSignature)) return typeSig;
 
         //Handle bot types
-        if(typeSig.Resolve() is TypeDefinition typeDef && ShouldTinyfy(typeDef)) {
-            //Inline enum types
-            if(typeDef.IsEnum) return botMod.CorLibTypeFactory.Int32;
+        {
+            if(typeSig.Resolve() is TypeDefinition typeDef && ShouldTinyfy(typeDef)) {
+                //Inline enum types
+                if(typeDef.IsEnum) typeSig = botMod.CorLibTypeFactory.Int32;
+            }
         }
 
         return typeSig;
     }
 
-    bool TinyfyType(TypeDefinition type, ref char nextName, bool rename = true) {
+    char nextTypeName = 'a';
+    bool TinyfyType(TypeDefinition type, bool rename = true) {
         //Enum types are inlined
         if(type.IsEnum) return false;
 
@@ -122,7 +131,7 @@ if(!DEBUG) {
         if(rename) {
             origNames.Add(type, type.Name!);
             type.Namespace = null;
-            type.Name = (nextName++).ToString();
+            type.Name = nextTypeName++.ToString();
         }
 
         HashSet<string> ifaceNames = type.Interfaces.SelectMany(intf => intf.Interface!.Resolve()!.Methods.Select(m => m.Name!.Value)).ToHashSet();
@@ -137,9 +146,10 @@ if(!DEBUG) {
         }
 
         //Tiny-fy nested types
-        char nextNestedName = 'a';
         foreach(TypeDefinition nestedType in type.NestedTypes.ToArray()) {
-            if(!TinyfyType(nestedType, ref nextNestedName)) type.NestedTypes.Remove(nestedType);
+            //Un-nest the type in the process (this removes the need for a NestedClass table)
+            type.NestedTypes.Remove(nestedType);
+            if(TinyfyType(nestedType)) botMod.TopLevelTypes.Add(nestedType);
         }
 
         return true;
@@ -371,7 +381,6 @@ if(!DEBUG) {
     }
 
     TypeDefinition staticType = botMod.GetOrCreateModuleType(); //We need a static type anyway, so why not .-.
-    char nextName = 'a';
     foreach(TypeDefinition type in botMod.TopLevelTypes.ToArray()) {
         bool keepType = false;
 
@@ -379,18 +388,13 @@ if(!DEBUG) {
             //Merge static types (there's no concept of "static classes" at the IL level, so we have to cheat a bit)
             if((type.IsSealed && type.IsAbstract) || type == privImplType) {
                 //Merge the types by transfering over fields, methods and properties
-                static T[] StealElements<T>(IList<T> list) {
-                    T[] elems = list.ToArray();
-                    list.Clear();
-                    return elems;
-                }
                 foreach(FieldDefinition field in StealElements(type.Fields)) staticType.Fields.Add(field);
                 foreach(MethodDefinition method in StealElements(type.Methods)) staticType.Methods.Add(method);
                 foreach(PropertyDefinition prop in StealElements(type.Properties)) staticType.Properties.Add(prop);
                 foreach(TypeDefinition nestedType in StealElements(type.NestedTypes)) staticType.NestedTypes.Add(nestedType);
             } else {
                 //Tinfy other types
-                keepType = TinyfyType(type, ref nextName);
+                keepType = TinyfyType(type);
             }
 
             //Enum types are inlined
@@ -429,7 +433,7 @@ if(!DEBUG) {
         }
 
         //Tinfy the type
-        TinyfyType(staticType, ref nextName, rename: false);
+        TinyfyType(staticType, rename: false);
     }
 
     //We need to expose the bot type
