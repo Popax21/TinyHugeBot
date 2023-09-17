@@ -543,9 +543,8 @@ if(!DEBUG) {
 
     //Compress the DOS header
     tinyBotPE.DosHeader.NextHeaderOffset = DosHeader.MinimalDosHeaderLength;
-    byte[] dosHeader = tinyBotPE.DosHeader.WriteIntoArray();
-    BinaryStreamReader dosReader = new BinaryStreamReader(dosHeader);
-    tinyBotPE.DosHeader = DosHeader.FromReader(ref dosReader);
+    BinaryStreamReader dosHeaderReader = new BinaryStreamReader(tinyBotPE.DosHeader.WriteIntoArray());
+    tinyBotPE.DosHeader = DosHeader.FromReader(ref dosHeaderReader);
 
     //Write the tiny bot DLL
     tinyBotPE.Write(args[1]);
