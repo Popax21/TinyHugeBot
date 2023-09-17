@@ -50,10 +50,12 @@ if(!DEBUG) {
     botMod.Assembly.CustomAttributes.Clear();
 
     //Tiny-fy types
-    HashSet<TypeDefinition> tinyfyedTypes = new HashSet<TypeDefinition>();
+    Dictionary<IMemberDescriptor, string> origNames = new Dictionary<IMemberDescriptor, string>();
+    string GetOrigName(IMemberDescriptor descr) => origNames.GetValueOrDefault(descr, descr.Name!);
+
     bool ShouldTinyfy(TypeDefinition type) {
         if(type == botType || type == privImplType || (type.Namespace?.Value?.StartsWith("HugeBot") ?? false)) return true;
-        if(tinyfyedTypes.Contains(type)) return true;
+        if(origNames.ContainsKey(type)) return true;
         if(type.DeclaringType != null) return ShouldTinyfy(type.DeclaringType);
         return false;
     }
@@ -70,18 +72,16 @@ if(!DEBUG) {
         return typeSig;
     }
 
-    bool TinyfyType(TypeDefinition type, ref char nextName) {
+    bool TinyfyType(TypeDefinition type, ref char nextName, bool rename = true) {
         //Enum types are inlined
         if(type.IsEnum) return false;
 
-        //Tiny-fy the name
-        type.Namespace = null;
-        type.Name = (nextName++).ToString();
-        tinyfyedTypes.Add(type);
-
         //Clear attributes
         type.CustomAttributes.Clear();
-        foreach(MethodDefinition meth in type.Methods) meth.CustomAttributes.Clear();
+        foreach(MethodDefinition meth in type.Methods) {
+            meth.CustomAttributes.Clear();
+            foreach(ParameterDefinition param in meth.ParameterDefinitions) param.CustomAttributes.Clear();
+        }
         foreach(FieldDefinition field in type.Fields) field.CustomAttributes.Clear();
 
         //Trim out constants
@@ -91,9 +91,12 @@ if(!DEBUG) {
 
         //Trim out parameter names
         foreach(MethodDefinition meth in type.Methods) {
-            foreach(Parameter param in meth.Parameters) {
-                if(param.Definition != null) param.Definition!.Name = null;
-            }
+            foreach(ParameterDefinition param in meth.ParameterDefinitions) param.Name = null;
+        }
+
+        //Trim out to-be-inlined methods
+        foreach(MethodDefinition meth in type.Methods.ToArray()) {
+            if(meth.Name!.ToString().EndsWith("_I")) type.Methods.Remove(meth);
         }
 
         //Trim out properties (the underlying getter/setter methods are kept, but we don't need the metadata)
@@ -109,17 +112,31 @@ if(!DEBUG) {
 
         //Tiny-fy and relink method bodies
         foreach(MethodDefinition meth in type.Methods) {
-            if(meth.CilMethodBody != null) TinyfyMethodBody(meth.CilMethodBody);
+            if(meth.CilMethodBody != null) {
+                InlineMethodCalls(meth.CilMethodBody);
+                RelinkMethodBody(meth.CilMethodBody);
+            }
         }
 
-        //Tiny-fy member names
+        //Tiny-fy names
+        if(rename) {
+            origNames.Add(type, type.Name!);
+            type.Namespace = null;
+            type.Name = (nextName++).ToString();
+        }
+
         HashSet<string> ifaceNames = type.Interfaces.SelectMany(intf => intf.Interface!.Resolve()!.Methods.Select(m => m.Name!.Value)).ToHashSet();
         foreach(MethodDefinition meth in type.Methods) {
+            origNames.Add(meth, meth.Name!);
             if(!meth.IsConstructor && meth.DeclaringType == type && !ifaceNames.Contains(meth.Name!.Value)) meth.Name = null;
         }
 
-        foreach(FieldDefinition field in type.Fields) field.Name = null;
-        
+        foreach(FieldDefinition field in type.Fields) {
+            origNames.Add(field, field.Name!);
+            field.Name = null;
+        }
+
+        //Tiny-fy nested types
         char nextNestedName = 'a';
         foreach(TypeDefinition nestedType in type.NestedTypes.ToArray()) {
             if(!TinyfyType(nestedType, ref nextNestedName)) type.NestedTypes.Remove(nestedType);
@@ -128,17 +145,194 @@ if(!DEBUG) {
         return true;
     }
 
-    void TinyfyMethodBody(CilMethodBody body) {
+    void InlineMethodCalls(CilMethodBody body) {
+        try {
+            foreach(CilInstruction instr in body.Instructions.ToArray()) {
+                //Check if this is a method call to be inlined
+                if(instr.OpCode != CilOpCodes.Call) continue;
+                if((instr.Operand as IMethodDescriptor)?.Resolve() is not MethodDefinition inlineMethod) continue;
+                if(!GetOrigName(inlineMethod).EndsWith("_I")) continue;
+                if(inlineMethod.CilMethodBody is not CilMethodBody inlineBody) continue;
+
+                int idx = body.Instructions.IndexOf(instr);
+
+                //Copy locals
+                CilLocalVariable[] newLocals = new CilLocalVariable[inlineBody.LocalVariables.Count];
+                for(int i = 0; i < newLocals.Length; i++) body.LocalVariables.Add(newLocals[i] = new CilLocalVariable(inlineBody.LocalVariables[i].VariableType));
+
+                //Parse arguments
+                int numArgs = inlineMethod.Signature!.GetTotalParameterCount();
+                CilInstruction[][] argInstrs = new CilInstruction[numArgs][];
+
+                int curArg = numArgs - 1, stackDepth = 1;
+                List<CilInstruction> curArgInstrs = new List<CilInstruction>();
+
+                int argsEndIdx = idx-1;
+                for(; curArg >= 0; argsEndIdx--) {
+                    CilInstruction argInstr = body.Instructions[argsEndIdx];
+                    curArgInstrs.Add(argInstr);
+
+                    if(argInstr.OpCode.FlowControl is not CilFlowControl.Next and not CilFlowControl.Meta and not CilFlowControl.Call) throw new Exception($"Invalid inline argument flow control: {argInstr.OpCode.FlowControl} [{argInstr}]");
+
+                    //Handle stack pushes / pops
+                    stackDepth -= argInstr.GetStackPushCount();
+                    stackDepth += argInstr.GetStackPopCount(body);
+
+                    //Check if we are at the end of this argument's code
+                    if(stackDepth <= 0) {
+                        curArgInstrs.Reverse();
+                        argInstrs[curArg--] = curArgInstrs.ToArray();
+                        curArgInstrs.Clear();
+                        stackDepth = 1;
+                    }
+                }
+
+                //Fixup jumps to the inlined method call
+                CilInstructionLabel? startLabel = null;
+                if(argsEndIdx+1 < idx) {
+                    body.Instructions.CalculateOffsets();
+                    int argsStartOff = body.Instructions[argsEndIdx+1].Offset, argsEndOff = instr.Offset + instr.Size;
+
+                    foreach(CilInstruction jumpInstr in body.Instructions) {
+                        if(jumpInstr.OpCode.OperandType is not CilOperandType.InlineBrTarget and not CilOperandType.ShortInlineBrTarget) continue;
+
+                        //Determine and check the jump target
+                        int jumpOff = jumpInstr.Operand switch {
+                            ICilLabel label => label.Offset,
+                            int off => off,
+                            sbyte off => off,
+                            _ => throw new Exception($"Invalid jump instruction operand: {jumpInstr}")
+                        };
+
+                        if(jumpOff < argsStartOff || jumpOff >= argsEndOff) continue;
+                        if(jumpOff != argsStartOff) throw new Exception($"Detected jump into middle of inlined function call: {jumpInstr} [0x{argsStartOff:x} <= 0x{jumpOff:x} <= 0x{argsEndOff:x}]");
+
+                        //Remap the jump
+                        jumpInstr.Operand = startLabel ??= new CilInstructionLabel();
+                    }
+                }
+
+                //Remove original instructions
+                body.Instructions.RemoveRange(argsEndIdx+1, idx - argsEndIdx);
+                int startIdx = idx = argsEndIdx+1;
+
+                //Give frequently used arguments their own local variables
+                int[] numArgUsages = new int[argInstrs.Length];
+                foreach(CilInstruction inlineInstr in inlineBody.Instructions) {
+                    if(!inlineInstr.IsLdarg()) continue;
+                    numArgUsages[inlineInstr.GetParameter(inlineMethod.Parameters).MethodSignatureIndex]++;
+                }
+
+                for(int i = 0; i < argInstrs.Length; i++) {
+                    //Check if this argument "deserves its own variable"
+                    int inlineSize = numArgUsages[i] * argInstrs[i].Sum(instr => instr.Size);
+                    int varSize = 4 + argInstrs[i].Sum(instr => instr.Size) + 3 + 3 * numArgUsages[i];
+                    if(inlineSize < varSize) continue;
+
+                    //Give the argument its own variable
+                    CilLocalVariable argLocal = new CilLocalVariable(inlineMethod.Parameters.GetBySignatureIndex(i).ParameterType);
+                    body.LocalVariables.Add(argLocal);
+
+                    foreach(CilInstruction argInstr in argInstrs[i]) body.Instructions.Insert(idx++, new CilInstruction(argInstr.OpCode, argInstr.Operand));
+                    body.Instructions.Insert(idx++, CilOpCodes.Stloc, argLocal);
+
+                    argInstrs[i] = new CilInstruction[] { new CilInstruction(CilOpCodes.Ldloc, argLocal) };
+                }
+
+                //Inline the inlined method body
+                Dictionary<int, CilInstruction> origOffMap = new Dictionary<int, CilInstruction>();
+                Dictionary<int, CilInstructionLabel> remapJumpTargets = new Dictionary<int, CilInstructionLabel>();
+
+                CilInstructionLabel? endLabel = null;
+                foreach(CilInstruction inlineInstr in inlineBody.Instructions) {
+                    int startInstrIdx = idx;
+
+                    switch(inlineInstr!) {
+                        case {} when inlineInstr.IsLdarg(): {
+                            foreach(CilInstruction argInstr in argInstrs[inlineInstr.GetParameter(inlineMethod.Parameters).MethodSignatureIndex]) body.Instructions.Insert(idx++, new CilInstruction(argInstr.OpCode, argInstr.Operand));
+                        } break;
+
+                        case {} when inlineInstr.IsStarg():
+                            throw new Exception("Starg is not supported in inlined methods");
+
+                        case {} when inlineInstr.OpCode == CilOpCodes.Ldarga || inlineInstr.OpCode == CilOpCodes.Ldarga_S:
+                            throw new Exception("Ldarga is not supported in inlined methods");
+
+                        case {} when inlineInstr.IsLdloc() || inlineInstr.IsStloc() || inlineInstr.OpCode.OperandType is CilOperandType.InlineVar or CilOperandType.ShortInlineVar:
+                            //Remap the local
+                            body.Instructions.Insert(idx++, 0 switch {
+                                {} when inlineInstr.IsLdloc() => CilOpCodes.Ldloc,
+                                {} when inlineInstr.IsStloc() => CilOpCodes.Stloc,
+                                _ => CilOpCodes.Stloc,
+                            }, newLocals[inlineInstr.GetLocalVariable(inlineBody.LocalVariables).Index]);
+                            break;
+
+                        case {} when inlineInstr.OpCode.OperandType is CilOperandType.InlineBrTarget or CilOperandType.ShortInlineBrTarget: {
+                            //Remap the jump
+                            int origJumpOff = inlineInstr.Operand switch {
+                                ICilLabel label => label.Offset,
+                                int off => off,
+                                sbyte off => off,
+                                _ => throw new Exception($"Invalid jump instruction operand: {inlineInstr}")
+                            };
+
+                            if(!remapJumpTargets.TryGetValue(origJumpOff, out CilInstructionLabel? remapJumplabel)) {
+                                remapJumpTargets.Add(origJumpOff, remapJumplabel = new CilInstructionLabel());
+                            }
+                            body.Instructions.Insert(idx++, inlineInstr.OpCode, remapJumplabel);
+                        } break;
+
+                        case {} when inlineInstr.OpCode == CilOpCodes.Ret:
+                            //Check if this is the last instruction
+                            if(inlineBody.Instructions.Last() == inlineInstr) break;
+
+                            //Insert a jump to the end
+                            endLabel ??= new CilInstructionLabel();
+                            body.Instructions.Insert(idx++, CilOpCodes.Br, endLabel);
+                            break;
+
+                        default:
+                            body.Instructions.Insert(idx++, new CilInstruction(inlineInstr.OpCode, inlineInstr.Operand));
+                            break;
+                    }
+
+                    origOffMap.Add(inlineInstr.Offset, body.Instructions[startInstrIdx]);
+                }
+
+                //Remap jumps
+                foreach((int origOff, CilInstructionLabel label) in remapJumpTargets) {
+                    if(!origOffMap.TryGetValue(origOff, out CilInstruction? targetInstr)) throw new Exception($"Encountered invalid original offset 0x{origOff} when remapping inlined jumps");
+                    label.Instruction = targetInstr;
+                }
+
+                //Mark the start and end label
+                if(startLabel != null) startLabel.Instruction = body.Instructions[startIdx];
+                if(endLabel != null) endLabel.Instruction = body.Instructions[idx];
+            }
+
+            //Cleanup
+            body.Instructions.OptimizeMacros();
+            body.VerifyLabels();
+            body.ComputeMaxStack();
+        } catch {
+            Console.WriteLine($"Messed up while inlining calls in '{body.Owner}' - dumping IL:");
+            body.Instructions.CalculateOffsets();
+            foreach(CilInstruction dumpInstr in body.Instructions) Console.WriteLine(dumpInstr);
+            throw;
+        }
+    }
+
+    void RelinkMethodBody(CilMethodBody body) {
         //Relink locals
         foreach(CilLocalVariable local in body.LocalVariables) local.VariableType = RelinkType(local.VariableType);
 
+        //Relink type references in operands
         foreach(CilInstruction instr in body.Instructions) {
-            //Relink type reference
-            if(instr.Operand is MethodSignature methodSig) {
+            if((instr.Operand as IMethodDescriptor)?.Signature is MethodSignature methodSig) {
                 methodSig.ReturnType = RelinkType(methodSig.ReturnType);
                 for(int i = 0; i < methodSig.ParameterTypes.Count; i++) methodSig.ParameterTypes[i] = RelinkType(methodSig.ParameterTypes[i]);
             }
-            if(instr.Operand is FieldSignature fieldSig) fieldSig.FieldType = RelinkType(fieldSig.FieldType);
+            if((instr.Operand as IFieldDescriptor)?.Signature is FieldSignature fieldSig) fieldSig.FieldType = RelinkType(fieldSig.FieldType);
         }
     }
 
@@ -179,7 +373,7 @@ if(!DEBUG) {
 
         foreach(MethodDefinition method in staticType.Methods) {
             if(!method.IsConstructor) continue;
-            method.Name = $"cctor{cctors.Count}";
+            method.Name = $"cctor{cctors.Count}_I"; //_I suffix will trigger method inlining
             method.IsSpecialName = method.IsRuntimeSpecialName = false;
             cctors.Add(method);
         }
@@ -201,7 +395,7 @@ if(!DEBUG) {
         }
 
         //Tinfy the type
-        TinyfyType(staticType, ref nextName);
+        TinyfyType(staticType, ref nextName, rename: false);
     }
 
     //We need to expose the bot type

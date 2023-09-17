@@ -18,7 +18,7 @@ public partial class MyBot {
     //  bits 24-63: upper hash bits
     private ulong[] transposTable = new ulong[TTSize];
 
-    private bool CheckTTEntry(ulong entry, ulong boardHash, int alpha, int beta, int depth) {
+    private bool CheckTTEntry_I(ulong entry, ulong boardHash, int alpha, int beta, int depth) {
         //Check if the hash bits match
         if((entry & ~TTIdxMask) != (boardHash & ~TTIdxMask)) return false;
 
@@ -34,7 +34,7 @@ public partial class MyBot {
         };
     }
 
-    private ulong EncodeTTEntry(short eval, TTBoundType bound, int depth, ulong boardHash) {
+    private ulong EncodeTTEntry_I(short eval, TTBoundType bound, int depth, ulong boardHash) {
 #if DEBUG
         //Check for overflows
         if(bound < TTBoundType.Exact || bound > TTBoundType.Upper) throw new ArgumentException($"Garbage TT bound given: {bound}");

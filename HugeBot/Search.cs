@@ -43,7 +43,7 @@ public partial class MyBot : IChessBot {
         if(board.IsRepeatedPosition()) return 0;
 
         //Check if the position is in the TT
-        if(CheckTTEntry(transposTable[board.ZobristKey & TTIdxMask], board.ZobristKey, alpha, beta, remDepth)) {
+        if(CheckTTEntry_I(transposTable[board.ZobristKey & TTIdxMask], board.ZobristKey, alpha, beta, remDepth)) {
             //The evaluation is stored in the lower 16 bits of the entry
             return unchecked((short) transposTable[board.ZobristKey & TTIdxMask]);
         }
@@ -92,7 +92,7 @@ public partial class MyBot : IChessBot {
 
         //Insert the move into the transposition table
         //TODO: Currently always replaces, investigate potential other strategies
-        transposTable[board.ZobristKey & TTIdxMask] = EncodeTTEntry((short) bestScore, ttBound, remDepth, board.ZobristKey);
+        transposTable[board.ZobristKey & TTIdxMask] = EncodeTTEntry_I((short) bestScore, ttBound, remDepth, board.ZobristKey);
 
         return bestScore;
     }
