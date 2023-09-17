@@ -45,8 +45,10 @@ if(!DEBUG) {
     ModuleDefinition botMod = ModuleDefinition.FromFile(args[0], new ModuleReaderParameters(AppDomain.CurrentDomain.BaseDirectory));
     if(botMod.Assembly == null) throw new Exception("No assembly in huge bot DLL!");
 
+    //Prepare types
     TypeDefinition botType = botMod.TopLevelTypes.First(t => t.FullName == "MyBot");
     TypeDefinition? privImplType = botMod.TopLevelTypes.FirstOrDefault(t => t.FullName == "<PrivateImplementationDetails>");
+    TypeDefinition staticType = botMod.GetOrCreateModuleType(); //We need a module type anyway, so why not .-.
 
     //Tiny-fy module and assembly metadata
     botMod.Name = null;
@@ -90,11 +92,33 @@ if(!DEBUG) {
         return typeSig;
     }
 
+    TypeDefinition? arrayInitType = null;
+
     string suffixStr = botMod.AssemblyReferences[0].Name!;
     int curSuffixStart = suffixStr.Length-2; //The one-char suffix is reserved for the bot class
     bool TinyfyType(TypeDefinition type, bool rename = true) {
-        //Enum types are inlined
+        //Enum types are inlined, so we don't need to keep them around
         if(type.IsEnum) return false;
+
+        //Merge static types (there's no concept of "static classes" at the IL level, so we have to cheat a bit)
+        //Also merge in the <PrivateImplementationDetails> type
+        if((type.IsSealed && type.IsAbstract) || type == privImplType) {
+            //Merge the types by transfering over everything
+            foreach(FieldDefinition field in StealElements(type.Fields)) staticType.Fields.Add(field);
+            foreach(MethodDefinition method in StealElements(type.Methods)) staticType.Methods.Add(method);
+            foreach(PropertyDefinition prop in StealElements(type.Properties)) staticType.Properties.Add(prop);
+            foreach(TypeDefinition nestedType in StealElements(type.NestedTypes)) staticType.NestedTypes.Add(nestedType);
+            return false;
+        }
+
+        //Check if this is a array init placeholder type
+        if(type.IsValueType && type.Fields.Count == 0 && type.Methods.Count == 0 && type.Properties.Count == 0 && type.ClassLayout?.PackingSize == 1) {
+            //If we already have such a type, keep the original one
+            if(arrayInitType != null) {
+                if(arrayInitType.ClassLayout!.ClassSize < type.ClassLayout.ClassSize) arrayInitType.ClassLayout!.ClassSize = type.ClassLayout.ClassSize;
+                return false;
+            } else arrayInitType = type;
+        }
 
         //Clear attributes
         type.CustomAttributes.Clear();
@@ -362,6 +386,7 @@ if(!DEBUG) {
         }
     }
 
+    List<FieldDefinition> arrayInitFields = new List<FieldDefinition>();
     void TinfyMethodBody(CilMethodBody body) {
         CilInstructionCollection instrs = body.Instructions;
 
@@ -439,6 +464,16 @@ if(!DEBUG) {
             instrs[i+1].ReplaceWithNop();
         }
 
+        //Find RuntimeHelpers.InitializeArray calls for later optimization
+        for(int i = 0; i < instrs.Count-1; i++) {
+            if(instrs[i].OpCode != CilOpCodes.Ldtoken || instrs[i+1].OpCode != CilOpCodes.Call) continue;
+            if(instrs[i+1].Operand is not IMethodDescriptor calledMethod) continue;
+            if(calledMethod.DeclaringType?.FullName != "System.Runtime.CompilerServices.RuntimeHelpers" || calledMethod.Name != "InitializeArray") continue;
+
+            if((instrs[i].Operand as IFieldDescriptor)?.Resolve() is not FieldDefinition initField) continue;
+            arrayInitFields.Add(initField);
+        }
+
         //Trim out NOPs
         CilInstructionLabel? nextInstrLabel = null;
         foreach(CilInstruction instr in instrs.ToArray()) {
@@ -466,60 +501,48 @@ if(!DEBUG) {
         }
     }
 
-    TypeDefinition staticType = botMod.GetOrCreateModuleType(); //We need a static type anyway, so why not .-.
     foreach(TypeDefinition type in botMod.TopLevelTypes.ToArray()) {
         bool keepType = false;
 
-        if(ShouldTinyfy(type)) {
-            //Merge static types (there's no concept of "static classes" at the IL level, so we have to cheat a bit)
-            if((type.IsSealed && type.IsAbstract) || type == privImplType) {
-                //Merge the types by transfering over fields, methods and properties
-                foreach(FieldDefinition field in StealElements(type.Fields)) staticType.Fields.Add(field);
-                foreach(MethodDefinition method in StealElements(type.Methods)) staticType.Methods.Add(method);
-                foreach(PropertyDefinition prop in StealElements(type.Properties)) staticType.Properties.Add(prop);
-                foreach(TypeDefinition nestedType in StealElements(type.NestedTypes)) staticType.NestedTypes.Add(nestedType);
-            } else {
-                //Tinfy other types
-                keepType = TinyfyType(type, rename: type != botType);
-            }
-
-            //Enum types are inlined
-            if(type.IsEnum) keepType = false;
-        }
+        //Tinfy types
+        if(ShouldTinyfy(type)) keepType = TinyfyType(type, rename: type != botType);
 
         //Remove the type if we don't need it
         if(!keepType && type != staticType) botMod.TopLevelTypes.Remove(type);
     }
+    
+    //Merge static constructors
+    List<MethodDefinition> cctors = new List<MethodDefinition>();
 
-    if(staticType != null) {
-        //Merge static constructors
-        List<MethodDefinition> cctors = new List<MethodDefinition>();
+    foreach(MethodDefinition method in staticType.Methods) {
+        if(!method.IsConstructor) continue;
+        method.Name = $"cctor{cctors.Count}_I"; //_I suffix will trigger method inlining upon tinyfication
+        method.IsSpecialName = method.IsRuntimeSpecialName = false;
+        cctors.Add(method);
+    }
 
-        foreach(MethodDefinition method in staticType.Methods) {
-            if(!method.IsConstructor) continue;
-            method.Name = $"cctor{cctors.Count}_I"; //_I suffix will trigger method inlining
-            method.IsSpecialName = method.IsRuntimeSpecialName = false;
-            cctors.Add(method);
+    if(cctors.Count >= 2) {
+        MethodDefinition mergedCctor = new MethodDefinition(".cctor", MethodAttributes.Private | MethodAttributes.Static | MethodAttributes.SpecialName | MethodAttributes.RuntimeSpecialName, MethodSignature.CreateStatic(botMod.CorLibTypeFactory.Void));
+        mergedCctor.CilMethodBody = new CilMethodBody(mergedCctor);
+        
+        foreach(MethodDefinition cctor in cctors) {
+            mergedCctor.CilMethodBody.Instructions.Add(new CilInstruction(CilOpCodes.Call, cctor));
         }
+        mergedCctor.CilMethodBody.Instructions.Add(new CilInstruction(CilOpCodes.Ret));
+        
+        staticType.Methods.Add(mergedCctor);
+    } else if(cctors.Count == 1) {
+        MethodDefinition cctor = cctors[0];
+        cctor.Name = ".cctor";
+        cctor.IsSpecialName = cctor.IsRuntimeSpecialName = true;
+    }
 
-        if(cctors.Count >= 2) {
-            MethodDefinition mergedCctor = new MethodDefinition(".cctor", MethodAttributes.Private | MethodAttributes.Static | MethodAttributes.SpecialName | MethodAttributes.RuntimeSpecialName, MethodSignature.CreateStatic(botMod.CorLibTypeFactory.Void));
-            mergedCctor.CilMethodBody = new CilMethodBody(mergedCctor);
-            
-            foreach(MethodDefinition cctor in cctors) {
-                mergedCctor.CilMethodBody.Instructions.Add(new CilInstruction(CilOpCodes.Call, cctor));
-            }
-            mergedCctor.CilMethodBody.Instructions.Add(new CilInstruction(CilOpCodes.Ret));
-            
-            staticType.Methods.Add(mergedCctor);
-        } else if(cctors.Count == 1) {
-            MethodDefinition cctor = cctors[0];
-            cctor.Name = ".cctor";
-            cctor.IsSpecialName = cctor.IsRuntimeSpecialName = true;
-        }
+    //Tinfy the static type
+    TinyfyType(staticType);
 
-        //Tinfy the type
-        TinyfyType(staticType);
+    //Fixup array init fields
+    if(arrayInitType != null) {
+        foreach(FieldDefinition initField in arrayInitFields) initField.Signature!.FieldType = arrayInitType.ToTypeSignature();
     }
 
     //Expose the bot type
