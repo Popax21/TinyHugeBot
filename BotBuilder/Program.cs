@@ -519,7 +519,7 @@ if(!DEBUG) {
         }
 
         //Tinfy the type
-        TinyfyType(staticType, rename: false);
+        TinyfyType(staticType);
     }
 
     //Expose the bot type
