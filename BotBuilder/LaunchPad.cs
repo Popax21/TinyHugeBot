@@ -4,11 +4,10 @@ using static System.AppDomain;
 class MyBot : IChessBot {
     //TinyBot_asmBuf either holds the TinyBot IChessBot instance, or the assembly buffer during decoding
     //We declare all our other variables here as well to save tokens later
-    dynamic TinyBot_asmBuf, asmDataBufOff = 0, accum = 0, parity = 1, remVals = 0, bits;
+    dynamic TinyBot_asmBuf = new byte[<TINYASMSIZE>], asmDataBufOff = 0, accum = 0, parity = 1, remVals = 0, bits;
 
     public MyBot() {
         //Decode the assembly
-        TinyBot_asmBuf = new byte[<TINYASMSIZE>];
         foreach(decimal dec in new[] {
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> BEGIN ENCODED ASSEMBLY <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
             <TINYASMENCDAT>
