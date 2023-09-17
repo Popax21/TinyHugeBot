@@ -61,7 +61,7 @@ if(!DEBUG) {
         asmRef.PublicKeyOrToken = null;
     }
 
-    botMod.Assembly.Name = "B"; //We need an assembly name
+    botMod.Assembly.Name = botMod.AssemblyReferences[0].Name!.ToString()[^1..]; //We need an assembly name
     botMod.Assembly.PublicKey = null;
     botMod.Assembly.CustomAttributes.Clear();
 
@@ -90,7 +90,8 @@ if(!DEBUG) {
         return typeSig;
     }
 
-    char nextTypeName = 'a';
+    string suffixStr = botMod.AssemblyReferences[0].Name!;
+    int curSuffixStart = suffixStr.Length-2; //The one-char suffix is reserved for the bot class
     bool TinyfyType(TypeDefinition type, bool rename = true) {
         //Enum types are inlined
         if(type.IsEnum) return false;
@@ -141,7 +142,7 @@ if(!DEBUG) {
         if(rename) {
             origNames.Add(type, type.Name!);
             type.Namespace = null;
-            type.Name = nextTypeName++.ToString();
+            type.Name = suffixStr[curSuffixStart--..];
         }
 
         HashSet<string> ifaceNames = type.Interfaces.SelectMany(intf => intf.Interface!.Resolve()!.Methods.Select(m => m.Name!.Value)).ToHashSet();
@@ -479,7 +480,7 @@ if(!DEBUG) {
                 foreach(TypeDefinition nestedType in StealElements(type.NestedTypes)) staticType.NestedTypes.Add(nestedType);
             } else {
                 //Tinfy other types
-                keepType = TinyfyType(type);
+                keepType = TinyfyType(type, rename: type != botType);
             }
 
             //Enum types are inlined
@@ -521,8 +522,8 @@ if(!DEBUG) {
         TinyfyType(staticType, rename: false);
     }
 
-    //We need to expose the bot type
-    botType.Name = botClass = "B"; 
+    //Expose the bot type
+    botType.Name = botClass = suffixStr[^1..]; //The one-char suffix is reserved for the bot class
 
     //Build the tiny bot DLL by modifying some other parameters
     IPEImage tinyBotImg = new ManagedPEImageBuilder().CreateImage(botMod).ConstructedImage ?? throw new Exception("No tiny bot PEImage was built!");
@@ -554,7 +555,7 @@ if(!DEBUG) {
 
     //Ensure that the DLL can still be loaded
     try {
-        Assembly.LoadFile(Path.GetFullPath(args[1])).GetType("B", true);
+        Assembly.LoadFile(Path.GetFullPath(args[1])).GetType(botClass, true);
     } catch(Exception e) {
         throw new Exception("TinyBot DLL verification error!", e);
     }
