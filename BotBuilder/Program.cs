@@ -93,6 +93,7 @@ if(!DEBUG) {
             foreach(ParameterDefinition param in meth.ParameterDefinitions) param.CustomAttributes.Clear();
         }
         foreach(FieldDefinition field in type.Fields) field.CustomAttributes.Clear();
+        foreach(InterfaceImplementation interfaceImpl in type.Interfaces) interfaceImpl.CustomAttributes.Clear();
 
         //Trim out constants
         foreach(FieldDefinition field in type.Fields.ToArray()) {
