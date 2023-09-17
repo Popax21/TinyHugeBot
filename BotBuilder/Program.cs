@@ -90,9 +90,7 @@ if(!DEBUG) {
         }
 
         //Trim out parameter names
-        foreach(MethodDefinition meth in type.Methods) {
-            foreach(ParameterDefinition param in meth.ParameterDefinitions) param.Name = null;
-        }
+        foreach(MethodDefinition meth in type.Methods) meth.ParameterDefinitions.Clear();
 
         //Trim out to-be-inlined methods
         foreach(MethodDefinition meth in type.Methods.ToArray()) {
