@@ -607,7 +607,7 @@ void EndHeader() {
     int numDecs = tinyBotEncDecs.Count - (headerDecIdx+1);
 
     int[] headerDecBits = decimal.GetBits(tinyBotEncDecs[headerDecIdx]);
-    headerDecBits[1] = numDecs;
+    headerDecBits[1] = numDecs + 1; //+1 to account for how LaunchPad deals with remVals 
     tinyBotEncDecs[headerDecIdx] = new decimal(headerDecBits);
 
     headerDecIdx = -1;

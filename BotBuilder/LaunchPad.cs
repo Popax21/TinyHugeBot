@@ -7,7 +7,7 @@ class MyBot : IChessBot {
     // - for bits: removing the need for a `var` token
     // - for the rest: removing the need to zero-initialize
     dynamic TinyBot_asmBuf = new byte[<TINYASMSIZE>], bits;
-    int asmDataBufOff, accum, remVals, parity;
+    int asmDataBufOff, accum, remVals;
 
     public MyBot() {
         //Decode the assembly
@@ -20,7 +20,7 @@ class MyBot : IChessBot {
             bits = decimal.GetBits(dec);
 
             //Check if we reached the end of the block
-            if(remVals-- == 0) {
+            if(--remVals <= 0) {
                 asmDataBufOff += bits[0];
                 remVals = bits[1];
                 continue;
@@ -32,8 +32,8 @@ class MyBot : IChessBot {
 
             //Accumulate two 4 bit scales, then add to the buffer
             accum <<= 4;
-            TinyBot_asmBuf[asmDataBufOff++] = (byte) (accum |= bits[3] >> 16);
-            asmDataBufOff -= parity ^= 1;
+            TinyBot_asmBuf[asmDataBufOff] = (byte) (accum |= bits[3] >> 16);
+            asmDataBufOff += remVals % 2;
         }
 
         //Load the tiny bot from the assembly
