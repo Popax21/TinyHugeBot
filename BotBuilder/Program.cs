@@ -14,11 +14,19 @@ using AsmResolver.DotNet.Serialized;
 using AsmResolver.DotNet.Signatures;
 using AsmResolver.DotNet.Signatures.Types;
 using AsmResolver.PE;
+using AsmResolver.PE.Builder;
 using AsmResolver.PE.DotNet.Builder;
 using AsmResolver.PE.DotNet.Cil;
+using AsmResolver.PE.DotNet.Metadata;
 using AsmResolver.PE.DotNet.Metadata.Guid;
+using AsmResolver.PE.DotNet.Metadata.Tables;
+using AsmResolver.PE.DotNet.Metadata.Tables.Rows;
 using AsmResolver.PE.File;
+using AsmResolver.PE.File.Headers;
+using AsmResolver.PE.Platforms;
 using MethodAttributes = AsmResolver.PE.DotNet.Metadata.Tables.Rows.MethodAttributes;
+using MethodImplAttributes = AsmResolver.PE.DotNet.Metadata.Tables.Rows.MethodImplAttributes;
+using TypeAttributes = AsmResolver.PE.DotNet.Metadata.Tables.Rows.TypeAttributes;
 
 static T[] StealElements<T>(IList<T> list) {
     T[] elems = list.ToArray();
@@ -149,6 +157,7 @@ if(!DEBUG) {
         //Tiny-fy nested types
         foreach(TypeDefinition nestedType in type.NestedTypes.ToArray()) {
             //Un-nest the type in the process (this removes the need for a NestedClass table)
+            nestedType.IsNestedPrivate = false;
             type.NestedTypes.Remove(nestedType);
             if(TinyfyType(nestedType)) botMod.TopLevelTypes.Add(nestedType);
         }
@@ -442,16 +451,23 @@ if(!DEBUG) {
 
     //Build the tiny bot DLL by modifying some other parameters
     IPEImage tinyBotImg = new ManagedPEImageBuilder().CreateImage(botMod).ConstructedImage ?? throw new Exception("No tiny bot PEImage was built!");
+    tinyBotImg.MachineType = MachineType.Amd64; //This surpresses the native bootstrapping code - we change it back afterwards to maintain compat with other platforms
     tinyBotImg.Resources = null;
+    tinyBotImg.Imports.Clear();
+    tinyBotImg.Exports = null;
+    tinyBotImg.Relocations.Clear();
+    tinyBotImg.DebugData.Clear();
+
     if(tinyBotImg.DotNetDirectory?.Metadata?.TryGetStream(out GuidStream? guidStream) ?? false) {
         tinyBotImg.DotNetDirectory.Metadata.Streams.Remove(guidStream);
     }
 
-    PEFile tinyBot = new ManagedPEFileBuilder().CreateFile(tinyBotImg);
-    tinyBot.OptionalHeader.FileAlignment = tinyBot.OptionalHeader.SectionAlignment = 512;
+    PEFile tinyBotPE = new ManagedPEFileBuilder().CreateFile(tinyBotImg);
+    tinyBotPE.FileHeader.Machine = MachineType.I386;
+    tinyBotPE.OptionalHeader.FileAlignment = tinyBotPE.OptionalHeader.SectionAlignment = 512;
 
     //Write the tiny bot DLL
-    tinyBot.Write(args[1]);
+    tinyBotPE.Write(args[1]);
 
     static long GetDLLSize(string path) => new FileInfo(path).Length;
     Console.WriteLine($"Built tiny bot: {args[0]} ({GetDLLSize(args[0])} bytes) -> {args[1]} ({GetDLLSize(args[1])} bytes)");
