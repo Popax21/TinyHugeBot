@@ -24,7 +24,7 @@ class MyBot : IChessBot {
                     asmDataBuf[asmDataBufOff++] = (byte) bits[i / 4];
 
                 //Accumulate two 4 bit scales, then add to the buffer
-                asmDataBuf[asmDataBufOff] = (byte) (accum = (accum << 4) | (bits[3] >> 16));
+                asmDataBuf[asmDataBufOff] = (byte) (accum = accum << 4 | bits[3] >> 16);
                 asmDataBufOff += parity ^= 1;
             }
 
