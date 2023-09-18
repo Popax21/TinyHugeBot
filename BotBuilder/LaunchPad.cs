@@ -11,14 +11,14 @@ class MyBot : IChessBot {
         //Decode the assembly
         //The assembly is encoded in a semi-RLE-like format
         //There are two types of tokens:
-        // - scaling factors [0;16): regular tokens: carry 100 bits of info
-        //   - 96 bits through the decimal integer number, which are immediately copied to the assembly buffer
-        //   - 4 bits through the decimal scaling factor: two regular tokens are paired up, and their scaling factors are combined into an extra byte
-        // - scaling factor 16: skip tokens: carry 88 bits of info, and can skip up to 255 bytes forward (efficiently encoding a stretch of null bytes)
-        //   - lowest 8 bits of the decimal integer number: the skip amount
-        //   - the remaining integer number bits are immediately copied to the assembly buffer
-        //   - skip tokens are invisible to the scalar accumulator; they don't contribute a scale value, nor do they affect parity
-        // - the sign bit is unused as a minus sign requires an extra token
+        // - scaling factors 0-15: regular tokens
+        //   - the decimal integer number encodes 12 bytes, which are copied to the assembly buffer
+        //   - the decimal scaling factor encodes an additional 4 bits - two regular tokens are paired up, and their scaling factors are combined to form an extra byte
+        // - scaling factor 16: skip tokens (can skip up to 255 bytes forward to efficiently encode a stretch of zero bytes)
+        //   - the lowest byte of the decimal integer number contains the amount of bytes to skip forward by
+        //   - the remaining 11 integer number bytes are copied to the assembly buffer
+        //   - skip tokens are invisible to the scalar accumulator; they don't contribute their scale value, nor do they affect parity
+        // - the sign bit is unused as a minus sign would require an extra token
         foreach(decimal dec in new[] {
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> BEGIN ENCODED ASSEMBLY <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
             <TINYASMENCDAT>
