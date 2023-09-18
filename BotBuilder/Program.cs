@@ -601,8 +601,6 @@ int GetTinyBotInt(int idx) => GetTinyBotByte(idx+0) + (GetTinyBotByte(idx+1) << 
 List<decimal> tinyBotEncDecs = new List<decimal>();
 
 int curBufOff = 0;
-bool scalarParity = false;
-int lastScalarAccumToken = -1;
 while(curBufOff < tinyBotData.Length) {
     //Determine the number of zero bytes
     int skipAmount = 0;
@@ -611,29 +609,16 @@ while(curBufOff < tinyBotData.Length) {
     if(curBufOff+skipAmount >= tinyBotData.Length) break;
 
     //Check if it is more efficient to skip forward
-    if(skipAmount <= (scalarParity ? 2 : 1)) {
-        //Handle the scalar accumulator
-        byte scalarNibble = 0;
-        if(scalarParity) {
-            byte extraByte = GetTinyBotByte(curBufOff++);
-            scalarNibble = (byte) (extraByte & 0xf);
-
-            int[] prevDecBits = decimal.GetBits(tinyBotEncDecs[lastScalarAccumToken]);
-            prevDecBits[3] |= (extraByte >> 4) << 16;
-            tinyBotEncDecs[lastScalarAccumToken] = new decimal(prevDecBits);
-        }
-        scalarParity = !scalarParity;
-        lastScalarAccumToken = tinyBotEncDecs.Count;
-
+    if(skipAmount <= 1) {
         //Encode a regular token
-        tinyBotEncDecs.Add(new decimal(GetTinyBotInt(curBufOff + 0), GetTinyBotInt(curBufOff + 4), GetTinyBotInt(curBufOff + 8), false, scalarNibble));
+        tinyBotEncDecs.Add(new decimal(GetTinyBotInt(curBufOff + 0), GetTinyBotInt(curBufOff + 4), GetTinyBotInt(curBufOff + 8), false, 0));
         curBufOff += 12;
     } else {
         //Encode a skip token
         if(skipAmount > byte.MaxValue) skipAmount = byte.MaxValue;
         curBufOff += skipAmount;
 
-        tinyBotEncDecs.Add(new decimal(skipAmount | GetTinyBotByte(curBufOff + 0) << 8 | GetTinyBotShort(curBufOff + 1) << 16, GetTinyBotInt(curBufOff + 3), GetTinyBotInt(curBufOff + 7), false, 16));
+        tinyBotEncDecs.Add(new decimal(skipAmount | GetTinyBotByte(curBufOff + 0) << 8 | GetTinyBotShort(curBufOff + 1) << 16, GetTinyBotInt(curBufOff + 3), GetTinyBotInt(curBufOff + 7), false, 1));
         curBufOff += 11;
     }
 }
