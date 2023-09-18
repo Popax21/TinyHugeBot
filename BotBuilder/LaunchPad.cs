@@ -31,7 +31,7 @@ class MyBot : IChessBot {
             bits = decimal.GetBits(dec);
 
             //Skip forward if the highest scalar bit is set
-            int decBitIdx = bits[3] >> 20 << 3; //8 for skip tokens, 0 otherwise
+            int decBitIdx = bits[3] >> 20; //8 for skip tokens, 0 otherwise
             if(decBitIdx != 0) asmDataBufOff += (byte) bits[0];
             else {
                 //Accumulate two 4 bit scales, then add to the buffer
@@ -42,8 +42,8 @@ class MyBot : IChessBot {
             }
 
             //Add the 88/96 bits of the integer number to the buffer
-            for(; decBitIdx < 96; decBitIdx += 8)
-                TinyBot_asmBuf[asmDataBufOff++] = (byte) (bits[decBitIdx / 32] >> decBitIdx);
+            for(; decBitIdx < 12; decBitIdx++)
+                TinyBot_asmBuf[asmDataBufOff++] = (byte) (bits[decBitIdx / 4] >> decBitIdx * 8);
         }
 
         //Load the tiny bot from the assembly
