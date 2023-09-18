@@ -15,24 +15,51 @@ public partial class MyBot : IChessBot {
 
         int deepeningSearchTime = timer.MillisecondsRemaining / 20;
 
+#if STATS
+        //Notify the stats tracker that the search starts
+        STAT_StartGlobalSearch();
+#endif
+
         //Do a NegaMax search with iterative deepening
         Move curBestMove = default;
         int curBestEval = 0;
         for(int depth = 1;; depth++) {
             //Do a NegaMax search with the current depth
+
+#if STATS
+            //Notify the stats tracker that the depth search starts
+            STAT_StartDepthSearch(depth);
+#endif
+#if DEBUG || STATS
+            bool didTimeOut = false;
+#endif
+
             try {
                 curBestEval = NegaMax(board, Eval.MinEval, Eval.MaxEval, depth, 0);
                 curBestMove = rootBestMove; //Update the best move
 #if DEBUG
-            } catch(TimeoutException) {}
+            } catch(TimeoutException) {
 #else
-            } catch(Exception) {}
+            } catch(Exception) {
 #endif
+#if DEBUG || STATS
+                didTimeOut = true;
+#endif
+            }
 
+#if STATS
+            //Notify the stats tracker that the depth search ended
+            STAT_EndDepthSearch(depth, didTimeOut);
+#endif
             //Check if time is up
             if(timer.MillisecondsElapsedThisTurn >= deepeningSearchTime) {
-#if DEBUG
-                Console.WriteLine($"Searched to depth {depth} in {timer.MillisecondsElapsedThisTurn:d5}ms: best {curBestMove.ToString().ToLower()} eval {curBestEval}");
+#if STATS
+                //Notify the stats tracker that the search ended
+                STAT_EndGlobalSearch(depth - (didTimeOut ? 1 : 0));
+#endif
+#if DEBUG || STATS
+                //Log the best move
+                Console.WriteLine($"Searched to depth {depth - (didTimeOut ? 1 : 0)} in {timer.MillisecondsElapsedThisTurn:d5}ms: best {curBestMove.ToString().ToLower()} eval {curBestEval}");
 #endif
                 return curBestMove;
             }
@@ -46,6 +73,10 @@ public partial class MyBot : IChessBot {
             throw new TimeoutException();
 #else
             throw new Exception();
+#endif
+
+#if STATS
+        STAT_NewNode_I();
 #endif
 
         //Handle repetition

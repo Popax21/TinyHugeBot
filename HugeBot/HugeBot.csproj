@@ -6,6 +6,7 @@
     <TargetFramework>net6.0</TargetFramework>
     <Nullable>enable</Nullable>
     <CheckForOverflowUnderflow Condition="'$(Configuration)' == 'Debug'">true</CheckForOverflowUnderflow>
+    <DefineConstants Condition="'$(DisableStats)' == ''">$(DefineConstants);STATS</DefineConstants>
   </PropertyGroup>
   
   <Target Name="CopyDLL" AfterTargets="Build">

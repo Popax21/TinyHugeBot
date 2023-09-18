@@ -1,7 +1,17 @@
 #!/bin/sh -e
-if [ "$1" == "--debug" ]; then
-    dotnet build HugeBot -c Debug
+BOTBUILDER_FLAGS=
+BUILD_FLAGS=
+
+if [[ "$@" == *"--debug" ]]; then
+    BUILD_FLAGS+="-c Debug "
+    BOTBUILDER_FLAGS+="--debug "
 else
-    dotnet build HugeBot -c Release
+    BUILD_FLAGS+="-c Release "
 fi
-dotnet run --project BotBuilder -- HugeBot.dll TinyBot.dll TinyBot.cs $1
+
+if [[ ! "$@" == *"--stats" ]]; then
+    BUILD_FLAGS+="-p:DisableStats=1 "
+fi
+
+dotnet build HugeBot $BUILD_FLAGS
+dotnet run --project BotBuilder -- HugeBot.dll TinyBot.dll TinyBot.cs $BOTBUILDER_FLAGS

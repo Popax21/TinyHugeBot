@@ -153,6 +153,24 @@ if(!DEBUG) {
             if(field.Signature is FieldSignature fieldSig) fieldSig.FieldType = RelinkType(fieldSig.FieldType);
         }
 
+        //Make everything non-private to prevent issues with inlining
+        if(type.IsNestedPrivate) {
+            type.IsNestedPrivate = false;
+            if(!type.IsNestedPublic) type.IsNestedAssembly = true;
+        }
+
+        foreach(MethodDefinition meth in type.Methods) {
+            if(!meth.IsPrivate) continue;
+            meth.IsPrivate = false;
+            if(!meth.IsPublic) meth.IsAssembly = true;
+        }
+
+        foreach(FieldDefinition field in type.Fields) {
+            if(!field.IsPrivate) continue;
+            field.IsPrivate = false;
+            if(!field.IsPublic) field.IsAssembly = true;
+        }
+
         //Tiny-fy and relink method bodies
         foreach(MethodDefinition meth in type.Methods) {
             if(meth.CilMethodBody != null) {
