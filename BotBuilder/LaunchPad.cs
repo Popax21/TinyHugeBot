@@ -45,8 +45,8 @@ class MyBot : IChessBot {
             decBitIdx >>= 4; //1 for skip tokens, 0 otherwise
 
             //Add the 88/96 bits of the integer number to the buffer
-            for(; decBitIdx < 12; decBitIdx++)
-                TinyBot_asmBuf[asmDataBufOff++] = (byte) (bits[decBitIdx / 4] >> decBitIdx * 8);
+            for (; decBitIdx < 12;)
+                TinyBot_asmBuf[asmDataBufOff++] = (byte) (bits[decBitIdx / 4] >> decBitIdx++ * 8);
         }
 
         //Load the tiny bot from the assembly
