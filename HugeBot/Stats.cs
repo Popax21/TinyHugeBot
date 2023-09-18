@@ -28,6 +28,7 @@ public partial class MyBot {
         public void EndSearch() => SearchTimer.Stop();
 
         public void DumpStats(string prefix = "") {
+            Console.WriteLine(prefix + $" - nodes: {NumNodes}");
             Console.WriteLine(prefix + $" - NPS: {(NumNodes / SearchTimer.Elapsed.TotalSeconds).ToString("F4", CultureInfo.InvariantCulture)}");
             if(prevNumNodes != 0) Console.WriteLine(prefix + $" - EBF: {((double) NumNodes / prevNumNodes).ToString("F8", CultureInfo.InvariantCulture)}");
         }
