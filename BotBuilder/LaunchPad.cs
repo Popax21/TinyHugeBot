@@ -25,7 +25,7 @@ class MyBot : IChessBot {
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>  END ENCODED ASSEMBLY  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
         }) {
             //Get the bits of the decimal
-            bits = decimal.GetBits(dec);
+            var bits = decimal.GetBits(dec);
 
             //Skip forward if the highest scalar bit is set
             dynamic idx = bits[3] >> 16; //16 for skip tokens, <16 otherwise
