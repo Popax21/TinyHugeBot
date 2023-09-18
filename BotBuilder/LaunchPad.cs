@@ -7,7 +7,8 @@ class MyBot : IChessBot {
     // - for bits: removing the need for a `var` token
     // - for the rest: removing the need to zero-initialize
     dynamic TinyBot_asmBuf = new byte[<TINYASMSIZE>], bits;
-    int asmDataBufOff, scaleAccum, parity;
+    int asmDataBufOff, parity;
+    byte scaleAccum;
 
     public MyBot() {
         //Decode the assembly
@@ -36,7 +37,7 @@ class MyBot : IChessBot {
                 //Accumulate two 4 bit scales, then add to the buffer
                 //Note that for even parity tokens, the byte we write here is immediately overwritten again 
                 scaleAccum <<= 4;
-                TinyBot_asmBuf[asmDataBufOff++] = (byte) (scaleAccum |= bits[3] >> 16);
+                TinyBot_asmBuf[asmDataBufOff++] = scaleAccum |= bits[3] >> 16;
                 asmDataBufOff -= parity ^= 1;
             }
 
