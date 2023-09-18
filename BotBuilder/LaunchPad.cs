@@ -4,17 +4,20 @@ using static System.AppDomain;
 class MyBot : IChessBot {
     //TinyBot_asmBuf either holds the TinyBot IChessBot instance, or the assembly buffer during decoding
     dynamic TinyBot_asmBuf = new byte[<TINYASMSIZE>];
-    int asmBufOff;
+    int asmBufOff, scaleParity;
+    byte scaleAccum;
 
     public MyBot() {
         //Decode the assembly
         //The assembly is encoded in a semi-RLE-like format
         //There are two types of tokens:
-        // - scaling factors 0: regular tokens
-        //   - carry 12 bytes of info through the decimal integer number, which are copied to the assembly buffer
-        // - scaling factor 1: skip tokens
-        //   - lowest byte of the decimal integer number: the skip amount
-        //   - the remaining 11 integer number bytes are copied to the assembly buffer
+        // - scaling factors [0;16): regular tokens: carry 100 bits of info
+        //   - 96 bits through the decimal integer number, which are immediately copied to the assembly buffer
+        //   - 4 bits through the decimal scaling factor: two regular tokens are paired up, and their scaling factors are combined into an extra byte
+        // - scaling factor 16: skip tokens: carry 88 bits of info, and can skip up to 255 bytes forward (efficiently encoding a stretch of null bytes)
+        //   - lowest 8 bits of the decimal integer number: the skip amount
+        //   - the remaining integer number bits are immediately copied to the assembly buffer
+        //   - skip tokens are invisible to the scalar accumulator; they don't contribute a scale value, nor do they affect parity
         // - the sign bit is unused as a minus sign requires an extra token
         foreach(decimal dec in new[] {
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> BEGIN ENCODED ASSEMBLY <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -22,13 +25,21 @@ class MyBot : IChessBot {
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>  END ENCODED ASSEMBLY  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
         }) {
             //Get the bits of the decimal
-            var bits = decimal.GetBits(dec);
+            bits = decimal.GetBits(dec);
 
             //Skip forward if the highest scalar bit is set
-            dynamic idx = bits[3] >> 16; //1 for skip tokens, 0 otherwise
-            if(idx != 0) asmBufOff += (byte) bits[0];
+            dynamic idx = bits[3] >> 16; //16 for skip tokens, <16 otherwise
+            if(idx == 16) asmBufOff += (byte) bits[0];
+            else {
+                //Accumulate two 4 bit scales, then add to the buffer
+                //Note that for even parity tokens, the byte we write here is immediately overwritten again 
+                scaleAccum <<= 4;
+                TinyBot_asmBuf[asmBufOff++] = scaleAccum |= idx;
+                asmBufOff -= scaleParity ^= 1;
+            }
 
             //Add the 88/96 bits of the integer number to the buffer
+            idx >>= 4; //1 for skip tokens, 0 otherwise
             while(idx < 12) TinyBot_asmBuf[asmBufOff++] = (byte) (bits[idx / 4] >> idx++ * 8);
         }
 
