@@ -3,11 +3,8 @@ using static System.AppDomain;
 
 class MyBot : IChessBot {
     //TinyBot_asmBuf either holds the TinyBot IChessBot instance, or the assembly buffer during decoding
-    //We declare all our other variables here as well to save tokens later by either:
-    // - for bits: removing the need for a `var` token
-    // - for the rest: removing the need to zero-initialize
-    dynamic TinyBot_asmBuf = new byte[<TINYASMSIZE>], bits;
-    int asmDataBufOff, parity;
+    dynamic TinyBot_asmBuf = new byte[<TINYASMSIZE>];
+    int asmBufOff, scaleParity;
     byte scaleAccum;
 
     public MyBot() {
@@ -31,22 +28,19 @@ class MyBot : IChessBot {
             bits = decimal.GetBits(dec);
 
             //Skip forward if the highest scalar bit is set
-            dynamic decBitIdx = bits[3] >> 16; //16 for skip tokens, <16 otherwise
-            if(decBitIdx == 16) asmDataBufOff += (byte) bits[0];
+            dynamic idx = bits[3] >> 16; //16 for skip tokens, <16 otherwise
+            if(idx == 16) asmBufOff += (byte) bits[0];
             else {
                 //Accumulate two 4 bit scales, then add to the buffer
                 //Note that for even parity tokens, the byte we write here is immediately overwritten again 
                 scaleAccum <<= 4;
-                TinyBot_asmBuf[asmDataBufOff++] = scaleAccum |= decBitIdx;
-                asmDataBufOff -= parity ^= 1;
+                TinyBot_asmBuf[asmBufOff++] = scaleAccum |= idx;
+                asmBufOff -= scaleParity ^= 1;
             }
 
-            //Initialize decBitIdx fully
-            decBitIdx >>= 4; //1 for skip tokens, 0 otherwise
-
             //Add the 88/96 bits of the integer number to the buffer
-            for (; decBitIdx < 12;)
-                TinyBot_asmBuf[asmDataBufOff++] = (byte) (bits[decBitIdx / 4] >> decBitIdx++ * 8);
+            idx >>= 4; //1 for skip tokens, 0 otherwise
+            while(idx < 12) TinyBot_asmBuf[asmBufOff++] = (byte) (bits[idx / 4] >> idx++ * 8);
         }
 
         //Load the tiny bot from the assembly
