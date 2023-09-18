@@ -31,15 +31,18 @@ class MyBot : IChessBot {
             bits = decimal.GetBits(dec);
 
             //Skip forward if the highest scalar bit is set
-            int decBitIdx = bits[3] >> 20; //8 for skip tokens, 0 otherwise
-            if(decBitIdx != 0) asmDataBufOff += (byte) bits[0];
+            dynamic decBitIdx = bits[3] >> 16; //16 for skip tokens, <16 otherwise
+            if(decBitIdx == 16) asmDataBufOff += (byte) bits[0];
             else {
                 //Accumulate two 4 bit scales, then add to the buffer
                 //Note that for even parity tokens, the byte we write here is immediately overwritten again 
                 scaleAccum <<= 4;
-                TinyBot_asmBuf[asmDataBufOff++] = scaleAccum |= bits[3] >> 16;
+                TinyBot_asmBuf[asmDataBufOff++] = scaleAccum |= decBitIdx;
                 asmDataBufOff -= parity ^= 1;
             }
+
+            //Initialize decBitIdx fully
+            decBitIdx >>= 4; //1 for skip tokens, 0 otherwise
 
             //Add the 88/96 bits of the integer number to the buffer
             for(; decBitIdx < 12; decBitIdx++)
