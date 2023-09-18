@@ -92,7 +92,7 @@ public partial class MyBot : IChessBot {
 
         //Check if we reached the bottom of the search tree
         //TODO Quiescence search
-        if(remDepth <= 0) return Eval.Evaluate(board);
+        if(remDepth <= 0) return Eval.Evaluate_I(board);
 
         //Generate legal moves
         Span<Move> moves = stackalloc Move[256];

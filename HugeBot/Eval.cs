@@ -20,7 +20,7 @@ public static class Eval {
     private static readonly int[] PSTIndices = { 0, 2, 3, 4, 5, 6 };
     private static readonly int[] PhaseContributions = { 0, 1, 1, 2, 4, 0 };
 
-    public static int Evaluate(Board board) {
+    public static int Evaluate_I(Board board) {
         //TODO Incremental evaluation
         //TODO More evaluation features (currently only ice4's are implemented - figure out how to tune new / existing ones)
         //TODO Pawn structure / passed pawns
