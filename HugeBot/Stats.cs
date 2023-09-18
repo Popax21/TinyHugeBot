@@ -8,26 +8,28 @@ public partial class MyBot {
     private const MethodImplOptions MImpl = MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization;
 
     private struct StatsTracker {
-        private readonly Stopwatch searchSw = new Stopwatch();
-        private int numNodes = 0;
+        public readonly Stopwatch SearchTimer = new Stopwatch();
+        public int NumNodes = 0;
+        private int prevNumNodes = 0;
 
-        public readonly long ElapsedMs => searchSw.ElapsedMilliseconds;
+        public readonly long ElapsedMs => SearchTimer.ElapsedMilliseconds;
 
         public StatsTracker() {}
 
-        public void StartSearch() {
-            numNodes = 0;
-            searchSw.Restart();
+        public void StartSearch(int prevNodes = 0) {
+            //Reset counters
+            NumNodes = 0;
+            prevNumNodes = prevNodes;
+
+            //Start the timer
+            SearchTimer.Restart();
         }
 
-        public void EndSearch() {
-            searchSw.Stop();
-        }
-
-        [MethodImpl(MImpl)] public void NewNode_I() => numNodes++;
+        public void EndSearch() => SearchTimer.Stop();
 
         public void DumpStats(string prefix = "") {
-            Console.WriteLine(prefix + $" - NPS: {(numNodes / searchSw.Elapsed.TotalSeconds).ToString("F4", CultureInfo.InvariantCulture)}");
+            Console.WriteLine(prefix + $" - NPS: {(NumNodes / SearchTimer.Elapsed.TotalSeconds).ToString("F4", CultureInfo.InvariantCulture)}");
+            if(prevNumNodes != 0) Console.WriteLine(prefix + $" - EBF: {((double) NumNodes / prevNumNodes).ToString("F8", CultureInfo.InvariantCulture)}");
         }
     };
 
@@ -40,7 +42,7 @@ public partial class MyBot {
         globalStats.DumpStats();
     }
 
-    private void STAT_StartDepthSearch(int depth) => depthStats.StartSearch();
+    private void STAT_StartDepthSearch(int depth) => depthStats.StartSearch(depth > 1 ? depthStats.NumNodes : 0);
     private void STAT_EndDepthSearch(int depth, bool didTimeOut) {
         depthStats.EndSearch();
         Console.WriteLine($"> Finished search to depth {depth} in {depthStats.ElapsedMs}ms{(didTimeOut ? " (timeout)" : "")}");
@@ -48,8 +50,8 @@ public partial class MyBot {
     }
 
     [MethodImpl(MImpl)] private void STAT_NewNode_I() {
-        globalStats.NewNode_I();
-        depthStats.NewNode_I();
+        globalStats.NumNodes++;
+        depthStats.NumNodes++;
     }
 
 }
