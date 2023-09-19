@@ -9,13 +9,38 @@ namespace BotTuner.Factories {
     //Takes a path to a UCI compliant chess bot and makes a new IChessBot that runs it
     class UCIBotFactory : IChessBotFactory {
         private readonly string path;
+        private readonly Process proc;
 
         public UCIBotFactory(string path) {
             Console.WriteLine($"Loading {path}...");
+
+            //Start an instance of the chosen bot
+            proc = Process.Start(new ProcessStartInfo(path) { RedirectStandardInput = true, RedirectStandardOutput = true })!;
+            proc.StandardInput.WriteLine("hi");
+            ReadUntil("uciok");
+
+            //Set options depending on if STRO is used or if ice4 is used
+            if (path == "stro" || path == "stro.exe") {
+                proc.StandardInput.WriteLine("setoption name asm value false");
+                proc.StandardInput.WriteLine("setoption name hash value 224");
+            } else {
+
+            }
+
+            //Store the path for passing to the UCIBot
             this.path = path;
         }
 
-        public IChessBot Create() => (IChessBot) new UCIBot(path);
+        //Read until a specific message is seen
+        public string ReadUntil(string cmd) {
+            while (proc.StandardOutput.ReadLine() is string msg) {
+                if (msg.StartsWith(cmd)) return msg;
+            }
+            throw new Exception();
+        }
+
+
+        public IChessBot Create() => new UCIBot(path, proc);
     }
 
     //Takes a UCI compliant chess bot, runs it in a seperate process, and uses that for the bot
@@ -24,28 +49,16 @@ namespace BotTuner.Factories {
 
         private readonly string bot;
 
-        public UCIBot(string bot) {
-            proc = Process.Start(new ProcessStartInfo(bot) { RedirectStandardInput = true, RedirectStandardOutput = true })!;
-            proc.StandardInput.WriteLine("hi");
-            ReadUntil("uciok");
-
-            //Set options depending on if STRO is used or if ice4 is used
-            if (bot == "stro" || bot == "stro.exe") {
-                proc.StandardInput.WriteLine("setoption name asm value false");
-                proc.StandardInput.WriteLine("setoption name hash value 224");
-            } else {
-
-            }
-
-            //
+        public UCIBot(string bot, Process proc) {
+            //Start a new game
             proc.StandardInput.WriteLine("ucinewgame");
 
-            //Store the bot's name for future use
+            //Store the bot process and it's name for future use
             this.bot = bot;
+            this.proc = proc;
         }
 
-        ~UCIBot() => proc.Kill(true);
-
+        //Read until a specific message is seen
         public string ReadUntil(string cmd) {
             while (proc.StandardOutput.ReadLine() is string msg)
             {

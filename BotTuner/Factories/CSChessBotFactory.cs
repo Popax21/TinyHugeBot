@@ -64,7 +64,7 @@ namespace BotTuner.Factories {
                     }
 
                     //Halt program
-                    throw new Exception("");
+                    throw new Exception();
                 }
 
                 peStream.Position = 0;
