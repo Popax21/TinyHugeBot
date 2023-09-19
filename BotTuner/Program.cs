@@ -8,8 +8,17 @@ namespace BotTuner
 {
     class Program {
         static void Main(string[] args) {
-            var runner = new MatchRunner(("Bots/LittleBlue.cs", null), new (string, Dictionary<string, string?>)[] { ("Bots/FrigBot.cs", null), ("Bots/TinyBot.cs", null) });
-            runner.Test();
+            var littleBlue = new CSChessBotFactory("Bots/LittleBlue.cs");
+            var frigBot = new CSChessBotFactory("Bots/FrigBot.cs");
+            MatchRunner.RunMatches(
+                littleBlue, 
+                new[] { frigBot }, 
+                60000, 
+                new[] { 
+                    "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", 
+                    "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" 
+                }
+            );
         }
     }
 }
