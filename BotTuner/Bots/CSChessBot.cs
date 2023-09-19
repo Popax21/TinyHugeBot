@@ -34,7 +34,7 @@ namespace BotTuner.Bots {
             };
 
             //Compile the file
-            var compiled = CSharpCompilation.Create($"CSCB",
+            var compiled = CSharpCompilation.Create("CSCB",
                 new[] { parsedSyntaxTree },
                 references: references,
                 options: new CSharpCompilationOptions(OutputKind.ConsoleApplication,
@@ -69,7 +69,7 @@ namespace BotTuner.Bots {
             //There is probably a better way of doing this here but it should work anyway
             System.ResolveEventHandler asmResolveCB = (_, _) => AppDomain.CurrentDomain.Load(emitted);
             AppDomain.CurrentDomain.AssemblyResolve += asmResolveCB;
-            bot = (IChessBot) AppDomain.CurrentDomain.CreateInstanceAndUnwrap($"CSCB{path}", "MyBot");
+            bot = (IChessBot) AppDomain.CurrentDomain.CreateInstanceAndUnwrap("CSCB", "MyBot");
             AppDomain.CurrentDomain.AssemblyResolve -= asmResolveCB;
         }
 
