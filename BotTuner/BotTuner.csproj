@@ -13,4 +13,10 @@
     <ProjectReference Include="..\Chess-Challenge\Chess-Challenge\Chess-Challenge.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="Bots\**">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>

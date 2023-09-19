@@ -40,8 +40,6 @@ namespace BotTuner.Factories {
     class UCIBot : IChessBot {
         private readonly Process proc;
 
-        private readonly string bot;
-
         public UCIBot(Process proc) {
             //Start a new game
             proc.StandardInput.WriteLine("ucinewgame");
