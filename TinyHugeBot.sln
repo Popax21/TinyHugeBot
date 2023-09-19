@@ -1,23 +1,22 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.0.31903.59
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.31515.178
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Chess-Challenge", "Chess-Challenge", "{F77E458E-397C-4CA2-98FC-9C7332D2D128}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chess-Challenge", "Chess-Challenge\Chess-Challenge\Chess-Challenge.csproj", "{DBBA3DD5-309F-401F-8FA3-5CB0931ADF19}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Chess-Challenge", "Chess-Challenge\Chess-Challenge\Chess-Challenge.csproj", "{DBBA3DD5-309F-401F-8FA3-5CB0931ADF19}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HugeBot", "HugeBot\HugeBot.csproj", "{473D80E6-3006-416E-A177-D581FA6FF755}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HugeBot", "HugeBot\HugeBot.csproj", "{473D80E6-3006-416E-A177-D581FA6FF755}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BotBuilder", "BotBuilder\BotBuilder.csproj", "{8F1ED48E-DFCF-4B11-B8AD-BF437CDB0D8E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BotBuilder", "BotBuilder\BotBuilder.csproj", "{8F1ED48E-DFCF-4B11-B8AD-BF437CDB0D8E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BotTuner", "BotTuner\BotTuner.csproj", "{53B97E7F-E501-4B71-A54F-72570D041362}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
-	EndGlobalSection
-	GlobalSection(SolutionProperties) = preSolution
-		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{DBBA3DD5-309F-401F-8FA3-5CB0931ADF19}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
@@ -32,8 +31,18 @@ Global
 		{8F1ED48E-DFCF-4B11-B8AD-BF437CDB0D8E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8F1ED48E-DFCF-4B11-B8AD-BF437CDB0D8E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8F1ED48E-DFCF-4B11-B8AD-BF437CDB0D8E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{53B97E7F-E501-4B71-A54F-72570D041362}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{53B97E7F-E501-4B71-A54F-72570D041362}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{53B97E7F-E501-4B71-A54F-72570D041362}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{53B97E7F-E501-4B71-A54F-72570D041362}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{DBBA3DD5-309F-401F-8FA3-5CB0931ADF19} = {F77E458E-397C-4CA2-98FC-9C7332D2D128}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {0A5341D6-0325-4D1F-952D-47B0CCCC2CED}
 	EndGlobalSection
 EndGlobal
