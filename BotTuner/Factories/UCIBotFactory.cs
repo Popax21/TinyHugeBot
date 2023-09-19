@@ -3,7 +3,6 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using ChessChallenge.API;
 
-//TODO: add comments to this
 namespace BotTuner.Factories {
 
     //Takes a path to a UCI compliant chess bot and makes a new IChessBot that runs it
@@ -31,8 +30,8 @@ namespace BotTuner.Factories {
             this.path = path;
         }
 
-        //Read until a specific message is seen
         public string ReadUntil(string cmd) {
+            //Read stdout until a specific message is seen
             while (proc.StandardOutput.ReadLine() is string msg) {
                 if (msg.StartsWith(cmd)) return msg;
             }
@@ -43,7 +42,7 @@ namespace BotTuner.Factories {
         public IChessBot Create() => new UCIBot(path, proc);
     }
 
-    //Takes a UCI compliant chess bot, runs it in a seperate process, and uses that for the bot
+    //Takes a process of a UCI compliant chess bot and uses that for the bot
     class UCIBot : IChessBot {
         private readonly Process proc;
 
@@ -58,8 +57,8 @@ namespace BotTuner.Factories {
             this.proc = proc;
         }
 
-        //Read until a specific message is seen
         public string ReadUntil(string cmd) {
+            //Read stdout until a specific message is seen
             while (proc.StandardOutput.ReadLine() is string msg)
             {
                 if (msg.StartsWith(cmd)) return msg;
