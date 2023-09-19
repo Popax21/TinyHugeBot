@@ -1,16 +1,28 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using ChessChallenge.API;
 
 //TODO: add comments to this
-namespace BotTuner.Bots {
+namespace BotTuner.Factories {
+
+    //Takes a path to a UCI compliant chess bot and makes a new IChessBot that runs it
+    class UCIBotFactory : IChessBotFactory {
+        private readonly string path;
+
+        public UCIBotFactory(string path) {
+            Console.WriteLine($"Loading {path}");
+            this.path = path;
+        }
+
+        public IChessBot Create() => (IChessBot) new UCIBot(path);
+    }
 
     //Takes a UCI compliant chess bot, runs it in a seperate process, and uses that for the bot
     class UCIBot : IChessBot {
         private readonly Process proc;
 
         public UCIBot(string bot) {
-            Console.WriteLine($"Starting {bot}...");
             proc = Process.Start(new ProcessStartInfo(bot) { RedirectStandardInput = true, RedirectStandardOutput = true })!;
             proc.StandardInput.WriteLine("hi");
             ReadUntil("uciok");

@@ -1,22 +1,21 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using ChessChallenge.API;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
 
-namespace BotTuner.Bots {
+namespace BotTuner.Factories {
 
-    //Takes a MyBot.cs file, compiles it at runtime, and uses that for the bot
+    //Takes a MyBot.cs file, compiles it at runtime, and cretaes a new IChessBot from it
     //Uses a lot of code from https://laurentkempe.com/2019/02/18/dynamically-compile-and-run-code-using-dotNET-Core-3.0/
-    class CSChessBot : IChessBot {
+    class CSChessBotFactory : IChessBotFactory {
+        private readonly byte[] assembly;
 
-        //Stores the chess bot contained in the source file
-        private readonly IChessBot bot;
-
-        public CSChessBot(string path) {
-            Console.WriteLine($"Starting {path}...");
+        public CSChessBotFactory(string path) {
+            Console.WriteLine($"Loading {path}...");
 
             //Read and parse the input file
             var sourceCode = File.ReadAllText(path);
@@ -25,7 +24,15 @@ namespace BotTuner.Bots {
             var parsedSyntaxTree = SyntaxFactory.ParseSyntaxTree(codeString, options);
 
             //Create necessary assembly references
+            var asmLocation = Path.GetDirectoryName(typeof(object).Assembly.Location);
             var references = new MetadataReference[] {
+                MetadataReference.CreateFromFile(Path.Combine(asmLocation, "mscorlib.dll")),
+                MetadataReference.CreateFromFile(Path.Combine(asmLocation, "System.dll")),
+                MetadataReference.CreateFromFile(Path.Combine(asmLocation, "System.Core.dll")),
+                MetadataReference.CreateFromFile(Path.Combine(asmLocation, "System.Runtime.dll")),
+                MetadataReference.CreateFromFile(Path.Combine(asmLocation, "System.Linq.dll")),
+                MetadataReference.CreateFromFile(Path.Combine(asmLocation, "System.Collections.dll")),
+                MetadataReference.CreateFromFile(Path.Combine(asmLocation, "System.Numerics.dll")),
                 MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
                 MetadataReference.CreateFromFile(typeof(Console).Assembly.Location),
                 MetadataReference.CreateFromFile(typeof(System.Runtime.AssemblyTargetedPatchBandAttribute).Assembly.Location),
@@ -37,7 +44,7 @@ namespace BotTuner.Bots {
             var compiled = CSharpCompilation.Create("CSCB",
                 new[] { parsedSyntaxTree },
                 references: references,
-                options: new CSharpCompilationOptions(OutputKind.ConsoleApplication,
+                options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
                     optimizationLevel: OptimizationLevel.Release,
                     assemblyIdentityComparer: DesktopAssemblyIdentityComparer.Default));
 
@@ -64,15 +71,10 @@ namespace BotTuner.Bots {
                 emitted = peStream.ToArray();
             }
 
-            //Load the assembly and create the chess bot instance
-            //See BotBuilder.Launchpad for a better explanation of this
-            //There is probably a better way of doing this here but it should work anyway
-            System.ResolveEventHandler asmResolveCB = (_, _) => AppDomain.CurrentDomain.Load(emitted);
-            AppDomain.CurrentDomain.AssemblyResolve += asmResolveCB;
-            bot = (IChessBot) AppDomain.CurrentDomain.CreateInstanceAndUnwrap("CSCB", "MyBot");
-            AppDomain.CurrentDomain.AssemblyResolve -= asmResolveCB;
+            //Store the assembly for future use
+            assembly = emitted;
         }
 
-        public Move Think(Board board, Timer timer) => bot.Think(board, timer);
+        public IChessBot Create() => (IChessBot) Assembly.Load(assembly).CreateInstance("MyBot");
     }
 }

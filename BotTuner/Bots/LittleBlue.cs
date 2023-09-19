@@ -2,9 +2,7 @@
 using System;
 using System.Linq;
 
-namespace ChessChallenge.Example
-{
-    public class EvilBot : IChessBot
+    public class MyBot : IChessBot
     {
         // Define globals to save tokens
         Board board;
@@ -246,7 +244,7 @@ namespace ChessChallenge.Example
             return (middlegame * gamephase + endgame * (24 - gamephase)) / 24 * (board.IsWhiteToMove ? 1 : -1);
         }
 
-        public EvilBot()
+        public MyBot()
         {
             // Precompute PSTs
             UnpackedPestoTables = PackedPestoTables.Select(packedTable =>
@@ -259,4 +257,3 @@ namespace ChessChallenge.Example
             }).ToArray();
         }
     }
-}
