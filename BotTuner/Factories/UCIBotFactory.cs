@@ -11,7 +11,7 @@ namespace BotTuner.Factories {
         private readonly string path;
 
         public UCIBotFactory(string path) {
-            Console.WriteLine($"Loading {path}");
+            Console.WriteLine($"Loading {path}...");
             this.path = path;
         }
 
@@ -22,13 +22,26 @@ namespace BotTuner.Factories {
     class UCIBot : IChessBot {
         private readonly Process proc;
 
+        private readonly string bot;
+
         public UCIBot(string bot) {
             proc = Process.Start(new ProcessStartInfo(bot) { RedirectStandardInput = true, RedirectStandardOutput = true })!;
             proc.StandardInput.WriteLine("hi");
             ReadUntil("uciok");
-            proc.StandardInput.WriteLine("setoption name asm value false");
-            proc.StandardInput.WriteLine("setoption name hash value 224");
+
+            //Set options depending on if STRO is used or if ice4 is used
+            if (bot == "stro" || bot == "stro.exe") {
+                proc.StandardInput.WriteLine("setoption name asm value false");
+                proc.StandardInput.WriteLine("setoption name hash value 224");
+            } else {
+
+            }
+
+            //
             proc.StandardInput.WriteLine("ucinewgame");
+
+            //Store the bot's name for future use
+            this.bot = bot;
         }
 
         ~UCIBot() => proc.Kill(true);
