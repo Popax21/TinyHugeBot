@@ -40,6 +40,9 @@ namespace BotTuner {
                             timer = new ChessChallenge.API.Timer(timer.OpponentMillisecondsRemaining, timer.MillisecondsRemaining, timerMillis);
                         }
 
+                        //Print out contestants
+                        Console.Write($"{player.GetName()} vs {opponentCopy.GetName()}: ");
+
                         //Print out result
                         if (board.IsDraw()) {
                             Console.WriteLine("Ended in draw!");

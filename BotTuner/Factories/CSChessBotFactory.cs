@@ -2,6 +2,7 @@
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Xml.Linq;
 using ChessChallenge.API;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -13,6 +14,7 @@ namespace BotTuner.Factories {
     //Uses a lot of code from https://laurentkempe.com/2019/02/18/dynamically-compile-and-run-code-using-dotNET-Core-3.0/
     class CSChessBotFactory : IChessBotFactory {
         private readonly byte[] assembly;
+        public readonly string name;
 
         public CSChessBotFactory(string path) {
             Console.WriteLine($"Loading {path}...");
@@ -75,9 +77,14 @@ namespace BotTuner.Factories {
             //Store the assembly for future use
             assembly = emitted;
 
+            //Store name for display purposes
+            name = Path.GetFileNameWithoutExtension(path);
+
             Console.WriteLine($"Finished loading {path}!");
         }
 
         public IChessBot Create() => (IChessBot) Assembly.Load(assembly).CreateInstance("MyBot");
+
+        public string GetName() => name;
     }
 }

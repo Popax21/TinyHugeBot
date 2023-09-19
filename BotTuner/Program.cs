@@ -15,8 +15,8 @@ namespace BotTuner
                 {"Threads", "1"}
             });
             MatchRunner.RunMatches(
-                frigBot, 
-                new IChessBotFactory[] { ice4 }, 
+                littleBlue, 
+                new IChessBotFactory[] { frigBot, ice4 }, 
                 60000, 
                 new[] { 
                     "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", 

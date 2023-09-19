@@ -10,6 +10,7 @@ namespace BotTuner.Factories {
     //Takes a path to a UCI compliant chess bot and makes a new IChessBot that runs it
     class UCIBotFactory : IChessBotFactory {
         private readonly Process proc;
+        public readonly string name;
 
         public UCIBotFactory(string path, Dictionary<string, string> options) {
             Console.WriteLine($"Loading {path}...");
@@ -24,6 +25,9 @@ namespace BotTuner.Factories {
                 proc.StandardInput.WriteLine($"setoption name {opt.Key} value {opt.Value}");
             }
 
+            //Store name for display purposes
+            name = Path.GetFileNameWithoutExtension(path);
+
             Console.WriteLine($"Finished loading {path}!");
         }
 
@@ -36,6 +40,8 @@ namespace BotTuner.Factories {
         }
 
         public IChessBot Create() => new UCIBot(proc);
+
+        public string GetName() => name;
     }
 
     //Takes a process of a UCI compliant chess bot and uses that for the bot
