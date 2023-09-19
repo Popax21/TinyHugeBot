@@ -1,3 +1,9 @@
 {
-    "dotnet.defaultSolution": "TinyHugeBot.sln"
+    "dotnet.defaultSolution": "TinyHugeBot.sln",
+    "cSpell.words": [
+        "tinyfication",
+        "tinyfied",
+        "tinyfier",
+        "tinyfy"
+    ]
 }
