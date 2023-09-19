@@ -10,6 +10,7 @@ namespace BotTuner.Bots {
         private readonly Process proc;
 
         public UCIBot(string bot) {
+            Console.WriteLine($"Starting {bot}...");
             proc = Process.Start(new ProcessStartInfo(bot) { RedirectStandardInput = true, RedirectStandardOutput = true })!;
             proc.StandardInput.WriteLine("hi");
             ReadUntil("uciok");
