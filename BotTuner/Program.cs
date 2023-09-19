@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using BotTuner.Factories;
 using ChessChallenge.API;
 
@@ -7,11 +8,8 @@ namespace BotTuner
 {
     class Program {
         static void Main(string[] args) {
-            Board board = Board.CreateBoardFromFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
-            Timer timer = new Timer(60000);
-            IChessBotFactory lbFactory = new CSChessBotFactory("Bots/LittleBlue.cs");
-            IChessBot bot = lbFactory.Create();
-            Console.WriteLine(bot.Think(board, timer));
+            var runner = new MatchRunner(("Bots/LittleBlue.cs", null), new (string, Dictionary<string, string?>)[] { ("Bots/FrigBot.cs", null), ("Bots/TinyBot.cs", null) });
+            runner.Test();
         }
     }
 }

@@ -23,6 +23,8 @@ namespace BotTuner.Factories {
             foreach (var opt in options) {
                 proc.StandardInput.WriteLine($"setoption name {opt.Key} value {opt.Value}");
             }
+
+            Console.WriteLine($"Finished loading {path}!");
         }
 
         public string ReadUntil(string cmd) {

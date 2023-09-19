@@ -34,6 +34,7 @@ namespace BotTuner.Factories {
                 MetadataReference.CreateFromFile(Path.Combine(asmLocation, "System.Collections.dll")),
                 MetadataReference.CreateFromFile(Path.Combine(asmLocation, "System.Numerics.dll")),
                 MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(System.Runtime.CompilerServices.DynamicAttribute).Assembly.Location),
                 MetadataReference.CreateFromFile(typeof(Console).Assembly.Location),
                 MetadataReference.CreateFromFile(typeof(System.Runtime.AssemblyTargetedPatchBandAttribute).Assembly.Location),
                 MetadataReference.CreateFromFile(typeof(Microsoft.CSharp.RuntimeBinder.CSharpArgumentInfo).Assembly.Location),
@@ -73,6 +74,8 @@ namespace BotTuner.Factories {
 
             //Store the assembly for future use
             assembly = emitted;
+
+            Console.WriteLine($"Finished loading {path}!");
         }
 
         public IChessBot Create() => (IChessBot) Assembly.Load(assembly).CreateInstance("MyBot");
