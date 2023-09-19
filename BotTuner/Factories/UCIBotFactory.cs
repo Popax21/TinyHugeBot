@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 using ChessChallenge.API;
 
@@ -7,10 +9,9 @@ namespace BotTuner.Factories {
 
     //Takes a path to a UCI compliant chess bot and makes a new IChessBot that runs it
     class UCIBotFactory : IChessBotFactory {
-        private readonly string path;
         private readonly Process proc;
 
-        public UCIBotFactory(string path) {
+        public UCIBotFactory(string path, Dictionary<string, string> options) {
             Console.WriteLine($"Loading {path}...");
 
             //Start an instance of the chosen bot
@@ -18,16 +19,10 @@ namespace BotTuner.Factories {
             proc.StandardInput.WriteLine("hi");
             ReadUntil("uciok");
 
-            //Set options depending on if STRO is used or if ice4 is used
-            if (path == "stro" || path == "stro.exe") {
-                proc.StandardInput.WriteLine("setoption name asm value false");
-                proc.StandardInput.WriteLine("setoption name hash value 224");
-            } else {
-
+            //Set options for the bot
+            foreach (var opt in options) {
+                proc.StandardInput.WriteLine($"setoption name {opt.Key} value {opt.Value}");
             }
-
-            //Store the path for passing to the UCIBot
-            this.path = path;
         }
 
         public string ReadUntil(string cmd) {
@@ -38,8 +33,7 @@ namespace BotTuner.Factories {
             throw new Exception();
         }
 
-
-        public IChessBot Create() => new UCIBot(path, proc);
+        public IChessBot Create() => new UCIBot(proc);
     }
 
     //Takes a process of a UCI compliant chess bot and uses that for the bot
@@ -48,12 +42,11 @@ namespace BotTuner.Factories {
 
         private readonly string bot;
 
-        public UCIBot(string bot, Process proc) {
+        public UCIBot(Process proc) {
             //Start a new game
             proc.StandardInput.WriteLine("ucinewgame");
 
-            //Store the bot process and it's name for future use
-            this.bot = bot;
+            //Store the bot process
             this.proc = proc;
         }
 
@@ -67,12 +60,15 @@ namespace BotTuner.Factories {
         }
 
         public Move Think(Board board, Timer timer) {
+            //Set board position
             proc.StandardInput.WriteLine($"position fen {board.GetFenString()}");
 
+            //Start searching for best move given the time remaining
             int wtime, btime;
             (wtime, btime) = board.IsWhiteToMove ? (timer.MillisecondsRemaining, timer.OpponentMillisecondsRemaining) : (timer.OpponentMillisecondsRemaining, timer.MillisecondsRemaining);
-            proc.StandardInput.WriteLine($"go wtime {wtime} winc {timer.IncrementMilliseconds} btime {btime} binc {timer.IncrementMilliseconds}");
+            proc.StandardInput.WriteLine($"go wtime {wtime} btime {btime} winc {timer.IncrementMilliseconds} binc {timer.IncrementMilliseconds}");
 
+            //Get the best move from the output
             string bestMove = ReadUntil("bestmove")[8..].Trim();
             Console.WriteLine($"BEST MOVE: {bestMove}");
             return new Move(bestMove, board);
