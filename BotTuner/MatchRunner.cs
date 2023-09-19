@@ -26,7 +26,7 @@ namespace BotTuner {
 
                         //Setup board and timer
                         var board = Board.CreateBoardFromFEN(fen);
-                        var timer = new ChessChallenge.API.Timer(timerMillis);
+                        var timer = new ChessChallenge.API.Timer(timerMillis, timerMillis, timerMillis);
 
                         //Play moves until the game ends
                         while (!board.IsDraw() && !board.IsInCheckmate() && !(timer.MillisecondsRemaining < 0)) {
