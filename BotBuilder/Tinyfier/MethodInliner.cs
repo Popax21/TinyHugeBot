@@ -17,8 +17,26 @@ public partial class Tinyfier {
         }
         Log($"Discovered {inlineTargetMethods.Count} inline target methods");
 
-        //Remove inline target methods from their types
-        foreach(MethodDefinition method in inlineTargetMethods) method?.DeclaringType?.Methods?.Remove(method);
+
+        //Make all members of types with inline target methods at least internal
+        //Afterwards, remove inline target methods from their types
+        foreach(MethodDefinition inlineTarget in inlineTargetMethods) {
+            if(inlineTarget.DeclaringType is not TypeDefinition declType) continue;
+
+            foreach(FieldDefinition field in declType.Fields) {
+                if(!field.IsPrivate) continue;
+                field.IsPrivate = false;
+                field.IsAssembly = true;
+            }
+
+            foreach(MethodDefinition method in declType.Methods) {
+                if(!method.IsPrivate) continue;
+                method.IsPrivate = false;
+                method.IsAssembly = true;
+            }
+
+            declType.Methods.Remove(inlineTarget);
+        }
 
         //Inline selected method calls in target types
         int numInlinedCalls = 0;
@@ -160,7 +178,7 @@ public partial class Tinyfier {
                         body.Instructions.Insert(idx++, 0 switch {
                             {} when inlineInstr.IsLdloc() => CilOpCodes.Ldloc,
                             {} when inlineInstr.IsStloc() => CilOpCodes.Stloc,
-                            _ => CilOpCodes.Stloc,
+                            _ => inlineInstr.OpCode,
                         }, newLocals[inlineInstr.GetLocalVariable(inlineBody.LocalVariables).Index]);
                         break;
 

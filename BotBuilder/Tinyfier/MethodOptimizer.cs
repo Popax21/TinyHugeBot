@@ -100,6 +100,7 @@ public partial class Tinyfier {
         foreach(CilInstruction instr in instrs.ToArray()) {
             if(instr.OpCode == CilOpCodes.Nop) {
                 //Fixup jumps
+                instrs.CalculateOffsets();
                 foreach(CilInstruction jumpInstr in instrs) {
                     if(jumpInstr.OpCode.OperandType is not CilOperandType.InlineBrTarget and not CilOperandType.ShortInlineBrTarget) continue;
 

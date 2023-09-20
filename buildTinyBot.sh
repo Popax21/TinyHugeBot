@@ -5,6 +5,8 @@ BUILD_FLAGS=
 if [[ "$@" == *"--debug" ]]; then
     BUILD_FLAGS+="-c Debug "
     BOTBUILDER_FLAGS+="--debug "
+elif [[ "$@" == *"--tinydebug" ]]; then
+    BUILD_FLAGS+="-c Debug "
 else
     BUILD_FLAGS+="-c Release "
 fi

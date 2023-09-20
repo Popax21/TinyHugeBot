@@ -289,7 +289,8 @@ public partial class Tinyfier {
     private TypeSignature? Relink(TypeSignature? typeSig) {
         switch(typeSig) {
             case GenericInstanceTypeSignature instSig: {
-                instSig.GenericType = Relink(instSig.GenericType);
+                ITypeDefOrRef relinkedGenericType = Relink(instSig.GenericType);
+                if(instSig.GenericType != relinkedGenericType) instSig.GenericType = relinkedGenericType; //Only assign if different, otherwise IsValueType is reset
                 RelinkAll(instSig.TypeArguments, Relink);
                 return instSig;
             }
