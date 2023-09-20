@@ -15,6 +15,11 @@ public partial class MyBot {
         public int NumNodes = 0;
         private int prevNumNodes = 0, prevPrevNumNodes = 0;
 
+        private int numNestedEbfP1s = 0, numNestedEbfP2s = 0;
+        private double nestedEbfP1Sum = 0, nestedEbfP2Sum = 0;
+        public double EBF_P1 => prevNumNodes > 0 ? (double) NumNodes / prevNumNodes : 0;
+        public double EBF_P2 => prevPrevNumNodes > 0 ? Math.Sqrt((double) NumNodes / prevPrevNumNodes) : 0;
+
         public int TTMisses = 0, TTDepthMisses = 0, TTBoundMisses = 0, TTHits = 0;
 
         public StatsTracker() {}
@@ -29,6 +34,9 @@ public partial class MyBot {
             prevNumNodes = NumNodes;
             NumNodes = 0;
 
+            numNestedEbfP1s = numNestedEbfP2s = 0;
+            nestedEbfP1Sum = nestedEbfP2Sum = 0;
+
             TTMisses = TTDepthMisses = TTBoundMisses = TTHits = 0;
 
             //Start the timer
@@ -37,13 +45,39 @@ public partial class MyBot {
 
         public void EndSearch() => SearchTimer.Stop();
 
+        public void UpdateGlobalStats(in StatsTracker nestedTracker) {
+            //Accumulate counters
+            NumNodes += nestedTracker.NumNodes;
+
+            TTMisses += nestedTracker.TTMisses;
+            TTDepthMisses += nestedTracker.TTDepthMisses;
+            TTBoundMisses += nestedTracker.TTBoundMisses;
+            TTHits += nestedTracker.TTHits;
+
+            //Update average EBFs
+            if(nestedTracker.EBF_P1 > 0) {
+                numNestedEbfP1s++;
+                nestedEbfP1Sum += nestedTracker.EBF_P1;
+            }
+            if(nestedTracker.EBF_P2 > 0) {
+                numNestedEbfP2s++;
+                nestedEbfP2Sum += nestedTracker.EBF_P2;
+            }
+        }
+
         public void DumpStats(string prefix = "") {
             //Node stats
             Console.WriteLine(prefix + $" - nodes searched: {NumNodes}");
             Console.WriteLine(prefix + $" - NPS: {(NumNodes / SearchTimer.Elapsed.TotalSeconds).ToString("F4", CultureInfo.InvariantCulture)}");
+
+            //EBF stats
             if(prevNumNodes != 0) {
-                Console.Write(prefix + $" - EBF: p1 {((double) NumNodes / prevNumNodes).ToString("F8", CultureInfo.InvariantCulture)}");
-                if(prevPrevNumNodes != 0) Console.Write($" p2 {((double) Math.Sqrt(NumNodes / prevPrevNumNodes)).ToString("F8", CultureInfo.InvariantCulture)}");
+                Console.Write(prefix + $" - EBF: p1 {EBF_P1.ToString("F8", CultureInfo.InvariantCulture)}");
+                if(prevPrevNumNodes != 0) Console.Write($" p2 {EBF_P2.ToString("F8", CultureInfo.InvariantCulture)}");
+                Console.WriteLine();
+            } else if(numNestedEbfP1s > 0) {
+                Console.Write(prefix + $" - average EBF: p1 {(nestedEbfP1Sum / numNestedEbfP1s).ToString("F8", CultureInfo.InvariantCulture)}");
+                if(numNestedEbfP2s != 0) Console.Write($" p2 {(nestedEbfP2Sum / numNestedEbfP2s).ToString("F8", CultureInfo.InvariantCulture)}");
                 Console.WriteLine();
             }
 
@@ -68,34 +102,18 @@ public partial class MyBot {
     private void STAT_StartDepthSearch(int depth) => depthStats.StartSearch(resetHistory: depth <= 1);
     private void STAT_EndDepthSearch(Move bestMove, int bestMoveEval, int depth, bool didTimeOut) {
         depthStats.EndSearch();
+        globalStats.UpdateGlobalStats(in depthStats);
+
         Console.WriteLine($"> Finished search to depth {depth} in {depthStats.ElapsedMs}ms{(didTimeOut ? " (timeout)" : "")}");
         if(!didTimeOut) Console.WriteLine($"   - best move: {bestMove.ToString()[7..^1]} ({bestMoveEval})");
         depthStats.DumpStats("  ");
     }
 
-    [MethodImpl(MImpl)] private void STAT_NewNode_I() {
-        globalStats.NumNodes++;
-        depthStats.NumNodes++;
-    }
+    [MethodImpl(MImpl)] private void STAT_NewNode_I() => depthStats.NumNodes++;
 
-    [MethodImpl(MImpl)] private void STAT_TT_Miss_I() {
-        globalStats.TTMisses++;
-        depthStats.TTMisses++;
-    }
-
-    [MethodImpl(MImpl)] private void STAT_TT_DepthMiss_I() {
-        globalStats.TTDepthMisses++;
-        depthStats.TTDepthMisses++;
-    }
-
-    [MethodImpl(MImpl)] private void STAT_TT_BoundMiss_I() {
-        globalStats.TTBoundMisses++;
-        depthStats.TTBoundMisses++;
-    }
-
-    [MethodImpl(MImpl)] private void STAT_TT_Hit_I() {
-        globalStats.TTHits++;
-        depthStats.TTHits++;
-    }
+    [MethodImpl(MImpl)] private void STAT_TT_Miss_I() => depthStats.TTMisses++;
+    [MethodImpl(MImpl)] private void STAT_TT_DepthMiss_I() => depthStats.TTDepthMisses++;
+    [MethodImpl(MImpl)] private void STAT_TT_BoundMiss_I() => depthStats.TTBoundMisses++;
+    [MethodImpl(MImpl)] private void STAT_TT_Hit_I() => depthStats.TTHits++;
 }
 #endif

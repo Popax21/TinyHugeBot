@@ -9,6 +9,8 @@ public partial class MyBot {
         Exact = 0b01 << 16, //For PV nodes
         Lower = 0b10 << 16, //For Fail-High / cut nodes
         Upper = 0b11 << 16, //For Fail-Low / all nodes
+
+        MASK = 0b11 << 16
     }
 
     //TT entry structure:
@@ -36,11 +38,15 @@ public partial class MyBot {
         }
 
         //Check the node bound type
-        if(!((TTBoundType) ((entry >> 16) & 0b11) switch {
+        if(!((TTBoundType) (entry & (ulong) TTBoundType.MASK) switch {
             TTBoundType.Exact => true,
             TTBoundType.Lower => beta <= unchecked((short) entry),
             TTBoundType.Upper => unchecked((short) entry) <= alpha,
+#if DEBUG
+            _ => throw new Exception($"Invalid TT entry bound type: entry 0x{entry:x16}")
+#else
             _ => false
+#endif
         })) {
 #if STATS
             STAT_TT_BoundMiss_I();
@@ -65,7 +71,7 @@ public partial class MyBot {
 
         return
             unchecked((ushort) eval) |
-            ((ulong) bound << 16) |
+            (ulong) bound |
             ((ulong) depth << 18) |
             (boardHash & ~TTIdxMask)
         ;   

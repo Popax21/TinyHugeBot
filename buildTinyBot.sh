@@ -2,16 +2,16 @@
 BOTBUILDER_FLAGS=
 BUILD_FLAGS=
 
-if [[ "$@" == *"--debug" ]]; then
+if [[ "$@" == *"--debug"* ]]; then
     BUILD_FLAGS+="-c Debug "
     BOTBUILDER_FLAGS+="--debug "
-elif [[ "$@" == *"--tinydebug" ]]; then
+elif [[ "$@" == *"--tinydebug"* ]]; then
     BUILD_FLAGS+="-c Debug "
 else
     BUILD_FLAGS+="-c Release "
 fi
 
-if [[ ! "$@" == *"--stats" ]]; then
+if [[ ! "$@" == *"--stats"* ]]; then
     BUILD_FLAGS+="-p:DisableStats=1 "
 fi
 
