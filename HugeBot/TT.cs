@@ -20,18 +20,40 @@ public partial class MyBot {
 
     private bool CheckTTEntry_I(ulong entry, ulong boardHash, int alpha, int beta, int depth) {
         //Check if the hash bits match
-        if((entry & ~TTIdxMask) != (boardHash & ~TTIdxMask)) return false;
+        if((entry & ~TTIdxMask) != (boardHash & ~TTIdxMask)) {
+#if STATS
+            STAT_TT_Miss_I();
+#endif
+            return false;
+        }
 
         //Check that the entry searched at least as deep as we would
-        if((int) ((entry >> 18) & 0x3f) < depth) return false;
+        if((int) ((entry >> 18) & 0x3f) < depth) {
+#if STATS
+            STAT_TT_DepthMiss_I();
+#endif
+            return false;
+        }
 
         //Check the node bound type
-        return (TTBoundType) ((entry >> 16) & 0b11) switch {
+        if(!((TTBoundType) ((entry >> 16) & 0b11) switch {
             TTBoundType.Exact => true,
             TTBoundType.Lower => beta <= unchecked((short) entry),
             TTBoundType.Upper => unchecked((short) entry) <= alpha,
             _ => false
-        };
+        })) {
+#if STATS
+            STAT_TT_BoundMiss_I();
+#endif
+
+            return false;
+        }
+
+#if STATS
+        STAT_TT_Hit_I();
+#endif
+
+        return true;
     }
 
     private ulong EncodeTTEntry_I(short eval, TTBoundType bound, int depth, ulong boardHash) {
