@@ -83,9 +83,10 @@ public partial class MyBot : IChessBot {
         if(board.IsRepeatedPosition()) return 0;
 
         //Check if the position is in the TT
+        //We can't use the TT for the root node, as we don't store the best move in the table to save space
         ulong boardHash = board.ZobristKey;
         ref ulong ttSlot = ref transposTable[boardHash & TTIdxMask];
-        if(CheckTTEntry_I(ttSlot, boardHash, alpha, beta, remDepth)) {
+        if(ply > 0 && CheckTTEntry_I(ttSlot, boardHash, alpha, beta, remDepth)) {
             //The evaluation is stored in the lower 16 bits of the entry
             return unchecked((short) ttSlot);
         }
