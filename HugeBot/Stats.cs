@@ -6,21 +6,25 @@ using ChessChallenge.API;
 
 #if STATS
 public partial class MyBot {
-    private const MethodImplOptions MImpl = MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization;
+    private const MethodImplOptions StatMImpl = MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization;
 
     private struct StatsTracker {
         public readonly Stopwatch SearchTimer = new Stopwatch();
         public readonly long ElapsedMs => SearchTimer.ElapsedMilliseconds;
 
+        //Node stats
         public int NumNodes = 0;
         private int prevNumNodes = 0, prevPrevNumNodes = 0;
 
+        //EBF stats
         private int numNestedEbfP1s = 0, numNestedEbfP2s = 0;
         private double nestedEbfP1Sum = 0, nestedEbfP2Sum = 0;
         public double EBF_P1 => prevNumNodes > 0 ? (double) NumNodes / prevNumNodes : 0;
         public double EBF_P2 => prevPrevNumNodes > 0 ? Math.Sqrt((double) NumNodes / prevPrevNumNodes) : 0;
 
-        public int TTMisses = 0, TTDepthMisses = 0, TTBoundMisses = 0, TTHits = 0;
+        //TT stats
+        public int TTRead_Misses = 0, TTRead_DepthMisses = 0, TTRead_BoundMisses = 0, TTRead_Hits = 0;
+        public int TTWrite_NewSlots = 0, TTWrite_SlotUpdates = 0, TTWrite_IdxCollisions = 0;
 
         public StatsTracker() {}
 
@@ -37,7 +41,8 @@ public partial class MyBot {
             numNestedEbfP1s = numNestedEbfP2s = 0;
             nestedEbfP1Sum = nestedEbfP2Sum = 0;
 
-            TTMisses = TTDepthMisses = TTBoundMisses = TTHits = 0;
+            TTRead_Misses = TTRead_DepthMisses = TTRead_BoundMisses = TTRead_Hits = 0;
+            TTWrite_NewSlots = TTWrite_SlotUpdates = TTWrite_IdxCollisions = 0;
 
             //Start the timer
             SearchTimer.Restart();
@@ -49,10 +54,14 @@ public partial class MyBot {
             //Accumulate counters
             NumNodes += nestedTracker.NumNodes;
 
-            TTMisses += nestedTracker.TTMisses;
-            TTDepthMisses += nestedTracker.TTDepthMisses;
-            TTBoundMisses += nestedTracker.TTBoundMisses;
-            TTHits += nestedTracker.TTHits;
+            TTRead_Misses += nestedTracker.TTRead_Misses;
+            TTRead_DepthMisses += nestedTracker.TTRead_DepthMisses;
+            TTRead_BoundMisses += nestedTracker.TTRead_BoundMisses;
+            TTRead_Hits += nestedTracker.TTRead_Hits;
+
+            TTWrite_NewSlots += nestedTracker.TTWrite_NewSlots;
+            TTWrite_SlotUpdates += nestedTracker.TTWrite_SlotUpdates;
+            TTWrite_IdxCollisions += nestedTracker.TTWrite_IdxCollisions;
 
             //Update average EBFs
             if(nestedTracker.EBF_P1 > 0) {
@@ -82,9 +91,13 @@ public partial class MyBot {
             }
 
             //TT stats
-            int numTTAccesses = TTMisses + TTDepthMisses + TTBoundMisses + TTHits;
-            string FormatTTStat(int stat) => $"{stat} ({((double) stat / numTTAccesses * 100.0).ToString("F3", CultureInfo.InvariantCulture)}%)";
-            Console.WriteLine(prefix + $" - TT: accesses {numTTAccesses} misses {FormatTTStat(TTMisses)} depth misses {FormatTTStat(TTDepthMisses)} bound misses {FormatTTStat(TTBoundMisses)} hits {FormatTTStat(TTHits)}");
+            static string FormatTTStat(int stat, int total) => $"{stat} ({((double) stat / total * 100.0).ToString("F3", CultureInfo.InvariantCulture)}%)";
+
+            int numTTReads = TTRead_Misses + TTRead_DepthMisses + TTRead_BoundMisses + TTRead_Hits;
+            Console.WriteLine(prefix + $" - TT reads: total {numTTReads} misses {FormatTTStat(TTRead_Misses, numTTReads)} depth misses {FormatTTStat(TTRead_DepthMisses, numTTReads)} bound misses {FormatTTStat(TTRead_BoundMisses, numTTReads)} hits {FormatTTStat(TTRead_Hits, numTTReads)}");
+
+            int numTTWrites = TTWrite_NewSlots + TTWrite_SlotUpdates + TTWrite_IdxCollisions;
+            Console.WriteLine(prefix + $" - TT writes: total {numTTWrites} new slots {FormatTTStat(TTWrite_NewSlots, numTTWrites)} slot updates {FormatTTStat(TTWrite_SlotUpdates, numTTWrites)} idx collisions {FormatTTStat(TTWrite_IdxCollisions, numTTWrites)}");
         }
     };
 
@@ -109,11 +122,15 @@ public partial class MyBot {
         depthStats.DumpStats("  ");
     }
 
-    [MethodImpl(MImpl)] private void STAT_NewNode_I() => depthStats.NumNodes++;
+    [MethodImpl(StatMImpl)] private void STAT_NewNode_I() => depthStats.NumNodes++;
 
-    [MethodImpl(MImpl)] private void STAT_TT_Miss_I() => depthStats.TTMisses++;
-    [MethodImpl(MImpl)] private void STAT_TT_DepthMiss_I() => depthStats.TTDepthMisses++;
-    [MethodImpl(MImpl)] private void STAT_TT_BoundMiss_I() => depthStats.TTBoundMisses++;
-    [MethodImpl(MImpl)] private void STAT_TT_Hit_I() => depthStats.TTHits++;
+    [MethodImpl(StatMImpl)] private void STAT_TTRead_Miss_I() => depthStats.TTRead_Misses++;
+    [MethodImpl(StatMImpl)] private void STAT_TTRead_DepthMiss_I() => depthStats.TTRead_DepthMisses++;
+    [MethodImpl(StatMImpl)] private void STAT_TTRead_BoundMiss_I() => depthStats.TTRead_BoundMisses++;
+    [MethodImpl(StatMImpl)] private void STAT_TTRead_Hit_I() => depthStats.TTRead_Hits++;
+
+    [MethodImpl(StatMImpl)] private void STAT_TTWrite_NewSlot_I() => depthStats.TTWrite_NewSlots++;
+    [MethodImpl(StatMImpl)] private void STAT_TTWrite_SlotUpdate_I() => depthStats.TTWrite_SlotUpdates++;
+    [MethodImpl(StatMImpl)] private void STAT_TTWrite_IdxCollision_I() => depthStats.TTWrite_IdxCollisions++;
 }
 #endif

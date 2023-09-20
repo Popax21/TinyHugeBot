@@ -24,7 +24,7 @@ public partial class MyBot {
         //Check if the hash bits match
         if((entry & ~TTIdxMask) != (boardHash & ~TTIdxMask)) {
 #if STATS
-            STAT_TT_Miss_I();
+            STAT_TTRead_Miss_I();
 #endif
             return false;
         }
@@ -32,7 +32,7 @@ public partial class MyBot {
         //Check that the entry searched at least as deep as we would
         if((int) ((entry >> 18) & 0x3f) < depth) {
 #if STATS
-            STAT_TT_DepthMiss_I();
+            STAT_TTRead_DepthMiss_I();
 #endif
             return false;
         }
@@ -49,14 +49,14 @@ public partial class MyBot {
 #endif
         })) {
 #if STATS
-            STAT_TT_BoundMiss_I();
+            STAT_TTRead_BoundMiss_I();
 #endif
 
             return false;
         }
 
 #if STATS
-        STAT_TT_Hit_I();
+        STAT_TTRead_Hit_I();
 #endif
 
         return true;
@@ -76,4 +76,13 @@ public partial class MyBot {
             (boardHash & ~TTIdxMask)
         ;   
     }
+
+#if STATS
+    [System.Runtime.CompilerServices.MethodImpl(StatMImpl)]
+    private void STAT_CheckForTTCollision_I(ulong prevEntry, ulong boardHash) {
+        if((prevEntry & (ulong) TTBoundType.MASK) == (ulong) TTBoundType.None) STAT_TTWrite_NewSlot_I();
+        else if((prevEntry & ~TTIdxMask) != (boardHash & ~TTIdxMask)) STAT_TTWrite_IdxCollision_I();
+        else STAT_TTWrite_SlotUpdate_I();
+    }
+#endif
 }
