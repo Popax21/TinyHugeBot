@@ -170,8 +170,13 @@ public partial class Tinyfier {
                     case {} when inlineInstr.IsStarg():
                         throw new InvalidCilInstructionException("Starg is not supported in inlined methods");
 
-                    case {} when inlineInstr.OpCode == CilOpCodes.Ldarga || inlineInstr.OpCode == CilOpCodes.Ldarga_S:
-                        throw new InvalidCilInstructionException("Ldarga is not supported in inlined methods");
+                    case {} when inlineInstr.OpCode == CilOpCodes.Ldarga || inlineInstr.OpCode == CilOpCodes.Ldarga_S: {
+                        //Check if the argument instructions consist of just an Ldloc
+                        CilInstruction[] instrs = argInstrs[inlineInstr.GetParameter(inlineMethod.Parameters).MethodSignatureIndex];
+                        if(instrs.Length != 1 || !instrs[0].IsLdloc()) throw new InvalidCilInstructionException("Ldarga is not supported for non-trivial arguments in inlined methods");
+
+                        body.Instructions.Insert(idx++, CilOpCodes.Ldloca, instrs[0].GetLocalVariable(body.LocalVariables));
+                    } break;
 
                     case {} when inlineInstr.IsLdloc() || inlineInstr.IsStloc() || inlineInstr.OpCode.OperandType is CilOperandType.InlineVar or CilOperandType.ShortInlineVar:
                         //Remap the local

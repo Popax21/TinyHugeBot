@@ -19,6 +19,7 @@ public partial class MyBot {
     //  bits 18-23: search depth
     //  bits 24-63: upper hash bits
     private ulong[] transposTable = new ulong[TTSize];
+    private ushort[] transposMoveTable = new ushort[TTSize];
 
     private bool CheckTTEntry_I(ulong entry, ulong boardHash, int alpha, int beta, int depth) {
         //Check if the hash bits match
@@ -83,6 +84,6 @@ public partial class MyBot {
             (ulong) bound |
             ((ulong) depth << 18) |
             (boardHash & ~TTIdxMask)
-        ;   
+        ;
     }
 }

@@ -6,8 +6,6 @@ public partial class MyBot : IChessBot {
     private Timer searchTimer = null!;
     private int searchAbortTime;
 
-    private Move rootBestMove;
-
     public Move Think(Board board, Timer timer) {
         //Determine search times
         searchTimer = timer;
@@ -20,10 +18,13 @@ public partial class MyBot : IChessBot {
         STAT_StartGlobalSearch();
 #endif
 
+        //Generate all legal moves for later lookup
+        Span<Move> moves = stackalloc Move[256];
+        board.GetLegalMovesNonAlloc(ref moves);
+
         //Do a NegaMax search with iterative deepening
         //TODO Look into aspiration windows (maybe even MTD(f))
-        Move curBestMove = default;
-        int curBestEval = 0;
+        int curBestEval = 0, curBestMoveIdx = 0;
         for(int depth = 1;; depth++) {
 #if STATS
             //Notify the stats tracker that the depth search starts
@@ -35,8 +36,21 @@ public partial class MyBot : IChessBot {
 
             //Do a NegaMax search with the current depth
             try {
-                curBestEval = NegaMax(board, -int.MaxValue, int.MaxValue, depth, 0);
-                curBestMove = rootBestMove; //Update the best move
+                curBestEval = NegaMax(board, -int.MaxValue, int.MaxValue, depth, 0, out ushort bestMove);
+
+                //Update the best move
+#if DEBUG
+                curBestMoveIdx = -1;
+#endif
+                for(int i = 0; i < moves.Length; i++) {
+                    if(moves[i].RawValue == bestMove) {
+                        curBestMoveIdx = i;
+                        break;
+                    }
+                }
+#if DEBUG
+                if(curBestMoveIdx < 0) throw new Exception("Root node search returned no best move");
+#endif
 #if DEBUG
             } catch(TimeoutException) {
 #else
@@ -49,26 +63,27 @@ public partial class MyBot : IChessBot {
 
 #if STATS
             //Notify the stats tracker that the depth search ended
-            STAT_EndDepthSearch(curBestMove, curBestEval, depth, didTimeOut);
+            STAT_EndDepthSearch(moves[curBestMoveIdx], curBestEval, depth, didTimeOut);
 #endif
             //Check if time is up
             if(timer.MillisecondsElapsedThisTurn >= deepeningSearchTime) {
 #if STATS
                 //Notify the stats tracker that the search ended
-                STAT_EndGlobalSearch(curBestMove, curBestEval, depth - (didTimeOut ? 1 : 0));
+                STAT_EndGlobalSearch(moves[curBestMoveIdx], curBestEval, depth - (didTimeOut ? 1 : 0));
 #endif
 #if DEBUG
                 //Log the best move
-                Console.WriteLine($"Searched to depth {depth - (didTimeOut ? 1 : 0)} in {timer.MillisecondsElapsedThisTurn:d5}ms: best {curBestMove.ToString().ToLower()} eval {curBestEval}");
+                Console.WriteLine($"Searched to depth {depth - (didTimeOut ? 1 : 0)} in {timer.MillisecondsElapsedThisTurn:d5}ms: best {moves[curBestMoveIdx].ToString().ToLower()} eval {curBestEval}");
 #endif
-                return curBestMove;
+                return moves[curBestMoveIdx];
             }
         }
     }
 
     //alpha / beta are exclusive lower / upper bounds
-    public int NegaMax(Board board, int alpha, int beta, int remDepth, int ply) {
+    public int NegaMax(Board board, int alpha, int beta, int remDepth, int ply, out ushort bestMove) {
         bool isZeroWindow = alpha == beta-1;
+        bestMove = 0;
 
         //Check if time is up
         if(searchTimer.MillisecondsElapsedThisTurn >= searchAbortTime)
@@ -88,11 +103,11 @@ public partial class MyBot : IChessBot {
         //TODO Reductions / Extensions
 
         //Check if the position is in the TT
-        //We can't use the TT for the root node, as we don't store the best move in the table to save space
         ulong boardHash = board.ZobristKey;
         ref ulong ttSlot = ref transposTable[boardHash & TTIdxMask];
-        if(ply > 0 && CheckTTEntry_I(ttSlot, boardHash, alpha, beta, remDepth)) {
+        if(CheckTTEntry_I(ttSlot, boardHash, alpha, beta, remDepth)) {
             //The evaluation is stored in the lower 16 bits of the entry
+            bestMove = transposMoveTable[boardHash & TTIdxMask];
             return unchecked((short) ttSlot);
         }
 
@@ -111,6 +126,9 @@ public partial class MyBot : IChessBot {
             return board.IsInCheck() ? Eval.MinEval + ply : 0;
         }
 
+        //Order moves
+        OrderMoves_I(board, alpha, beta, remDepth, ply, moves, ttSlot, boardHash);
+
 #if STATS
         //Report that we are starting to search a new unpruned node
         STAT_AlphaBeta_SearchNode_I(isZeroWindow, moves.Length);
@@ -128,7 +146,7 @@ public partial class MyBot : IChessBot {
             int score;
             switch(hasPvMove) {
                 case true:
-                    score = -NegaMax(board, -alpha - 1, -alpha, remDepth-1, ply+1);
+                    score = -NegaMax(board, -alpha - 1, -alpha, remDepth-1, ply+1, out _);
                     if(score <= alpha || score >= beta) break; //We check the beta bound as well as we can fail-high because of our fail-soft search
 
                     //Research with the full window
@@ -138,7 +156,7 @@ public partial class MyBot : IChessBot {
 
                     goto default;
                 default:
-                    score = -NegaMax(board, -beta, -alpha, remDepth-1, ply+1);
+                    score = -NegaMax(board, -beta, -alpha, remDepth-1, ply+1, out _);
                     break;
             }
 
@@ -152,7 +170,7 @@ public partial class MyBot : IChessBot {
             //Update the best score
             if(score > bestScore) {
                 bestScore = score;
-                if(ply == 0) rootBestMove = moves[i];
+                bestMove = moves[i].RawValue;
             }
 
             //Update alpha/beta bounds
@@ -187,6 +205,7 @@ public partial class MyBot : IChessBot {
         //Insert the move into the transposition table
         //TODO Currently always replaces, investigate potential other strategies
         StoreTTEntry_I(ref ttSlot, (short) bestScore, ttBound, remDepth, boardHash);
+        transposMoveTable[boardHash & TTIdxMask] = bestMove;
 
         return bestScore;
     }
