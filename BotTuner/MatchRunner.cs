@@ -4,6 +4,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
 using API = ChessChallenge.API;
@@ -11,7 +12,11 @@ using API = ChessChallenge.API;
 namespace BotTuner;
 
 public class MatchRunner : IDisposable {
-    public record Match(IChessBotFactory WhiteBot, IChessBotFactory BlackBot, string StartFEN, int TimerMs) {
+    public enum MatchResult {
+        Win, Draw, Loss
+    }
+
+    public record Match(IChessBotFactory WhiteBot, IChessBotFactory BlackBot, string StartFEN, int TimerStartMs, int TimerIncMs) {
         public readonly TaskCompletionSource<GameResult> CompletionSource = new TaskCompletionSource<GameResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         public Task<GameResult> Task => CompletionSource.Task;
     }
@@ -75,7 +80,7 @@ public class MatchRunner : IDisposable {
 
         //Create bot instances
         API.IChessBot whiteBot = match.WhiteBot.CreateBot(), blackBot = match.BlackBot.CreateBot();
-        int whiteRemTime = match.TimerMs, blackRemTime = match.TimerMs;
+        int whiteRemTime = match.TimerStartMs, blackRemTime = match.TimerStartMs;
 
         //Play moves until the game ends
         var moveGen = new MoveGenerator();
@@ -84,10 +89,10 @@ public class MatchRunner : IDisposable {
 
             //Let the bot think
             var botBoard = new API.Board(board);
-            var botTimer = new API.Timer(board.IsWhiteToMove ? whiteRemTime : blackRemTime, board.IsWhiteToMove ? blackRemTime : whiteRemTime, match.TimerMs, 0);
+            var botTimer = new API.Timer(board.IsWhiteToMove ? whiteRemTime : blackRemTime, board.IsWhiteToMove ? blackRemTime : whiteRemTime, match.TimerStartMs, match.TimerIncMs);
             var botMove = board.IsWhiteToMove ? whiteBot.Think(botBoard, botTimer) : blackBot.Think(botBoard, botTimer);
             
-            (board.IsWhiteToMove ? ref whiteRemTime : ref blackRemTime) = botTimer.MillisecondsRemaining;
+            (board.IsWhiteToMove ? ref whiteRemTime : ref blackRemTime) = botTimer.MillisecondsRemaining + match.TimerIncMs;
 
             //Check that the move is legal, then make it
             var move = new Move(botMove.RawValue);
@@ -105,13 +110,13 @@ public class MatchRunner : IDisposable {
             return Arbiter.GetGameState(board);
     }
 
-    public async Task RunMatches(IChessBotFactory player, IChessBotFactory[] opponents, string[] startFens, int timerMs) {
+    public async Task<T> RunMatches<T>(IChessBotFactory player, IChessBotFactory[] opponents, string[] startFens, int timerStartMs, int timerIncMs) where T : struct, IAdditionOperators<T, MatchResult, T> {
         //Queue matches
         List<Match> matches = new List<Match>();
         foreach (IChessBotFactory opponent in opponents) {
             foreach (string startFen in startFens) {
                 foreach (bool isWhite in new[] { false, true }) {
-                    Match match = new Match(isWhite ? player : opponent, isWhite ? opponent : player, startFen, timerMs);
+                    Match match = new Match(isWhite ? player : opponent, isWhite ? opponent : player, startFen, timerStartMs, timerIncMs);
                     matches.Add(match);
                     matchQueue.Add(match);
                 }
@@ -122,7 +127,7 @@ public class MatchRunner : IDisposable {
         Console.WriteLine($"RUNNER> Queued {numMatches} matches");
 
         //Wait for the matches to complete
-        //TODO Accumulate results
+        T result = default;
         while (matches.Count > 0) {
             await Task.WhenAny(matches.Select(m => m.Task));
 
@@ -135,10 +140,20 @@ public class MatchRunner : IDisposable {
                 //Print out result
                 Console.WriteLine($"RUNNER> {match.WhiteBot.Name} (white) vs {match.BlackBot.Name} (black) FEN '{match.StartFEN}' -> {Enum.GetName(match.Task.Result)}");
 
+                //Accumulate result
+                result += match.Task.Result switch {
+                    {} res when Arbiter.IsWhiteWinsResult(res) => match.WhiteBot == player ? MatchResult.Win : MatchResult.Loss,
+                    {} res when Arbiter.IsBlackWinsResult(res) => match.BlackBot == player ? MatchResult.Win : MatchResult.Loss,
+                    {} res when Arbiter.IsDrawResult(res) => MatchResult.Draw,
+                    _ => throw new Exception($"Invalid game result {match.Task.Result}")
+                };
+
                 //Remove the match from the list of ongoing matches
                 matches.RemoveAt(i--);
             }
         }
         Console.WriteLine($"RUNNER> Finished running all {numMatches} matches");
+
+        return result;
     }
 }

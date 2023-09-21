@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Numerics;
 using System.Threading.Tasks;
 using BotTuner.Factories;
 using ChessChallenge.Chess;
@@ -21,11 +23,27 @@ public static class Program {
             {"Threads", "1"}
         });
 
-        await runner.RunMatches(
+        ResStats stats = await runner.RunMatches<ResStats>(
             littleBlue, 
             new IChessBotFactory[] { frigBot, stro4k, ice4 }, 
             new[] { FenUtility.StartPositionFEN },
-            60000
+            60000, 0
         );
+        Console.WriteLine($"Wins: {stats.NumWins}");
+        Console.WriteLine($"Losses: {stats.NumLosses}");
+        Console.WriteLine($"Draws: {stats.NumDraws}");
+    }
+
+    public struct ResStats : IAdditionOperators<ResStats, MatchRunner.MatchResult, ResStats> {
+        public int NumWins, NumLosses, NumDraws;
+
+        public static ResStats operator +(ResStats stats, MatchRunner.MatchResult res) {
+            switch(res) {
+                case MatchRunner.MatchResult.Win: stats.NumWins++; break;
+                case MatchRunner.MatchResult.Loss: stats.NumLosses++; break;
+                case MatchRunner.MatchResult.Draw: stats.NumDraws++; break;
+            }
+            return stats;
+        }
     }
 }
