@@ -49,15 +49,15 @@ public partial class MyBot : IChessBot {
 
 #if STATS
             //Notify the stats tracker that the depth search ended
-            STAT_EndDepthSearch(depth, didTimeOut);
+            STAT_EndDepthSearch(curBestMove, curBestEval, depth, didTimeOut);
 #endif
             //Check if time is up
             if(timer.MillisecondsElapsedThisTurn >= deepeningSearchTime) {
 #if STATS
                 //Notify the stats tracker that the search ended
-                STAT_EndGlobalSearch(depth - (didTimeOut ? 1 : 0));
+                STAT_EndGlobalSearch(curBestMove, curBestEval, depth - (didTimeOut ? 1 : 0));
 #endif
-#if DEBUG || STATS
+#if DEBUG
                 //Log the best move
                 Console.WriteLine($"Searched to depth {depth - (didTimeOut ? 1 : 0)} in {timer.MillisecondsElapsedThisTurn:d5}ms: best {curBestMove.ToString().ToLower()} eval {curBestEval}");
 #endif
@@ -134,6 +134,9 @@ public partial class MyBot : IChessBot {
 
         //Insert the move into the transposition table
         //TODO: Currently always replaces, investigate potential other strategies
+#if STATS
+        STAT_CheckForTTCollision_I(ttSlot, boardHash);
+#endif
         ttSlot = EncodeTTEntry_I((short) bestScore, ttBound, remDepth, boardHash);
 
         return bestScore;

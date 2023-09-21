@@ -9,6 +9,8 @@ public partial class MyBot {
         Exact = 0b01 << 16, //For PV nodes
         Lower = 0b10 << 16, //For Fail-High / cut nodes
         Upper = 0b11 << 16, //For Fail-Low / all nodes
+
+        MASK = 0b11 << 16
     }
 
     //TT entry structure:
@@ -20,18 +22,44 @@ public partial class MyBot {
 
     private bool CheckTTEntry_I(ulong entry, ulong boardHash, int alpha, int beta, int depth) {
         //Check if the hash bits match
-        if((entry & ~TTIdxMask) != (boardHash & ~TTIdxMask)) return false;
+        if((entry & ~TTIdxMask) != (boardHash & ~TTIdxMask)) {
+#if STATS
+            STAT_TTRead_Miss_I();
+#endif
+            return false;
+        }
 
         //Check that the entry searched at least as deep as we would
-        if((int) ((entry >> 18) & 0x3f) < depth) return false;
+        if((int) ((entry >> 18) & 0x3f) < depth) {
+#if STATS
+            STAT_TTRead_DepthMiss_I();
+#endif
+            return false;
+        }
 
         //Check the node bound type
-        return (TTBoundType) ((entry >> 16) & 0b11) switch {
+        if(!((TTBoundType) (entry & (ulong) TTBoundType.MASK) switch {
             TTBoundType.Exact => true,
             TTBoundType.Lower => beta <= unchecked((short) entry),
             TTBoundType.Upper => unchecked((short) entry) <= alpha,
+#if DEBUG
+            _ => throw new Exception($"Invalid TT entry bound type: entry 0x{entry:x16}")
+#else
             _ => false
-        };
+#endif
+        })) {
+#if STATS
+            STAT_TTRead_BoundMiss_I();
+#endif
+
+            return false;
+        }
+
+#if STATS
+        STAT_TTRead_Hit_I();
+#endif
+
+        return true;
     }
 
     private ulong EncodeTTEntry_I(short eval, TTBoundType bound, int depth, ulong boardHash) {
@@ -43,9 +71,18 @@ public partial class MyBot {
 
         return
             unchecked((ushort) eval) |
-            ((ulong) bound << 16) |
+            (ulong) bound |
             ((ulong) depth << 18) |
             (boardHash & ~TTIdxMask)
         ;   
     }
+
+#if STATS
+    [System.Runtime.CompilerServices.MethodImpl(StatMImpl)]
+    private void STAT_CheckForTTCollision_I(ulong prevEntry, ulong boardHash) {
+        if((prevEntry & (ulong) TTBoundType.MASK) == (ulong) TTBoundType.None) STAT_TTWrite_NewSlot_I();
+        else if((prevEntry & ~TTIdxMask) != (boardHash & ~TTIdxMask)) STAT_TTWrite_IdxCollision_I();
+        else STAT_TTWrite_SlotUpdate_I();
+    }
+#endif
 }
