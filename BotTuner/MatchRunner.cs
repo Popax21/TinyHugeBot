@@ -7,67 +7,67 @@ using System.Threading;
 using System.Threading.Tasks;
 using ChessChallenge.API;
 
-namespace BotTuner {
-    class MatchRunner {
-        public static void RunMatches(IChessBotFactory player, IChessBotFactory[] opponents, int timerMillis, string[] boards) {
-            //Start games for each matchup on a different thread
-            var threads = new List<Thread>();
-            foreach (var opponent in opponents) {
-                var opponentCopy = opponent;
-                var thread = new Thread(() => {
-                    bool sideToPlay = true;
+namespace BotTuner;
 
-                    //Loop through all specified boards
-                    foreach (var fen in boards) {
-                        //Create bot instances
-                        var playerInstance = player.Create();
-                        var opponentInstance = opponentCopy.Create();
+public static class MatchRunner {
+    public static void RunMatches(IChessBotFactory player, IChessBotFactory[] opponents, int timerMillis, string[] boards) {
+        //Start games for each matchup on a different thread
+        var threads = new List<Thread>();
+        foreach (var opponent in opponents) {
+            var opponentCopy = opponent;
+            var thread = new Thread(() => {
+                bool sideToPlay = true;
 
-                        //Setup board and timer
-                        var board = new ChessChallenge.Chess.Board(null);
-                        var timer = new ChessChallenge.API.Timer(timerMillis, timerMillis, timerMillis);
+                //Loop through all specified boards
+                foreach (var fen in boards) {
+                    //Create bot instances
+                    var playerInstance = player.Create();
+                    var opponentInstance = opponentCopy.Create();
 
-                        //Play moves until the game ends
-                        var botBoard = new Board(board);
-                        while (!botBoard.IsDraw() && !botBoard.IsInCheckmate() && !(timer.MillisecondsRemaining < 0)) {
-                            if (!(board.IsWhiteToMove ^ sideToPlay)) {
-                                var move = playerInstance.Think(botBoard, timer);
-                                board.MakeMove(new ChessChallenge.Chess.Move(move.RawValue));
-                            } else {
-                                var move = opponentInstance.Think(botBoard, timer);
-                                board.MakeMove(new ChessChallenge.Chess.Move(move.RawValue));
-                            }
+                    //Setup board and timer
+                    var board = new ChessChallenge.Chess.Board(null);
+                    var timer = new ChessChallenge.API.Timer(timerMillis, timerMillis, timerMillis);
 
-                            //Remake timer, otherwise bots that use the timer will bug
-                            timer = new ChessChallenge.API.Timer(timer.OpponentMillisecondsRemaining, timer.MillisecondsRemaining, timerMillis);
-
-                            //Remake board, otherwise bugs happen apparently
-                            botBoard = new Board(board);
-                        }
-
-                        //Print out contestants
-                        Console.Write($"{player.GetName()} vs {opponentCopy.GetName()}: ");
-
-                        //Print out result
-                        if (botBoard.IsDraw()) {
-                            Console.WriteLine("Ended in draw!");
-                        } else if (board.IsWhiteToMove ^ sideToPlay) {
-                            Console.WriteLine("Ended in win!");
+                    //Play moves until the game ends
+                    var botBoard = new Board(board);
+                    while (!botBoard.IsDraw() && !botBoard.IsInCheckmate() && !(timer.MillisecondsRemaining < 0)) {
+                        if (!(board.IsWhiteToMove ^ sideToPlay)) {
+                            var move = playerInstance.Think(botBoard, timer);
+                            board.MakeMove(new ChessChallenge.Chess.Move(move.RawValue));
                         } else {
-                            Console.WriteLine("Ended in loss!");
+                            var move = opponentInstance.Think(botBoard, timer);
+                            board.MakeMove(new ChessChallenge.Chess.Move(move.RawValue));
                         }
 
-                        sideToPlay = !sideToPlay;
-                    }
-                });
-                thread.Start();
-                threads.Add(thread);
-            }
+                        //Remake timer, otherwise bots that use the timer will bug
+                        timer = new ChessChallenge.API.Timer(timer.OpponentMillisecondsRemaining, timer.MillisecondsRemaining, timerMillis);
 
-            //Wait for all games to finish
-            foreach (var thread in threads) {
-                thread.Join();
-            }
+                        //Remake board, otherwise bugs happen apparently
+                        botBoard = new Board(board);
+                    }
+
+                    //Print out contestants
+                    Console.Write($"{player.GetName()} vs {opponentCopy.GetName()}: ");
+
+                    //Print out result
+                    if (botBoard.IsDraw()) {
+                        Console.WriteLine("Ended in draw!");
+                    } else if (board.IsWhiteToMove ^ sideToPlay) {
+                        Console.WriteLine("Ended in win!");
+                    } else {
+                        Console.WriteLine("Ended in loss!");
+                    }
+
+                    sideToPlay = !sideToPlay;
+                }
+            });
+            thread.Start();
+            threads.Add(thread);
+        }
+
+        //Wait for all games to finish
+        foreach (var thread in threads) {
+            thread.Join();
         }
     }
 }
