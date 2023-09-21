@@ -1,5 +1,6 @@
 using System.Linq;
 using AsmResolver.DotNet;
+using AsmResolver.PE.DotNet.Metadata.Tables.Rows;
 
 public partial class Tinyfier {
     private void FlattenTypes() {
@@ -7,10 +8,14 @@ public partial class Tinyfier {
         for(int i = 0; i < targetTypes.Count; i++) {
             //Add nested types to the target list
             foreach(TypeDefinition nestedType in targetTypes[i].NestedTypes.ToArray()) {
-                //Make private nested types internal
+                //Update visibility
                 if(nestedType.IsNestedPrivate) {
-                    nestedType.IsNestedPrivate = false;
+                    nestedType.Attributes &= ~TypeAttributes.VisibilityMask;
                     nestedType.IsNotPublic = true;
+                } else {
+                    nestedType.Attributes &= ~TypeAttributes.VisibilityMask;
+                    nestedType.IsPublic = targetTypes[i].IsPublic;
+                    nestedType.IsNotPublic = targetTypes[i].IsNotPublic;
                 }
 
                 targetTypes[i].NestedTypes.Remove(nestedType);

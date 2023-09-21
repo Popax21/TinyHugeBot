@@ -63,31 +63,34 @@ public partial class Tinyfier {
             foreach(MethodDefinition meth in type.Methods) meth.ParameterDefinitions.Clear();
 
             //Trim field and method names, except for special name methods and overrides
-            foreach(FieldDefinition field in type.Fields) field.Name = null;
-            foreach(MethodDefinition method in type.Methods) {
-                if(method.IsSpecialName || method.IsRuntimeSpecialName) continue;
+            //Don't trim delegate type methods, that will confuse the runtime
+            if(!type.IsDelegate) {
+                foreach(FieldDefinition field in type.Fields) field.Name = null;
+                foreach(MethodDefinition method in type.Methods) {
+                    if(method.IsSpecialName || method.IsRuntimeSpecialName) continue;
 
-                //Check if this is a virtual override
-                if(method.IsVirtual && !method.IsNewSlot && type.BaseType?.Resolve() is TypeDefinition baseType) {
-                    if(baseType.Methods.Any(m => m.IsVirtual && !m.IsFinal && m.Name == method.Name && SignatureComparer.Default.Equals(m.Signature, method.Signature))) continue;
-                }
-
-                //Check if this is an interface implementation (note that explicit interface implementations don't count)
-                if(!type.MethodImplementations.Any(impl => impl.Body == this)) {
-                    bool isInterfImpl = false;
-                    foreach(InterfaceImplementation interfImpl in type.Interfaces) {
-                        if(interfImpl.Interface?.Resolve() is not TypeDefinition interfType) continue;
-
-                        MethodDefinition? interfMethod = interfType.Methods.FirstOrDefault(m => m.Name == method.Name && SignatureComparer.Default.Equals(m.Signature, method.Signature));
-                        if(interfMethod != null && !type.MethodImplementations.Any(impl => impl.Declaration == interfMethod)) {
-                            isInterfImpl = true;
-                            break;
-                        }
+                    //Check if this is a virtual override
+                    if(method.IsVirtual && !method.IsNewSlot && type.BaseType?.Resolve() is TypeDefinition baseType) {
+                        if(baseType.Methods.Any(m => m.IsVirtual && !m.IsFinal && m.Name == method.Name && SignatureComparer.Default.Equals(m.Signature, method.Signature))) continue;
                     }
-                    if(isInterfImpl) continue;
-                }
 
-                method.Name = null;
+                    //Check if this is an interface implementation (note that explicit interface implementations don't count)
+                    if(!type.MethodImplementations.Any(impl => impl.Body == this)) {
+                        bool isInterfImpl = false;
+                        foreach(InterfaceImplementation interfImpl in type.Interfaces) {
+                            if(interfImpl.Interface?.Resolve() is not TypeDefinition interfType) continue;
+
+                            MethodDefinition? interfMethod = interfType.Methods.FirstOrDefault(m => m.Name == method.Name && SignatureComparer.Default.Equals(m.Signature, method.Signature));
+                            if(interfMethod != null && !type.MethodImplementations.Any(impl => impl.Declaration == interfMethod)) {
+                                isInterfImpl = true;
+                                break;
+                            }
+                        }
+                        if(isInterfImpl) continue;
+                    }
+
+                    method.Name = null;
+                }
             }
         }
 
