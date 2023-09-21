@@ -4,7 +4,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
 using API = ChessChallenge.API;
@@ -21,6 +20,7 @@ public class MatchRunner : IDisposable {
         public Task<GameResult> Task => CompletionSource.Task;
     }
 
+    private readonly object botCreateLock = new object();
     private readonly CancellationTokenSource cancelSrc = new CancellationTokenSource();
     private readonly Thread[] runnerThreads;
     private readonly BlockingCollection<Match> matchQueue = new BlockingCollection<Match>();
@@ -80,7 +80,12 @@ public class MatchRunner : IDisposable {
         board.LoadPosition(match.StartFEN);
 
         //Create bot instances
-        API.IChessBot whiteBot = match.WhiteBot.CreateBot(), blackBot = match.BlackBot.CreateBot();
+        API.IChessBot whiteBot, blackBot;
+        lock(botCreateLock) {
+            whiteBot = match.WhiteBot.CreateBot();
+            blackBot = match.BlackBot.CreateBot();
+        }
+
         int whiteRemTime = match.TimerStartMs, blackRemTime = match.TimerStartMs;
 
         //Play moves until the game ends
@@ -112,7 +117,7 @@ public class MatchRunner : IDisposable {
             return Arbiter.GetGameState(board);
     }
 
-    public async Task<T> RunMatches<T>(IChessBotFactory player, IChessBotFactory[] opponents, string[] startFens, int timerStartMs, int timerIncMs) where T : struct, IAdditionOperators<T, MatchResult, T> {
+    public async Task RunMatches(IChessBotFactory player, IChessBotFactory[] opponents, string[] startFens, int timerStartMs, int timerIncMs, Action<Match, IChessBotFactory, MatchResult>? matchResCb = null) {
         //Queue matches
         List<Match> matches = new List<Match>();
         foreach (IChessBotFactory opponent in opponents) {
@@ -129,7 +134,6 @@ public class MatchRunner : IDisposable {
         Console.WriteLine($"RUNNER> Queued {numMatches} matches");
 
         //Wait for the matches to complete
-        T result = default;
         while (matches.Count > 0) {
             await Task.WhenAny(matches.Select(m => m.Task));
 
@@ -139,17 +143,15 @@ public class MatchRunner : IDisposable {
                 if (match.Task.Exception != null) throw match.Task.Exception;
                 if (!match.Task.IsCompleted) continue;
 
-                //Print out result
-                Console.WriteLine($"RUNNER> {match.WhiteBot.Name} (white) vs {match.BlackBot.Name} (black) FEN '{match.StartFEN}' -> {Enum.GetName(match.Task.Result)}");
-
-                //Accumulate result
                 MatchResult matchRes = match.Task.Result switch {
                     {} res when Arbiter.IsWhiteWinsResult(res) => match.WhiteBot == player ? MatchResult.Win : MatchResult.Loss,
                     {} res when Arbiter.IsBlackWinsResult(res) => match.BlackBot == player ? MatchResult.Win : MatchResult.Loss,
                     {} res when Arbiter.IsDrawResult(res) => MatchResult.Draw,
                     _ => throw new Exception($"Invalid game result {match.Task.Result}")
                 };
-                result += matchRes;
+
+                Console.WriteLine($"RUNNER> {match.WhiteBot.Name} (white) vs {match.BlackBot.Name} (black) FEN '{match.StartFEN}' -> {Enum.GetName(matchRes)}");
+                matchResCb?.Invoke(match, match.WhiteBot == player ? match.BlackBot : match.WhiteBot, matchRes);
                 HandleMatchResult(match, player, matchRes);
 
                 //Remove the match from the list of ongoing matches
@@ -157,8 +159,6 @@ public class MatchRunner : IDisposable {
             }
         }
         Console.WriteLine($"RUNNER> Finished running all {numMatches} matches");
-
-        return result;
     }
 
     protected virtual void HandleMatchPosition(Match match, Board board) {}

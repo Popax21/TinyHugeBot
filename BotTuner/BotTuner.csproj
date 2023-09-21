@@ -1,5 +1,4 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net7.0</TargetFramework>
@@ -8,17 +7,11 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.7.0" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\Chess-Challenge\Chess-Challenge\Chess-Challenge.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Remove="Bots\**" />
-    <Content Include="Bots\**">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
+    <EmbeddedResource Include="nunn.pgn" LogicalName="nunn2" />
+    <EmbeddedResource Include="silversuite.pgn" LogicalName="silversuite" />
   </ItemGroup>
-
 </Project>
