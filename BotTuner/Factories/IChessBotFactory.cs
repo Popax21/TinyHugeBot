@@ -1,8 +1,8 @@
 ﻿using ChessChallenge.API;
 
-namespace BotTuner.Factories {
-    interface IChessBotFactory {
-        IChessBot Create();
-        string GetName();
-    }
+namespace BotTuner.Factories; 
+
+internal interface IChessBotFactory {
+    IChessBot Create();
+    string GetName();
 }
