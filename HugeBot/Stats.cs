@@ -178,15 +178,6 @@ public partial class MyBot {
         (!isZw ? ref depthStats.OpenWindowStats : ref depthStats.ZeroWindowStats).NumNodes++;
     }
 
-    [MethodImpl(StatMImpl)] private void STAT_TTRead_Miss_I() => depthStats.TTRead_Misses++;
-    [MethodImpl(StatMImpl)] private void STAT_TTRead_DepthMiss_I() => depthStats.TTRead_DepthMisses++;
-    [MethodImpl(StatMImpl)] private void STAT_TTRead_BoundMiss_I() => depthStats.TTRead_BoundMisses++;
-    [MethodImpl(StatMImpl)] private void STAT_TTRead_Hit_I() => depthStats.TTRead_Hits++;
-
-    [MethodImpl(StatMImpl)] private void STAT_TTWrite_NewSlot_I() => depthStats.TTWrite_NewSlots++;
-    [MethodImpl(StatMImpl)] private void STAT_TTWrite_SlotUpdate_I() => depthStats.TTWrite_SlotUpdates++;
-    [MethodImpl(StatMImpl)] private void STAT_TTWrite_IdxCollision_I() => depthStats.TTWrite_IdxCollisions++;
-
     [MethodImpl(StatMImpl)] private void STAT_AlphaBeta_SearchNode_I(bool isZw, int numMoves) {
         ref StatsTracker.WindowStatCounters tracker = ref !isZw ? ref depthStats.OpenWindowStats : ref depthStats.ZeroWindowStats;
         tracker.AlphaBeta_NumSearchedNodes++;
@@ -195,6 +186,15 @@ public partial class MyBot {
     [MethodImpl(StatMImpl)] private void STAT_AlphaBeta_SearchedMove_I(bool isZw) => (!isZw ? ref depthStats.OpenWindowStats : ref depthStats.ZeroWindowStats).AlphaBeta_NumSearchedMoves++;
     [MethodImpl(StatMImpl)] private void STAT_AlphaBeta_FailLow_I(bool isZw) => (!isZw ? ref depthStats.OpenWindowStats : ref depthStats.ZeroWindowStats).AlphaBeta_NumFailLows++;
     [MethodImpl(StatMImpl)] private void STAT_AlphaBeta_FailHigh_I(bool isZw) => (!isZw ? ref depthStats.OpenWindowStats : ref depthStats.ZeroWindowStats).AlphaBeta_NumFailHighs++;
+
+    [MethodImpl(StatMImpl)] private void STAT_TTRead_Miss_I() => depthStats.TTRead_Misses++;
+    [MethodImpl(StatMImpl)] private void STAT_TTRead_DepthMiss_I() => depthStats.TTRead_DepthMisses++;
+    [MethodImpl(StatMImpl)] private void STAT_TTRead_BoundMiss_I() => depthStats.TTRead_BoundMisses++;
+    [MethodImpl(StatMImpl)] private void STAT_TTRead_Hit_I() => depthStats.TTRead_Hits++;
+
+    [MethodImpl(StatMImpl)] private void STAT_TTWrite_NewSlot_I() => depthStats.TTWrite_NewSlots++;
+    [MethodImpl(StatMImpl)] private void STAT_TTWrite_SlotUpdate_I() => depthStats.TTWrite_SlotUpdates++;
+    [MethodImpl(StatMImpl)] private void STAT_TTWrite_IdxCollision_I() => depthStats.TTWrite_IdxCollisions++;
 
     [MethodImpl(StatMImpl)] private void STAT_PVS_Research_I() => depthStats.PVS_NumResearches++;
     [MethodImpl(StatMImpl)] private void STAT_PVS_FoundPVMove_I(int moveIdx, bool hadPVMove) {
