@@ -1,8 +1,7 @@
 ﻿using System;
 using System.IO;
-using System.Linq;
 using System.Reflection;
-using System.Xml.Linq;
+using System.Runtime.Loader;
 using ChessChallenge.API;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -12,21 +11,22 @@ namespace BotTuner.Factories;
 
 //Takes a MyBot.cs file, compiles it at runtime, and cretaes a new IChessBot from it
 //Uses a lot of code from https://laurentkempe.com/2019/02/18/dynamically-compile-and-run-code-using-dotNET-Core-3.0/
-class CSChessBotFactory : IChessBotFactory {
-    private readonly byte[] assembly;
-    public readonly string name;
+public class CSChessBotFactory : IChessBotFactory {
+    private readonly Assembly assembly;
 
     public CSChessBotFactory(string path) {
-        Console.WriteLine($"Loading {path}...");
+        Console.WriteLine($"Loading CS bot '{path}'...");
+
+        //Store name for display purposes
+        Name = Path.GetFileNameWithoutExtension(path);
 
         //Read and parse the input file
-        var sourceCode = File.ReadAllText(path);
-        var codeString = SourceText.From(sourceCode);
-        var options = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.CSharp10);
-        var parsedSyntaxTree = SyntaxFactory.ParseSyntaxTree(codeString, options);
+        var botSrc = SourceText.From(File.ReadAllText(path));
+        var parseOpts = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.CSharp10);
+        var parsedSyntaxTree = SyntaxFactory.ParseSyntaxTree(botSrc, parseOpts);
 
         //Create necessary assembly references
-        var asmLocation = Path.GetDirectoryName(typeof(object).Assembly.Location);
+        var asmLocation = Path.GetDirectoryName(typeof(object).Assembly.Location)!;
         var references = new MetadataReference[] {
             MetadataReference.CreateFromFile(Path.Combine(asmLocation, "mscorlib.dll")),
             MetadataReference.CreateFromFile(Path.Combine(asmLocation, "System.dll")),
@@ -44,46 +44,37 @@ class CSChessBotFactory : IChessBotFactory {
         };
 
         //Compile the file
-        var compiled = CSharpCompilation.Create("CSCB",
+        var compiledBot = CSharpCompilation.Create($"CSBot_{Name}",
             new[] { parsedSyntaxTree },
-            references: references,
-            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+            references,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
                 optimizationLevel: OptimizationLevel.Release,
-                assemblyIdentityComparer: DesktopAssemblyIdentityComparer.Default));
+                assemblyIdentityComparer: DesktopAssemblyIdentityComparer.Default
+            )
+        );
 
-        //Convert the compiled assembly to a byte[]
-        byte[] emitted;
-        using (var peStream = new MemoryStream()) {
-            var result = compiled.Emit(peStream);
+        //Emit the assembly
+        using var peStream = new MemoryStream();
+        var emittedAsm = compiledBot.Emit(peStream);
+        if (!emittedAsm.Success) {
+            Console.WriteLine($"Compilation of CS bot '{path}' failed!");
 
-            //Make sure the compilation was successful
-            if (!result.Success) {
-                Console.WriteLine($"Compilation of {path} failed!");
-
-                //List failures if unsuccessful
-                var failures = result.Diagnostics.Where(diagnostic => diagnostic.IsWarningAsError || diagnostic.Severity == DiagnosticSeverity.Error);
-                foreach (var diagnostic in failures) {
+            //List failures
+            foreach (var diagnostic in emittedAsm.Diagnostics)
+                if (diagnostic.IsWarningAsError || diagnostic.Severity == DiagnosticSeverity.Error)
                     Console.WriteLine("{0}: {1}", diagnostic.Id, diagnostic.GetMessage());
-                }
 
-                //Halt program
-                throw new Exception();
-            }
-
-            peStream.Position = 0;
-            emitted = peStream.ToArray();
+            //Halt program
+            throw new Exception($"Compilation of CS bot '{path}' failed");
         }
 
-        //Store the assembly for future use
-        assembly = emitted;
+        //Load the assembly
+        peStream.Position = 0;
+        assembly = AssemblyLoadContext.Default.LoadFromStream(peStream);
 
-        //Store name for display purposes
-        name = Path.GetFileNameWithoutExtension(path);
-
-        Console.WriteLine($"Finished loading {path}!");
+        Console.WriteLine($"Finished loading CS bot '{path}'!");
     }
 
-    public IChessBot Create() => (IChessBot) Assembly.Load(assembly).CreateInstance("MyBot");
-
-    public string GetName() => name;
+    public string Name { get; }
+    public IChessBot CreateBot() => (IChessBot) assembly.CreateInstance("MyBot")!;
 }

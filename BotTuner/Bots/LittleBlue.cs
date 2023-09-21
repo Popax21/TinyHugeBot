@@ -40,7 +40,6 @@ using System.Linq;
 
                 // Check if time is expired
                 if (timer.MillisecondsElapsedThisTurn > time_limit) {
-                    Console.WriteLine($"EVIL: depth {depth}");
                     break;
                 }
 
