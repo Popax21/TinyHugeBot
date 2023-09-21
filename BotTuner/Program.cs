@@ -18,6 +18,11 @@ public static partial class Program {
         try {
             //Command dispatch
             switch(args[0].ToLowerInvariant()) {
+                case "compare": {
+                    if(args.Length < 3) throw new Exception("Not enough arguments for benchmark command");
+                    await RunCompare(args[1], args[2], args.Length <= 3 ? 60_000 : int.Parse(args[3]), args.Length <= 4 ? AllPositionCollections : args[4..]);
+                } break;
+
                 case "benchmark": {
                     if(args.Length < 3) throw new Exception("Not enough arguments for benchmark command");
                     BotDBPath = args[2];
