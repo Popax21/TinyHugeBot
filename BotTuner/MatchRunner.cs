@@ -16,7 +16,7 @@ public class MatchRunner : IDisposable {
         Win, Draw, Loss
     }
 
-    public record Match(IChessBotFactory WhiteBot, IChessBotFactory BlackBot, string StartFEN, int TimerStartMs, int TimerIncMs) {
+    public record Match(ulong ID, IChessBotFactory WhiteBot, IChessBotFactory BlackBot, string StartFEN, int TimerStartMs, int TimerIncMs) {
         public readonly TaskCompletionSource<GameResult> CompletionSource = new TaskCompletionSource<GameResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         public Task<GameResult> Task => CompletionSource.Task;
     }
@@ -24,6 +24,7 @@ public class MatchRunner : IDisposable {
     private readonly CancellationTokenSource cancelSrc = new CancellationTokenSource();
     private readonly Thread[] runnerThreads;
     private readonly BlockingCollection<Match> matchQueue = new BlockingCollection<Match>();
+    private ulong nextMatchID = 0;
 
     public MatchRunner(int? numRunners = null) {
         numRunners ??= Environment.ProcessorCount / 2;
@@ -57,7 +58,7 @@ public class MatchRunner : IDisposable {
 
                 try {
                     //Run the match
-                    var matchRes = RunMatches(match, cancelToken);
+                    var matchRes = RunMatch(match, cancelToken);
 
                     //Report back the result
                     match.CompletionSource.SetResult(matchRes);
@@ -73,7 +74,7 @@ public class MatchRunner : IDisposable {
         }
     }
 
-    private static GameResult RunMatches(Match match, CancellationToken cancelToken) {
+    private GameResult RunMatch(Match match, CancellationToken cancelToken) {
         //Setup board and timer
         var board = new Board(null);
         board.LoadPosition(match.StartFEN);
@@ -99,6 +100,7 @@ public class MatchRunner : IDisposable {
             if (!moveGen.GenerateMoves(board).ToArray().Any(m => m.Value == move.Value))
                 throw new Exception($"Bot '{(board.IsWhiteToMove ? match.WhiteBot : match.BlackBot).Name}' made an illegal move in position {FenUtility.CurrentFen(board)}: {MoveUtility.GetMoveNameUCI(move)}");
 
+            HandleMatchPosition(match, board);
             board.MakeMove(move, false);
         }
 
@@ -116,7 +118,7 @@ public class MatchRunner : IDisposable {
         foreach (IChessBotFactory opponent in opponents) {
             foreach (string startFen in startFens) {
                 foreach (bool isWhite in new[] { false, true }) {
-                    Match match = new Match(isWhite ? player : opponent, isWhite ? opponent : player, startFen, timerStartMs, timerIncMs);
+                    Match match = new Match(nextMatchID++, isWhite ? player : opponent, isWhite ? opponent : player, startFen, timerStartMs, timerIncMs);
                     matches.Add(match);
                     matchQueue.Add(match);
                 }
@@ -141,12 +143,14 @@ public class MatchRunner : IDisposable {
                 Console.WriteLine($"RUNNER> {match.WhiteBot.Name} (white) vs {match.BlackBot.Name} (black) FEN '{match.StartFEN}' -> {Enum.GetName(match.Task.Result)}");
 
                 //Accumulate result
-                result += match.Task.Result switch {
+                MatchResult matchRes = match.Task.Result switch {
                     {} res when Arbiter.IsWhiteWinsResult(res) => match.WhiteBot == player ? MatchResult.Win : MatchResult.Loss,
                     {} res when Arbiter.IsBlackWinsResult(res) => match.BlackBot == player ? MatchResult.Win : MatchResult.Loss,
                     {} res when Arbiter.IsDrawResult(res) => MatchResult.Draw,
                     _ => throw new Exception($"Invalid game result {match.Task.Result}")
                 };
+                result += matchRes;
+                HandleMatchResult(match, player, matchRes);
 
                 //Remove the match from the list of ongoing matches
                 matches.RemoveAt(i--);
@@ -156,4 +160,7 @@ public class MatchRunner : IDisposable {
 
         return result;
     }
+
+    protected virtual void HandleMatchPosition(Match match, Board board) {}
+    protected virtual void HandleMatchResult(Match match, IChessBotFactory player, MatchResult result) {}
 }
