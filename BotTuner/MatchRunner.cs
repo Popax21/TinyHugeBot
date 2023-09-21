@@ -6,7 +6,6 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using ChessChallenge.API;
-using ChessChallenge.Application;
 
 namespace BotTuner {
     class MatchRunner {
@@ -25,26 +24,32 @@ namespace BotTuner {
                         var opponentInstance = opponentCopy.Create();
 
                         //Setup board and timer
-                        var board = Board.CreateBoardFromFEN(fen);
+                        var board = new ChessChallenge.Chess.Board(null);
                         var timer = new ChessChallenge.API.Timer(timerMillis, timerMillis, timerMillis);
 
                         //Play moves until the game ends
-                        while (!board.IsDraw() && !board.IsInCheckmate() && !(timer.MillisecondsRemaining < 0)) {
+                        var botBoard = new Board(board);
+                        while (!botBoard.IsDraw() && !botBoard.IsInCheckmate() && !(timer.MillisecondsRemaining < 0)) {
                             if (!(board.IsWhiteToMove ^ sideToPlay)) {
-                                board.MakeMove(playerInstance.Think(board, timer));
+                                var move = playerInstance.Think(botBoard, timer);
+                                board.MakeMove(new ChessChallenge.Chess.Move(move.RawValue));
                             } else {
-                                board.MakeMove(opponentInstance.Think(board, timer));
+                                var move = opponentInstance.Think(botBoard, timer);
+                                board.MakeMove(new ChessChallenge.Chess.Move(move.RawValue));
                             }
 
                             //Remake timer, otherwise bots that use the timer will bug
                             timer = new ChessChallenge.API.Timer(timer.OpponentMillisecondsRemaining, timer.MillisecondsRemaining, timerMillis);
+
+                            //Remake board, otherwise bugs happen apparently
+                            botBoard = new Board(board);
                         }
 
                         //Print out contestants
                         Console.Write($"{player.GetName()} vs {opponentCopy.GetName()}: ");
 
                         //Print out result
-                        if (board.IsDraw()) {
+                        if (botBoard.IsDraw()) {
                             Console.WriteLine("Ended in draw!");
                         } else if (board.IsWhiteToMove ^ sideToPlay) {
                             Console.WriteLine("Ended in win!");
