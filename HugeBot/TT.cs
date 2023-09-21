@@ -62,27 +62,27 @@ public partial class MyBot {
         return true;
     }
 
-    private ulong EncodeTTEntry_I(short eval, TTBoundType bound, int depth, ulong boardHash) {
+    private void StoreTTEntry_I(ref ulong entrySlot, short eval, TTBoundType bound, int depth, ulong boardHash) {
 #if DEBUG
         //Check for overflows
         if(bound < TTBoundType.Exact || bound > TTBoundType.Upper) throw new ArgumentException($"Garbage TT bound given: {bound}");
         if(depth < 0 || depth >= (1 << 6)) throw new ArgumentException($"Out-of-bounds TT depth given: {depth}");
 #endif
 
-        return
+#if STATS
+        //Check for collisions
+        ulong prevEntry = entrySlot;
+        if((prevEntry & (ulong) TTBoundType.MASK) == (ulong) TTBoundType.None) STAT_TTWrite_NewSlot_I();
+        else if((prevEntry & ~TTIdxMask) != (boardHash & ~TTIdxMask)) STAT_TTWrite_IdxCollision_I();
+        else STAT_TTWrite_SlotUpdate_I();
+#endif
+
+        //Store the TT entry
+        entrySlot =
             unchecked((ushort) eval) |
             (ulong) bound |
             ((ulong) depth << 18) |
             (boardHash & ~TTIdxMask)
         ;   
     }
-
-#if STATS
-    [System.Runtime.CompilerServices.MethodImpl(StatMImpl)]
-    private void STAT_CheckForTTCollision_I(ulong prevEntry, ulong boardHash) {
-        if((prevEntry & (ulong) TTBoundType.MASK) == (ulong) TTBoundType.None) STAT_TTWrite_NewSlot_I();
-        else if((prevEntry & ~TTIdxMask) != (boardHash & ~TTIdxMask)) STAT_TTWrite_IdxCollision_I();
-        else STAT_TTWrite_SlotUpdate_I();
-    }
-#endif
 }

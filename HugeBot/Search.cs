@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using ChessChallenge.API;
 using HugeBot;
 
@@ -134,11 +134,8 @@ public partial class MyBot : IChessBot {
         }
 
         //Insert the move into the transposition table
-        //TODO: Currently always replaces, investigate potential other strategies
-#if STATS
-        STAT_CheckForTTCollision_I(ttSlot, boardHash);
-#endif
-        ttSlot = EncodeTTEntry_I((short) bestScore, ttBound, remDepth, boardHash);
+        //TODO Currently always replaces, investigate potential other strategies
+        StoreTTEntry_I(ref ttSlot, (short) bestScore, ttBound, remDepth, boardHash);
 
         return bestScore;
     }
