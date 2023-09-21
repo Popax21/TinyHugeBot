@@ -161,7 +161,7 @@ public partial class MyBot : IChessBot {
                 if(score >= beta) {
                     //We failed high; our score is only a lower bound
 #if STATS
-                    STAT_AlphaBeta_FailHigh_I(isZeroWindow);
+                    STAT_AlphaBeta_FailHigh_I(isZeroWindow, i);
 #endif
 
                     ttBound = TTBoundType.Lower;
