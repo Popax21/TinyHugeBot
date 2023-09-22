@@ -9,6 +9,7 @@ namespace HugeBot;
 
 public static class Eval {
     public const short MinEval = -30000, MaxEval = +30000;
+    public const short MinMate = -29000, MaxMate = +29000;
 
     internal const ulong EvalMask = 0x0000_ffff_0000_ffffUL;
 

@@ -2,7 +2,7 @@ using System;
 using ChessChallenge.API;
 
 public partial class MyBot {
-    public void OrderMoves_I(Board board, int alpha, int beta, int remDepth, int ply, Span<Move> moves, ulong ttEntry, ulong boardHash) {
+    public void OrderMoves_I(int alpha, int beta, int remDepth, int ply, Span<Move> moves, ulong ttEntry, ulong boardHash) {
         static void SwapMove_I(ref Move a, ref Move b) {
             Move tmp = a;
             a = b;
@@ -17,7 +17,7 @@ public partial class MyBot {
             bestMove = transposMoveTable[boardHash & TTIdxMask];
         } else if(beta > alpha-1 && remDepth >= 3) {
             //Perform IID to determine the move to place first
-            NegaMax(board, alpha, beta, remDepth - 2, ply, out bestMove);
+            NegaMax(alpha, beta, remDepth - 2, ply, out bestMove);
         } else return;
 
         //Place the best move first
