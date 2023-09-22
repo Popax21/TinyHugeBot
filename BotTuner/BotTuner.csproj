@@ -11,13 +11,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Remove="Bots\**" />
-    <Content Include="Bots\**">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
-
-  <ItemGroup>
     <EmbeddedResource Include="nunn.pgn" LogicalName="nunn2" />
     <EmbeddedResource Include="silversuite.pgn" LogicalName="silversuite" />
   </ItemGroup>
