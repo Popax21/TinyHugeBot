@@ -32,17 +32,17 @@ public partial class MyBot {
             public int NumNodes;
 
             //Alpha-Beta stats
-            public int AlphaBeta_NumSearchedNodes, AlphaBeta_NumGeneratedMoves, AlphaBeta_NumSearchedMoves;
-            public int AlphaBeta_NumFailLows, AlphaBeta_NumFailHighs, AlphaBeta_FailHighMoveIdxSum;
+            public int AlphaBeta_SearchedNodes, AlphaBeta_GeneratedMoves, AlphaBeta_SearchedMoves;
+            public int AlphaBeta_FailLows, AlphaBeta_FailHighs, AlphaBeta_FailHighMoveIdxSum;
 
             public void UpdateGlobalStats(in WindowStatCounters nestedTracker) {
                 NumNodes += nestedTracker.NumNodes;
 
-                AlphaBeta_NumSearchedNodes += nestedTracker.AlphaBeta_NumSearchedNodes;
-                AlphaBeta_NumGeneratedMoves += nestedTracker.AlphaBeta_NumGeneratedMoves;
-                AlphaBeta_NumSearchedMoves += nestedTracker.AlphaBeta_NumSearchedMoves;
-                AlphaBeta_NumFailLows += nestedTracker.AlphaBeta_NumFailLows;
-                AlphaBeta_NumFailHighs += nestedTracker.AlphaBeta_NumFailHighs;
+                AlphaBeta_SearchedNodes += nestedTracker.AlphaBeta_SearchedNodes;
+                AlphaBeta_GeneratedMoves += nestedTracker.AlphaBeta_GeneratedMoves;
+                AlphaBeta_SearchedMoves += nestedTracker.AlphaBeta_SearchedMoves;
+                AlphaBeta_FailLows += nestedTracker.AlphaBeta_FailLows;
+                AlphaBeta_FailHighs += nestedTracker.AlphaBeta_FailHighs;
                 AlphaBeta_FailHighMoveIdxSum += nestedTracker.AlphaBeta_FailHighMoveIdxSum;
             }
 
@@ -50,9 +50,9 @@ public partial class MyBot {
                 printStat($"nodes: {FormatPercentageI(NumNodes, stats.NumNodes)}");
 
                 //Alpha-Beta stats
-                double avgGeneratedMoves = (double) AlphaBeta_NumGeneratedMoves / AlphaBeta_NumSearchedNodes, avgSearchedMoves = (double) AlphaBeta_NumSearchedMoves / AlphaBeta_NumSearchedNodes;
-                printStat($"alpha-beta: nodes {FormatPercentageI(AlphaBeta_NumSearchedNodes, NumNodes)} avg. generated moves {FormatFloat(avgGeneratedMoves, 4)} avg. searched moves {FormatPercentageF(avgSearchedMoves, avgGeneratedMoves, 4)}");
-                printStat($"cutoffs: fail-lows {FormatPercentageI(AlphaBeta_NumFailLows, AlphaBeta_NumSearchedNodes)} fail-highs {FormatPercentageI(AlphaBeta_NumFailHighs, AlphaBeta_NumSearchedNodes)} avg. fail-high move idx {FormatFloat((double) AlphaBeta_FailHighMoveIdxSum / AlphaBeta_NumFailHighs, 4)}");
+                double avgGeneratedMoves = (double) AlphaBeta_GeneratedMoves / AlphaBeta_SearchedNodes, avgSearchedMoves = (double) AlphaBeta_SearchedMoves / AlphaBeta_SearchedNodes;
+                printStat($"alpha-beta: nodes {FormatPercentageI(AlphaBeta_SearchedNodes, NumNodes)} avg. generated moves {FormatFloat(avgGeneratedMoves, 4)} avg. searched moves {FormatPercentageF(avgSearchedMoves, avgGeneratedMoves, 4)}");
+                printStat($"cutoffs: fail-lows {FormatPercentageI(AlphaBeta_FailLows, AlphaBeta_SearchedNodes)} fail-highs {FormatPercentageI(AlphaBeta_FailHighs, AlphaBeta_SearchedNodes)} avg. fail-high move idx {FormatFloat((double) AlphaBeta_FailHighMoveIdxSum / AlphaBeta_FailHighs, 4)}");
             }
         }
         public WindowStatCounters OpenWindowStats, ZeroWindowStats;
@@ -61,6 +61,9 @@ public partial class MyBot {
         public int TTRead_Misses, TTRead_DepthMisses, TTRead_BoundMisses, TTRead_Hits;
         public int TTWrite_NewSlots, TTWrite_SlotUpdates, TTWrite_IdxCollisions;
 
+        //Move order stats
+        public int MoveOrder_Invokes, MoveOrder_TTHits, MoveOrder_NumIIDInvokes;
+
         //PVS stats
         public int PVS_NumPVMoves, PVS_PVMoveIdxSum, PVS_NumResearches, PVS_NumCorrections;
 
@@ -68,6 +71,7 @@ public partial class MyBot {
             if(resetHistory) NumNodes = prevNumNodes = prevPrevNumNodes = 0;
 
             //Reset counters
+            ElapsedMs = 0;
             prevPrevNumNodes = prevNumNodes;
             prevNumNodes = NumNodes;
             NumNodes = 0;
@@ -79,6 +83,8 @@ public partial class MyBot {
 
             TTRead_Misses = TTRead_DepthMisses = TTRead_BoundMisses = TTRead_Hits = 0;
             TTWrite_NewSlots = TTWrite_SlotUpdates = TTWrite_IdxCollisions = 0;
+
+            MoveOrder_Invokes = MoveOrder_TTHits = MoveOrder_NumIIDInvokes = 0;
 
             PVS_NumPVMoves = PVS_PVMoveIdxSum = PVS_NumResearches = PVS_NumCorrections = 0;
         }
@@ -99,6 +105,10 @@ public partial class MyBot {
             TTWrite_NewSlots += nestedTracker.TTWrite_NewSlots;
             TTWrite_SlotUpdates += nestedTracker.TTWrite_SlotUpdates;
             TTWrite_IdxCollisions += nestedTracker.TTWrite_IdxCollisions;
+
+            MoveOrder_Invokes += nestedTracker.MoveOrder_Invokes;
+            MoveOrder_TTHits += nestedTracker.MoveOrder_TTHits;
+            MoveOrder_NumIIDInvokes += nestedTracker.MoveOrder_NumIIDInvokes;
 
             PVS_NumPVMoves += nestedTracker.PVS_NumPVMoves;
             PVS_PVMoveIdxSum += nestedTracker.PVS_PVMoveIdxSum;
@@ -143,8 +153,11 @@ public partial class MyBot {
             int numTTWrites = TTWrite_NewSlots + TTWrite_SlotUpdates + TTWrite_IdxCollisions;
             printStat($"TT writes: total {numTTWrites} new slots {FormatPercentageI(TTWrite_NewSlots, numTTWrites)} slot updates {FormatPercentageI(TTWrite_SlotUpdates, numTTWrites)} idx collisions {FormatPercentageI(TTWrite_IdxCollisions, numTTWrites)}");
 
+            //Move ordering stats
+            printStat($"move ordering: invocs {MoveOrder_Invokes} TT hits {FormatPercentageI(MoveOrder_TTHits, MoveOrder_Invokes)} IID invocs {FormatPercentageI(MoveOrder_NumIIDInvokes, MoveOrder_Invokes)}");
+
             //PVS stats
-            printStat($"PVS: PV moves {FormatPercentageI(PVS_NumPVMoves, OpenWindowStats.AlphaBeta_NumSearchedMoves)} avg. PV move idx {FormatFloat((double) PVS_PVMoveIdxSum / PVS_NumPVMoves, 4)} researches {FormatPercentageI(PVS_NumResearches, PVS_NumPVMoves)} anomalies {FormatPercentageI(PVS_NumResearches - PVS_NumCorrections, PVS_NumResearches)}");
+            printStat($"PVS: PV moves {FormatPercentageI(PVS_NumPVMoves, OpenWindowStats.AlphaBeta_SearchedMoves)} avg. PV move idx {FormatFloat((double) PVS_PVMoveIdxSum / PVS_NumPVMoves, 4)} researches {FormatPercentageI(PVS_NumResearches, PVS_NumPVMoves)} anomalies {FormatPercentageI(PVS_NumResearches - PVS_NumCorrections, PVS_NumResearches)}");
         }
     };
 
@@ -181,21 +194,21 @@ public partial class MyBot {
 
     [MethodImpl(StatMImpl)] private void STAT_AlphaBeta_SearchNode_I(bool isZw, int numMoves) {
         if(!isZw) {
-            depthStats.OpenWindowStats.AlphaBeta_NumSearchedNodes++;
-            depthStats.OpenWindowStats.AlphaBeta_NumGeneratedMoves += numMoves;
+            depthStats.OpenWindowStats.AlphaBeta_SearchedNodes++;
+            depthStats.OpenWindowStats.AlphaBeta_GeneratedMoves += numMoves;
         } else {
-            depthStats.ZeroWindowStats.AlphaBeta_NumSearchedNodes++;
-            depthStats.ZeroWindowStats.AlphaBeta_NumGeneratedMoves += numMoves;
+            depthStats.ZeroWindowStats.AlphaBeta_SearchedNodes++;
+            depthStats.ZeroWindowStats.AlphaBeta_GeneratedMoves += numMoves;
         }
     }
-    [MethodImpl(StatMImpl)] private void STAT_AlphaBeta_SearchedMove_I(bool isZw) => _ = !isZw ? depthStats.OpenWindowStats.AlphaBeta_NumSearchedMoves++ : depthStats.ZeroWindowStats.AlphaBeta_NumSearchedMoves++;
-    [MethodImpl(StatMImpl)] private void STAT_AlphaBeta_FailLow_I(bool isZw) => _ = !isZw ? depthStats.OpenWindowStats.AlphaBeta_NumFailLows++ : depthStats.ZeroWindowStats.AlphaBeta_NumFailLows++;
+    [MethodImpl(StatMImpl)] private void STAT_AlphaBeta_SearchedMove_I(bool isZw) => _ = !isZw ? depthStats.OpenWindowStats.AlphaBeta_SearchedMoves++ : depthStats.ZeroWindowStats.AlphaBeta_SearchedMoves++;
+    [MethodImpl(StatMImpl)] private void STAT_AlphaBeta_FailLow_I(bool isZw) => _ = !isZw ? depthStats.OpenWindowStats.AlphaBeta_FailLows++ : depthStats.ZeroWindowStats.AlphaBeta_FailLows++;
     [MethodImpl(StatMImpl)] private void STAT_AlphaBeta_FailHigh_I(bool isZw, int moveIdx) {
         if(!isZw) {
-            depthStats.OpenWindowStats.AlphaBeta_NumFailHighs++;
+            depthStats.OpenWindowStats.AlphaBeta_FailHighs++;
             depthStats.OpenWindowStats.AlphaBeta_FailHighMoveIdxSum += moveIdx;
         } else {
-            depthStats.ZeroWindowStats.AlphaBeta_NumFailHighs++;
+            depthStats.ZeroWindowStats.AlphaBeta_FailHighs++;
             depthStats.ZeroWindowStats.AlphaBeta_FailHighMoveIdxSum += moveIdx;
         }
     }
@@ -208,6 +221,10 @@ public partial class MyBot {
     [MethodImpl(StatMImpl)] private void STAT_TTWrite_NewSlot_I() => depthStats.TTWrite_NewSlots++;
     [MethodImpl(StatMImpl)] private void STAT_TTWrite_SlotUpdate_I() => depthStats.TTWrite_SlotUpdates++;
     [MethodImpl(StatMImpl)] private void STAT_TTWrite_IdxCollision_I() => depthStats.TTWrite_IdxCollisions++;
+
+    [MethodImpl(StatMImpl)] private void STAT_MoveOrder_Invoke_I() => depthStats.MoveOrder_Invokes++;
+    [MethodImpl(StatMImpl)] private void STAT_MoveOrder_TTHit_I() => depthStats.MoveOrder_TTHits++;
+    [MethodImpl(StatMImpl)] private void STAT_MoveOrder_IIDInvoke_I() => depthStats.MoveOrder_NumIIDInvokes++;
 
     [MethodImpl(StatMImpl)] private void STAT_PVS_Research_I() => depthStats.PVS_NumResearches++;
     [MethodImpl(StatMImpl)] private void STAT_PVS_FoundPVMove_I(int moveIdx, bool hadPVMove) {
