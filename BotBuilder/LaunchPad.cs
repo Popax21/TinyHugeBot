@@ -48,7 +48,7 @@ class MyBot : IChessBot {
         //As such load it whenever any assembly fails to load >:)
         System.ResolveEventHandler asmResolveCB = (_, _) => CurrentDomain.Load(TinyBot_asmBuf); //We can't use a dynamic variable for the callback because we need it to be a delegate type
         CurrentDomain.AssemblyResolve += asmResolveCB;
-        TinyBot_asmBuf = CurrentDomain.CreateInstanceAndUnwrap("B", "<TINYBOTCLASS>");
+        TinyBot_asmBuf = CurrentDomain.CreateInstanceAndUnwrap(ToString(), "<TINYBOTCLASS>");
         CurrentDomain.AssemblyResolve -= asmResolveCB;
     }
 
