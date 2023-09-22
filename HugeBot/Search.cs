@@ -73,6 +73,7 @@ public partial class MyBot : IChessBot {
             //Notify the stats tracker that the depth search ended
             STAT_EndDepthSearch(iterBestMove != 0 ? FindMove_I(moves, iterBestMove) : default, curBestEval, depth, didTimeOut);
 #endif
+
             //Check if time is up, if we found a checkmate, if we reached our max depth
             if(timer.MillisecondsElapsedThisTurn >= deepeningSearchTime || curBestEval <= Eval.MinMate || curBestEval >= Eval.MaxMate || depth >= MaxDepth) {
                 Move bestMove = FindMove_I(moves, curBestMove);
