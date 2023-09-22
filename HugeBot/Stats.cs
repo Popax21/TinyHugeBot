@@ -106,11 +106,11 @@ public partial class MyBot {
             PVS_NumCorrections += nestedTracker.PVS_NumCorrections;
 
             //Update average EBFs
-            if(nestedTracker.EBF_P1 > 0) {
+            if(nestedTracker.EBF_P1 is > 1 and < 100 ) {
                 numNestedEbfP1s++;
                 nestedEbfP1Sum += nestedTracker.EBF_P1;
             }
-            if(nestedTracker.EBF_P2 > 0) {
+            if(nestedTracker.EBF_P2 is > 1 and < 100) {
                 numNestedEbfP2s++;
                 nestedEbfP2Sum += nestedTracker.EBF_P2;
             }
