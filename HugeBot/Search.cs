@@ -92,7 +92,7 @@ public partial class MyBot : IChessBot {
 
     //alpha / beta are exclusive lower / upper bounds
     public int NegaMax(int alpha, int beta, int remDepth, int ply, out ushort bestMove) {
-        bool isZeroWindow = alpha == beta-1;
+        bool isPvCandidateNode = alpha+1 < beta; //Because of PVS, all nodes without a zero window are considered candidate nodes
         bestMove = 0;
 
         //Check if time is up
@@ -104,7 +104,7 @@ public partial class MyBot : IChessBot {
 #endif
 
 #if STATS
-        STAT_NewNode_I(isZeroWindow);
+        STAT_NewNode_I(isPvCandidateNode, false);
 #endif
 
         //Handle repetition
@@ -124,8 +124,7 @@ public partial class MyBot : IChessBot {
         //TODO Pruning
 
         //Check if we reached the bottom of the search tree
-        //TODO Quiescence search
-        if(remDepth <= 0) return Eval.Evaluate_I(searchBoard);
+        if(remDepth <= 0) return QSearch(alpha, beta);
 
         //Generate legal moves
         Span<Move> moves = stackalloc Move[256];
@@ -136,13 +135,13 @@ public partial class MyBot : IChessBot {
             return searchBoard.IsInCheck() ? Eval.MinEval + ply : 0;
         }
 
+#if STATS
+        //Report that we are starting to search a new node
+        STAT_AlphaBeta_SearchNode_I(isPvCandidateNode, false, moves.Length);
+#endif
+
         //Order moves
         OrderMoves_I(alpha, beta, remDepth, ply, moves, ttSlot, boardHash);
-
-#if STATS
-        //Report that we are starting to search a new unpruned node
-        STAT_AlphaBeta_SearchNode_I(isZeroWindow, moves.Length);
-#endif
 
         //Search for the best move
         int bestScore = Eval.MinEval;
@@ -174,7 +173,7 @@ public partial class MyBot : IChessBot {
 
 #if STATS
             //Report that we searched a move
-            STAT_AlphaBeta_SearchedMove_I(isZeroWindow);
+            STAT_AlphaBeta_SearchedMove_I(isPvCandidateNode, false);
 #endif
 
             //Update the best score
@@ -189,7 +188,7 @@ public partial class MyBot : IChessBot {
                 if(score >= beta) {
                     //We failed high; our score is only a lower bound
 #if STATS
-                    STAT_AlphaBeta_FailHigh_I(isZeroWindow, i);
+                    STAT_AlphaBeta_FailHigh_I(isPvCandidateNode, false, i);
 #endif
 
                     ttBound = TTBoundType.Lower;
@@ -209,10 +208,10 @@ public partial class MyBot : IChessBot {
 
 #if STATS
         //Check if we failed low
-        if(ttBound == TTBoundType.Upper) STAT_AlphaBeta_FailLow_I(isZeroWindow);
+        if(ttBound == TTBoundType.Upper) STAT_AlphaBeta_FailLow_I(isPvCandidateNode, false);
 #endif
 
-        //Insert the move into the transposition table
+        //Insert the best move found into the transposition table (except when in Q-Search)
         //TODO Currently always replaces, investigate potential other strategies
         StoreTTEntry_I(ref ttSlot, (short) bestScore, ttBound, remDepth, boardHash);
         transposMoveTable[boardHash & TTIdxMask] = bestMove;

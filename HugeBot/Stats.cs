@@ -27,15 +27,15 @@ public partial class MyBot {
         public double EBF_P1 => prevNumNodes > 0 ? (double) NumNodes / prevNumNodes : 0;
         public double EBF_P2 => prevPrevNumNodes > 0 ? Math.Sqrt((double) NumNodes / prevPrevNumNodes) : 0;
 
-        //Window-type stats
-        public struct WindowStatCounters {
+        //Search-type stats
+        public struct SearchTypeStatCounters {
             public int NumNodes;
 
             //Alpha-Beta stats
             public int AlphaBeta_SearchedNodes, AlphaBeta_GeneratedMoves, AlphaBeta_SearchedMoves;
             public int AlphaBeta_FailLows, AlphaBeta_FailHighs, AlphaBeta_FailHighMoveIdxSum;
 
-            public void UpdateGlobalStats(in WindowStatCounters nestedTracker) {
+            public void UpdateGlobalStats(in SearchTypeStatCounters nestedTracker) {
                 NumNodes += nestedTracker.NumNodes;
 
                 AlphaBeta_SearchedNodes += nestedTracker.AlphaBeta_SearchedNodes;
@@ -55,7 +55,7 @@ public partial class MyBot {
                 printStat($"cutoffs: fail-lows {FormatPercentageI(AlphaBeta_FailLows, AlphaBeta_SearchedNodes)} fail-highs {FormatPercentageI(AlphaBeta_FailHighs, AlphaBeta_SearchedNodes)} avg. fail-high move idx {FormatFloat((double) AlphaBeta_FailHighMoveIdxSum / AlphaBeta_FailHighs, 4)}");
             }
         }
-        public WindowStatCounters OpenWindowStats, ZeroWindowStats;
+        public SearchTypeStatCounters PVCandidateStats, ZeroWindowStats, QSearchStats;
 
         //TT stats
         public int TTRead_Misses, TTRead_DepthMisses, TTRead_BoundMisses, TTRead_Hits;
@@ -76,7 +76,7 @@ public partial class MyBot {
             prevNumNodes = NumNodes;
             NumNodes = 0;
 
-            OpenWindowStats = ZeroWindowStats = default;
+            PVCandidateStats = ZeroWindowStats = QSearchStats = default;
 
             numNestedEbfP1s = numNestedEbfP2s = 0;
             nestedEbfP1Sum = nestedEbfP2Sum = 0;
@@ -94,8 +94,9 @@ public partial class MyBot {
             ElapsedMs += nestedTracker.ElapsedMs;
             NumNodes += nestedTracker.NumNodes;
 
-            OpenWindowStats.UpdateGlobalStats(in nestedTracker.OpenWindowStats);
+            PVCandidateStats.UpdateGlobalStats(in nestedTracker.PVCandidateStats);
             ZeroWindowStats.UpdateGlobalStats(in nestedTracker.ZeroWindowStats);
+            QSearchStats.UpdateGlobalStats(in nestedTracker.QSearchStats);
 
             TTRead_Misses += nestedTracker.TTRead_Misses;
             TTRead_DepthMisses += nestedTracker.TTRead_DepthMisses;
@@ -141,10 +142,12 @@ public partial class MyBot {
             }
 
             //Window-type stats
-            printStat("open-window stats:");
-            OpenWindowStats.DumpStats(in this, IncrIndent(printStat));
+            printStat("PV candidate stats:");
+            PVCandidateStats.DumpStats(in this, IncrIndent(printStat));
             printStat("zero-window stats:");
             ZeroWindowStats.DumpStats(in this, IncrIndent(printStat));
+            printStat("Q-search stats:");
+            QSearchStats.DumpStats(in this, IncrIndent(printStat));
 
             //TT stats
             int numTTReads = TTRead_Misses + TTRead_DepthMisses + TTRead_BoundMisses + TTRead_Hits;
@@ -157,7 +160,7 @@ public partial class MyBot {
             printStat($"move ordering: invocs {MoveOrder_Invokes} TT hits {FormatPercentageI(MoveOrder_TTHits, MoveOrder_Invokes)} IID invocs {FormatPercentageI(MoveOrder_NumIIDInvokes, MoveOrder_Invokes)}");
 
             //PVS stats
-            printStat($"PVS: PV moves {FormatPercentageI(PVS_NumPVMoves, OpenWindowStats.AlphaBeta_SearchedMoves)} avg. PV move idx {FormatFloat((double) PVS_PVMoveIdxSum / PVS_NumPVMoves, 4)} researches {FormatPercentageI(PVS_NumResearches, PVS_NumPVMoves)} anomalies {FormatPercentageI(PVS_NumResearches - PVS_NumCorrections, PVS_NumResearches)}");
+            printStat($"PVS: PV moves {FormatPercentageI(PVS_NumPVMoves, PVCandidateStats.AlphaBeta_SearchedMoves)} avg. PV move idx {FormatFloat((double) PVS_PVMoveIdxSum / PVS_NumPVMoves, 4)} researches {FormatPercentageI(PVS_NumResearches, PVS_NumPVMoves)} anomalies {FormatPercentageI(PVS_NumResearches - PVS_NumCorrections, PVS_NumResearches)}");
         }
     };
 
@@ -187,26 +190,43 @@ public partial class MyBot {
         depthStats.DumpStats(IncrIndent(PrintStat));
     }
 
-    [MethodImpl(StatMImpl)] private void STAT_NewNode_I(bool isZw) {
+    [MethodImpl(StatMImpl)] private void STAT_NewNode_I(bool isPV, bool isQS) {
         depthStats.NumNodes++;
-        (!isZw ? ref depthStats.OpenWindowStats : ref depthStats.ZeroWindowStats).NumNodes++;
+
+        if(isPV) depthStats.PVCandidateStats.NumNodes++;
+        else if(isQS) depthStats.QSearchStats.NumNodes++;
+        else depthStats.ZeroWindowStats.NumNodes++;
     }
 
-    [MethodImpl(StatMImpl)] private void STAT_AlphaBeta_SearchNode_I(bool isZw, int numMoves) {
-        if(!isZw) {
-            depthStats.OpenWindowStats.AlphaBeta_SearchedNodes++;
-            depthStats.OpenWindowStats.AlphaBeta_GeneratedMoves += numMoves;
+    [MethodImpl(StatMImpl)] private void STAT_AlphaBeta_SearchNode_I(bool isPV, bool isQS, int numMoves) {
+        if(isPV) {
+            depthStats.PVCandidateStats.AlphaBeta_SearchedNodes++;
+            depthStats.PVCandidateStats.AlphaBeta_GeneratedMoves += numMoves;
+        } else if(isQS) {
+            depthStats.QSearchStats.AlphaBeta_SearchedNodes++;
+            depthStats.QSearchStats.AlphaBeta_GeneratedMoves += numMoves;
         } else {
             depthStats.ZeroWindowStats.AlphaBeta_SearchedNodes++;
             depthStats.ZeroWindowStats.AlphaBeta_GeneratedMoves += numMoves;
         }
     }
-    [MethodImpl(StatMImpl)] private void STAT_AlphaBeta_SearchedMove_I(bool isZw) => _ = !isZw ? depthStats.OpenWindowStats.AlphaBeta_SearchedMoves++ : depthStats.ZeroWindowStats.AlphaBeta_SearchedMoves++;
-    [MethodImpl(StatMImpl)] private void STAT_AlphaBeta_FailLow_I(bool isZw) => _ = !isZw ? depthStats.OpenWindowStats.AlphaBeta_FailLows++ : depthStats.ZeroWindowStats.AlphaBeta_FailLows++;
-    [MethodImpl(StatMImpl)] private void STAT_AlphaBeta_FailHigh_I(bool isZw, int moveIdx) {
-        if(!isZw) {
-            depthStats.OpenWindowStats.AlphaBeta_FailHighs++;
-            depthStats.OpenWindowStats.AlphaBeta_FailHighMoveIdxSum += moveIdx;
+    [MethodImpl(StatMImpl)] private void STAT_AlphaBeta_SearchedMove_I(bool isPV, bool isQS) {
+        if(isPV) depthStats.PVCandidateStats.AlphaBeta_SearchedMoves++;
+        else if(isQS) depthStats.QSearchStats.AlphaBeta_SearchedMoves++;
+        else depthStats.ZeroWindowStats.AlphaBeta_SearchedMoves++;
+    }
+    [MethodImpl(StatMImpl)] private void STAT_AlphaBeta_FailLow_I(bool isPV, bool isQS) {
+        if(isPV) depthStats.PVCandidateStats.AlphaBeta_FailLows++;
+        else if(isQS) depthStats.QSearchStats.AlphaBeta_FailLows++;
+        else depthStats.ZeroWindowStats.AlphaBeta_FailLows++;
+    }
+    [MethodImpl(StatMImpl)] private void STAT_AlphaBeta_FailHigh_I(bool isPV, bool isQS, int moveIdx) {
+        if(isPV) {
+            depthStats.PVCandidateStats.AlphaBeta_FailHighs++;
+            depthStats.PVCandidateStats.AlphaBeta_FailHighMoveIdxSum += moveIdx;
+        } else if(isQS) {
+            depthStats.QSearchStats.AlphaBeta_FailHighs++;
+            depthStats.QSearchStats.AlphaBeta_FailHighMoveIdxSum += moveIdx;
         } else {
             depthStats.ZeroWindowStats.AlphaBeta_FailHighs++;
             depthStats.ZeroWindowStats.AlphaBeta_FailHighMoveIdxSum += moveIdx;
