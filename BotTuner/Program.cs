@@ -37,11 +37,12 @@ public static partial class Program {
     }
 
     public static string[] AllPositionCollections = new string[] {
-        "nunn", "silversuite"
+        "nunn2", "silversuite"
     };
 
     public static string[] LoadPositionCollection(string name) {
-        using StreamReader reader = new StreamReader($"{name}.pgn");
+        using Stream stream = Assembly.GetCallingAssembly().GetManifestResourceStream(name) ?? throw new ArgumentException($"No EDB collection with name '{name}' found");
+        using StreamReader reader = new StreamReader(stream);
 
         List<string> fens = new List<string>();
         while(reader.ReadLine() is string line) {
