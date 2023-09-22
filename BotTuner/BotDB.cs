@@ -21,7 +21,7 @@ public static partial class Program {
 
     public static IChessBotFactory[] LoadAllBots(string dir) {
         Console.WriteLine($"Loading all bots from '{dir}'...");
-        return Directory.GetFiles(dir).Order().Select(LoadBot).ToArray();
+        return Directory.GetFiles(dir).Select(LoadBot).ToArray();
     }
 
     public static IChessBotFactory[] LoadPrevBotVers()
