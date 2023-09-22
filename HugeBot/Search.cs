@@ -13,9 +13,9 @@ public partial class MyBot : IChessBot {
         //Determine search times
         searchBoard = board;
         searchTimer = timer;
-        searchAbortTime = timer.MillisecondsRemaining / 8;
+        searchAbortTime = timer.MillisecondsRemaining / 12;
 
-        int deepeningSearchTime = timer.MillisecondsRemaining / 20;
+        int deepeningSearchTime = timer.MillisecondsRemaining / 30;
 
 #if STATS
         //Notify the stats tracker that the search starts
