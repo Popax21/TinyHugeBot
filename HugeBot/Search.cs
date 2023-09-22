@@ -3,7 +3,7 @@ using ChessChallenge.API;
 using HugeBot;
 
 public partial class MyBot : IChessBot {
-    public const int MaxDepth = 64; //Limited by TT
+    public const int MaxDepth = 63; //Limited by TT
 
     private Board searchBoard = null!;
     private Timer searchTimer = null!;
@@ -31,7 +31,7 @@ public partial class MyBot : IChessBot {
                 if(moves[i].RawValue == val) return moves[i];
             }
 #if DEBUG
-            throw new Exception("Search returned invalid root move");
+            throw new Exception($"Search returned invalid root move: 0x{val:x4}");
 #else
             return default;
 #endif
@@ -53,7 +53,7 @@ public partial class MyBot : IChessBot {
             //Do a NegaMax search with the current depth
             ushort iterBestMove = 0;
             try {
-                curBestEval = NegaMax(-int.MaxValue, int.MaxValue, depth, 0, out iterBestMove);
+                curBestEval = NegaMax(-0x10_0000, +0x10_0000, depth, 0, out iterBestMove);
                 curBestMove = iterBestMove;
 #if DEBUG
             } catch(TimeoutException) {
@@ -71,10 +71,10 @@ public partial class MyBot : IChessBot {
 
 #if STATS
             //Notify the stats tracker that the depth search ended
-            STAT_EndDepthSearch(FindMove_I(moves, iterBestMove), curBestEval, depth, didTimeOut);
+            STAT_EndDepthSearch(iterBestMove != 0 ? FindMove_I(moves, iterBestMove) : default, curBestEval, depth, didTimeOut);
 #endif
             //Check if time is up, if we found a checkmate, if we reached our max depth
-            if(timer.MillisecondsElapsedThisTurn >= deepeningSearchTime || curBestEval <= Eval.MinMate || curBestEval >= Eval.MaxMate || depth >= MaxDepth-1) {
+            if(timer.MillisecondsElapsedThisTurn >= deepeningSearchTime || curBestEval <= Eval.MinMate || curBestEval >= Eval.MaxMate || depth >= MaxDepth) {
                 Move bestMove = FindMove_I(moves, curBestMove);
 
 #if STATS
