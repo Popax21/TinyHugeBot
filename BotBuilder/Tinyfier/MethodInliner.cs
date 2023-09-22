@@ -1,10 +1,13 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using AsmResolver.DotNet;
 using AsmResolver.DotNet.Code.Cil;
 using AsmResolver.PE.DotNet.Cil;
 
 public partial class Tinyfier {
+    private static readonly Regex nestedNameRegex = new Regex(@"<[^|<>]*>g__([^|<>]*)\|\d+_\d+"); 
+
     private readonly HashSet<MethodDefinition> inlineTargetMethods = new HashSet<MethodDefinition>();
     private readonly HashSet<CilMethodBody> inlineHandledMethods = new HashSet<CilMethodBody>();
 
@@ -12,7 +15,11 @@ public partial class Tinyfier {
         //Discover inline target methods
         foreach(TypeDefinition type in targetTypes) {
             foreach(MethodDefinition method in type.Methods) {
-                if(method.CilMethodBody != null && (method.Name?.ToString().EndsWith("_I") ?? false)) inlineTargetMethods.Add(method);
+                if(method.CilMethodBody == null || method.Name is null) continue; 
+                if(
+                    method.Name.ToString().EndsWith("_I") ||
+                    (nestedNameRegex.Match(method.Name) is { Groups: [ .., { Success: true, Value: string nestedName } ] } && nestedName.EndsWith("_I"))
+                ) inlineTargetMethods.Add(method);
             }
         }
         Log($"Discovered {inlineTargetMethods.Count} inline target methods");

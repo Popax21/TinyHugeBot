@@ -86,6 +86,8 @@ public partial class Tinyfier {
             lastCastSize = castSize;
         }
 
+        //Remove unnecessary references
+
         //Remove base object constructor calls
         for(int i = 0; i < instrs.Count-1; i++) {
             if(instrs[i].OpCode != CilOpCodes.Ldarg_0 || instrs[i+1].OpCode != CilOpCodes.Call) continue;
