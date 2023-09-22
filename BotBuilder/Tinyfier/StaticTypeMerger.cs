@@ -61,7 +61,7 @@ public partial class Tinyfier {
 
         //Add the merged type from the module, and remove the unmerged types
         //If we merged the module type, then make the new type the module type
-        AddTargetType(mergedStaticType, staticTypes.Any(t => t.IsModuleType));
+        AddTargetType(mergedStaticType, staticTypes.Any(t => Module.TopLevelTypes[0] == t));
         Array.ForEach(staticTypes, RemoveTargetType);
 
         Log($"Merged {staticTypes.Length} static types");

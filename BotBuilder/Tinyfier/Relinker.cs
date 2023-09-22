@@ -35,6 +35,9 @@ public partial class Tinyfier {
     }
 
     private void RelinkTargetReferences() {
+        //If the module type is a target type, mark it as referenced
+        if(Module.TopLevelTypes is [{} modType, ..] && targetTypesSet.Contains(modType)) referencedTypes.Add(modType);
+
         //Relink non-target types
         void RelinkNonTargetType(TypeDefinition type) {
             RelinkTypeReferences(type);
