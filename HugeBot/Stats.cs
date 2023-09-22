@@ -183,7 +183,7 @@ public partial class MyBot {
         if(!didTimeOut) globalStats.UpdateGlobalStats(in depthStats);
 
         Console.WriteLine($"> Finished search to depth {depth} in {depthStats.ElapsedMs}ms{(didTimeOut ? " (timeout)" : "")}");
-        if(!didTimeOut) PrintStat($"best move: {bestMove.ToString()[7..^1]} ({(!didTimeOut ? bestMoveEval.ToString() : "????")})", 1);
+        PrintStat($"best move: {bestMove.ToString()[7..^1]} ({(!didTimeOut ? bestMoveEval.ToString() : "????")})", 1);
         depthStats.DumpStats(IncrIndent(PrintStat));
     }
 
