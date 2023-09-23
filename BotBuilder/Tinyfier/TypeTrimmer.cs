@@ -41,9 +41,9 @@ public partial class Tinyfier {
                 continue;
             }
 
-            //Trim unreferenced fields
+            //Trim unreferenced / constant fields
             foreach(FieldDefinition field in type.Fields.ToArray()) {
-                if(referencedFields.Contains(field)) continue;
+                if(field.Constant == null && referencedFields.Contains(field)) continue;
                 type.Fields.Remove(field);
                 numTrimmedFields++;
             }

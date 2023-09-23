@@ -112,16 +112,10 @@ public partial class Tinyfier {
                 int argsStartOff = body.Instructions[argsEndIdx+1].Offset, argsEndOff = instr.Offset + instr.Size;
 
                 foreach(CilInstruction jumpInstr in body.Instructions) {
-                    if(jumpInstr.OpCode.OperandType is not CilOperandType.InlineBrTarget and not CilOperandType.ShortInlineBrTarget) continue;
+                    if(!jumpInstr.IsBranch()) continue;
 
                     //Determine and check the jump target
-                    int jumpOff = jumpInstr.Operand switch {
-                        ICilLabel label => label.Offset,
-                        int off => off,
-                        sbyte off => off,
-                        _ => throw new InvalidCilInstructionException($"Invalid jump instruction operand: {jumpInstr}")
-                    };
-
+                    int jumpOff = GetJumpOffset(jumpInstr);
                     if(jumpOff < argsStartOff || jumpOff >= argsEndOff) continue;
                     if(jumpOff != argsStartOff) {
                         throw new InvalidCilInstructionException($"Detected jump into middle of inlined function call: {jumpInstr} [0x{argsStartOff:x} <= 0x{jumpOff:x} <= 0x{argsEndOff:x}]");
@@ -194,15 +188,9 @@ public partial class Tinyfier {
                         }, newLocals[inlineInstr.GetLocalVariable(inlineBody.LocalVariables).Index]);
                         break;
 
-                    case {} when inlineInstr.OpCode.OperandType is CilOperandType.InlineBrTarget or CilOperandType.ShortInlineBrTarget: {
+                    case {} when inlineInstr.IsBranch(): {
                         //Remap the jump
-                        int origJumpOff = inlineInstr.Operand switch {
-                            ICilLabel label => label.Offset,
-                            int off => off,
-                            sbyte off => off,
-                            _ => throw new InvalidCilInstructionException($"Invalid jump instruction operand: {inlineInstr}")
-                        };
-
+                        int origJumpOff = GetJumpOffset(inlineInstr);
                         if(!remapJumpTargets.TryGetValue(origJumpOff, out CilInstructionLabel? remapJumplabel)) {
                             remapJumpTargets.Add(origJumpOff, remapJumplabel = new CilInstructionLabel());
                         }
