@@ -145,6 +145,11 @@ public partial class Tinyfier {
 
         Stack<int> dfsStack = new Stack<int>();
         dfsStack.Push(0);
+        foreach(CilExceptionHandler handler in body.ExceptionHandlers) {
+            if(handler.HandlerStart is { Offset: int handlerOff }) dfsStack.Push(instrs.GetIndexByOffset(handlerOff));
+            if(handler.FilterStart is { Offset: int filterOff }) dfsStack.Push(instrs.GetIndexByOffset(filterOff));
+        }
+
         while(dfsStack.TryPop(out int instrIdx)) {
             if(visited[instrIdx]) continue;
             visited[instrIdx] = true;      
@@ -160,7 +165,7 @@ public partial class Tinyfier {
                 sbyte off => off,
                 _ => throw new Exception($"Invalid jump instruction operand: {instrs[instrIdx]}")
             };
-            dfsStack.Push(Enumerable.Range(0, instrs.Count).First(idx => instrs[idx].Offset == jumpOff));
+            dfsStack.Push(instrs.GetIndexByOffset(jumpOff));
             if(instrs[instrIdx].IsConditionalBranch()) dfsStack.Push(instrIdx + 1);
         }
 
@@ -175,15 +180,19 @@ public partial class Tinyfier {
     private void TrimUnnecessaryBranches(CilMethodBody body, CilInstructionCollection instrs) {
         TrimNOPs(body, instrs);
         foreach(CilInstruction instr in instrs) {
-            if(!instr.IsUnconditionalBranch()) continue;
+            if(instr.OpCode != CilOpCodes.Br && instr.OpCode != CilOpCodes.Br_S) continue;
 
+            instrs.CalculateOffsets();
             int jumpOff = instr.Operand switch {
                 ICilLabel label => label.Offset,
                 int off => off,
                 sbyte off => off,
                 _ => throw new Exception($"Invalid jump instruction operand: {instr}")
             };
-            if(jumpOff == instr.Offset + instr.Size) instr.ReplaceWithNop();
+            if(jumpOff == instr.Offset + instr.Size) {
+                Console.WriteLine(instr);
+                instr.ReplaceWithNop();
+            }
         }
     }
 
