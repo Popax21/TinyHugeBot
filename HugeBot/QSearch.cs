@@ -40,7 +40,8 @@ public partial class MyBot {
         bool failedLow = true;
 #endif
 
-        //TODO Move ordering
+        //Move ordering
+        OrderBestMoveFirst_I(alpha, beta, 0, -1, moves, ttSlot, boardHash);
 
         for(int i = 0; i < moves.Length; i++) {
             //Evaluate the move

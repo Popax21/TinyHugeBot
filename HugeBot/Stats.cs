@@ -62,7 +62,7 @@ public partial class MyBot {
         public int TTWrite_NewSlots, TTWrite_SlotUpdates, TTWrite_IdxCollisions;
 
         //Move order stats
-        public int MoveOrder_Invokes, MoveOrder_TTHits, MoveOrder_NumIIDInvokes;
+        public int MoveOrder_BestMoveInvokes, MoveOrder_BestMoveTTHits, MoveOrder_BestMoveIIDInvokes;
 
         //PVS stats
         public int PVS_NumPVMoves, PVS_PVMoveIdxSum, PVS_NumResearches, PVS_NumCorrections;
@@ -84,7 +84,7 @@ public partial class MyBot {
             TTRead_Misses = TTRead_DepthMisses = TTRead_BoundMisses = TTRead_Hits = 0;
             TTWrite_NewSlots = TTWrite_SlotUpdates = TTWrite_IdxCollisions = 0;
 
-            MoveOrder_Invokes = MoveOrder_TTHits = MoveOrder_NumIIDInvokes = 0;
+            MoveOrder_BestMoveInvokes = MoveOrder_BestMoveTTHits = MoveOrder_BestMoveIIDInvokes = 0;
 
             PVS_NumPVMoves = PVS_PVMoveIdxSum = PVS_NumResearches = PVS_NumCorrections = 0;
         }
@@ -107,9 +107,9 @@ public partial class MyBot {
             TTWrite_SlotUpdates += nestedTracker.TTWrite_SlotUpdates;
             TTWrite_IdxCollisions += nestedTracker.TTWrite_IdxCollisions;
 
-            MoveOrder_Invokes += nestedTracker.MoveOrder_Invokes;
-            MoveOrder_TTHits += nestedTracker.MoveOrder_TTHits;
-            MoveOrder_NumIIDInvokes += nestedTracker.MoveOrder_NumIIDInvokes;
+            MoveOrder_BestMoveInvokes += nestedTracker.MoveOrder_BestMoveInvokes;
+            MoveOrder_BestMoveTTHits += nestedTracker.MoveOrder_BestMoveTTHits;
+            MoveOrder_BestMoveIIDInvokes += nestedTracker.MoveOrder_BestMoveIIDInvokes;
 
             PVS_NumPVMoves += nestedTracker.PVS_NumPVMoves;
             PVS_PVMoveIdxSum += nestedTracker.PVS_PVMoveIdxSum;
@@ -157,7 +157,7 @@ public partial class MyBot {
             printStat($"TT writes: total {numTTWrites} new slots {FormatPercentageI(TTWrite_NewSlots, numTTWrites)} slot updates {FormatPercentageI(TTWrite_SlotUpdates, numTTWrites)} idx collisions {FormatPercentageI(TTWrite_IdxCollisions, numTTWrites)}");
 
             //Move ordering stats
-            printStat($"move ordering: invocs {MoveOrder_Invokes} TT hits {FormatPercentageI(MoveOrder_TTHits, MoveOrder_Invokes)} IID invocs {FormatPercentageI(MoveOrder_NumIIDInvokes, MoveOrder_Invokes)}");
+            printStat($"move ordering: best move: invocs {MoveOrder_BestMoveInvokes} TT hits {FormatPercentageI(MoveOrder_BestMoveTTHits, MoveOrder_BestMoveInvokes)} IID invocs {FormatPercentageI(MoveOrder_BestMoveIIDInvokes, MoveOrder_BestMoveInvokes)}");
 
             //PVS stats
             printStat($"PVS: PV moves {FormatPercentageI(PVS_NumPVMoves, PVCandidateStats.AlphaBeta_SearchedMoves)} avg. PV move idx {FormatFloat((double) PVS_PVMoveIdxSum / PVS_NumPVMoves, 4)} researches {FormatPercentageI(PVS_NumResearches, PVS_NumPVMoves)} anomalies {FormatPercentageI(PVS_NumResearches - PVS_NumCorrections, PVS_NumResearches)}");
@@ -242,9 +242,9 @@ public partial class MyBot {
     [MethodImpl(StatMImpl)] private void STAT_TTWrite_SlotUpdate_I() => depthStats.TTWrite_SlotUpdates++;
     [MethodImpl(StatMImpl)] private void STAT_TTWrite_IdxCollision_I() => depthStats.TTWrite_IdxCollisions++;
 
-    [MethodImpl(StatMImpl)] private void STAT_MoveOrder_Invoke_I() => depthStats.MoveOrder_Invokes++;
-    [MethodImpl(StatMImpl)] private void STAT_MoveOrder_TTHit_I() => depthStats.MoveOrder_TTHits++;
-    [MethodImpl(StatMImpl)] private void STAT_MoveOrder_IIDInvoke_I() => depthStats.MoveOrder_NumIIDInvokes++;
+    [MethodImpl(StatMImpl)] private void STAT_MoveOrder_BestMoveInvoke_I() => depthStats.MoveOrder_BestMoveInvokes++;
+    [MethodImpl(StatMImpl)] private void STAT_MoveOrder_BestMoveTTHit_I() => depthStats.MoveOrder_BestMoveTTHits++;
+    [MethodImpl(StatMImpl)] private void STAT_MoveOrder_BestMoveIIDInvoke_I() => depthStats.MoveOrder_BestMoveIIDInvokes++;
 
     [MethodImpl(StatMImpl)] private void STAT_PVS_Research_I() => depthStats.PVS_NumResearches++;
     [MethodImpl(StatMImpl)] private void STAT_PVS_FoundPVMove_I(int moveIdx, bool hadPVMove) {
