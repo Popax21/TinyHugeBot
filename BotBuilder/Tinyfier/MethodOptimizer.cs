@@ -623,8 +623,8 @@ public partial class Tinyfier {
         private static bool? HandleSignedCompare(ref ExprValue left, ref ExprValue right, bool isSigned) {
             bool? is64Bit = Check64BitConistency(left, right);
             if(isSigned && is64Bit.HasValue) {
-                left ^= is64Bit.Value ? (ExprValue) 0x8000000000000000UL : (ExprValue) 0x8000000000U;
-                right ^= is64Bit.Value ? (ExprValue) 0x8000000000000000UL : (ExprValue) 0x8000000000U;
+                left ^= is64Bit.Value ? (ExprValue) 0x8000000000000000UL : (ExprValue) 0x80000000U;
+                right ^= is64Bit.Value ? (ExprValue) 0x8000000000000000UL : (ExprValue) 0x80000000U;
             }
             return is64Bit;
         }
