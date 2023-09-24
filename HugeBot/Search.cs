@@ -170,7 +170,7 @@ public partial class MyBot : IChessBot {
         }
 
         //Apply Late-Move Reduction (LMR)
-        if(!isInCheck && lmrIdx >= 0) ApplyLMR_I(isPvCandidateNode, lmrIdx, ref remDepth);
+        if(!isInCheck && lmrIdx >= 0) ApplyLMR_I(lmrIdx, ref remDepth);
 
         //Re-check if we reached the bottom of the search tree because of reductions
         if(remDepth <= 0) {
