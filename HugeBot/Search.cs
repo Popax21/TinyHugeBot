@@ -135,7 +135,7 @@ public partial class MyBot : IChessBot {
         //Apply Null Move Pruning
         //Only apply to non-PV candidates, otherwise we duplicate our work on researches (I think?)
         int prunedScore = 0;
-        if(!isPvCandidateNode && TryNullMovePruning_I(alpha, beta, remDepth, ply, ref prunedScore)) return prunedScore;
+        if(!isPvCandidateNode && ApplyNullMovePruning_I(alpha, beta, remDepth, ply, ref prunedScore)) return prunedScore;
 
         //Generate legal moves
         Span<Move> moves = stackalloc Move[256];

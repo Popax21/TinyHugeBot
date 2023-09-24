@@ -20,8 +20,6 @@ public partial class MyBot {
             return unchecked((short) ttSlot);
         }
 
-        //TODO Pruning
-
         //Evaluate the current position as a stand-pat score, and update the window using it
         int standPatScore = Eval.Evaluate_I(searchBoard);
         if(standPatScore > alpha) {
@@ -45,8 +43,12 @@ public partial class MyBot {
         SortMoves(toBeOrderedMoves, ply);
 
         for(int i = 0; i < moves.Length; i++) {
-            //Evaluate the move
             Move move = moves[i];
+
+            //Apply delta-pruning
+            if(ApplyDeltaPruning_I(move, alpha, standPatScore)) continue;
+
+            //Evaluate the move
             searchBoard.MakeMove(move);
             int score = -QSearch(-beta, -alpha, ply+1);
             searchBoard.UndoMove(move);

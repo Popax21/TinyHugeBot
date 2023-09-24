@@ -4,7 +4,7 @@ using HugeBot;
 public partial class MyBot {
     private int numNullMoves = 0;
     private ushort nullMoveRefutation;
-    public bool TryNullMovePruning_I(int alpha, int beta, int remDepth, int ply, ref int score) {
+    public bool ApplyNullMovePruning_I(int alpha, int beta, int remDepth, int ply, ref int score) {
 #if FSTATS
         STAT_NullMovePruning_Invoke_I();
 #endif
@@ -34,6 +34,20 @@ public partial class MyBot {
 
         return score >= beta;
     }
+
+    private const int DeltaPruningSafetyMargin = 2*90; //~200 centipawns
+    private static readonly ushort[] DeltaPruningMargins = new ushort[] {
+        DeltaPruningSafetyMargin + 1000,    //None - as we only evaluate non-quiet moves this means that it's a pawn promition, so it has the same margin as a queen
+        DeltaPruningSafetyMargin + 90,      //Pawns
+        DeltaPruningSafetyMargin + 310,     //Knights
+        DeltaPruningSafetyMargin + 340,     //Bishops
+        DeltaPruningSafetyMargin + 500,     //Rooks
+        DeltaPruningSafetyMargin + 1000,    //Queen
+        0                                   //Kings - just a placeholder
+    };
+
+    public bool ApplyDeltaPruning_I(Move move, int alpha, int standPatScore)
+        => standPatScore + DeltaPruningMargins[(int) move.CapturePieceType] < alpha;
 
     private void Pruning_ResetSpecialMove_I() => nullMoveRefutation = 0;
 
