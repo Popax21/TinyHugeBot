@@ -16,7 +16,7 @@ public partial class MyBot {
     }
 
     public Span<Move> PlaceBestMoveFirst_I(int alpha, int beta, int remDepth, int ply, Span<Move> moves, ulong ttEntry, ulong boardHash) {
-#if STATS
+#if STATS && FSTATS
         STAT_MoveOrder_BestMoveInvoke_I();
 #endif
 
@@ -27,14 +27,14 @@ public partial class MyBot {
             //Place the move in the TT first
             bestMove = transposMoveTable[boardHash & TTIdxMask];
 
-#if STATS
+#if STATS && FSTATS
             STAT_MoveOrder_BestMoveTTHit_I();
 #endif
         } else if(beta > alpha-1 && remDepth >= 3) {
             //Perform IID to determine the move to place first
             NegaMax(alpha, beta, remDepth - 2, ply, out bestMove);
 
-#if STATS
+#if STATS && FSTATS
             STAT_MoveOrder_BestMoveIIDInvoke_I();
 #endif
         } else return moves;

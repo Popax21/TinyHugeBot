@@ -57,12 +57,14 @@ public partial class MyBot {
         }
         public SearchTypeStatCounters PVCandidateStats, ZeroWindowStats, QSearchStats;
 
+#if FSTATS
         //TT stats
         public int TTRead_Misses, TTRead_DepthMisses, TTRead_BoundMisses, TTRead_Hits;
         public int TTWrite_NewSlots, TTWrite_SlotUpdates, TTWrite_IdxCollisions;
 
         //Move order stats
         public int MoveOrder_BestMoveInvokes, MoveOrder_BestMoveTTHits, MoveOrder_BestMoveIIDInvokes;
+#endif
 
         //PVS stats
         public int PVS_NumPVMoves, PVS_PVMoveIdxSum, PVS_NumResearches, PVS_NumCorrections;
@@ -76,15 +78,17 @@ public partial class MyBot {
             prevNumNodes = NumNodes;
             NumNodes = 0;
 
-            PVCandidateStats = ZeroWindowStats = QSearchStats = default;
-
             numNestedEbfP1s = numNestedEbfP2s = 0;
             nestedEbfP1Sum = nestedEbfP2Sum = 0;
 
+            PVCandidateStats = ZeroWindowStats = QSearchStats = default;
+
+#if FSTATS
             TTRead_Misses = TTRead_DepthMisses = TTRead_BoundMisses = TTRead_Hits = 0;
             TTWrite_NewSlots = TTWrite_SlotUpdates = TTWrite_IdxCollisions = 0;
 
             MoveOrder_BestMoveInvokes = MoveOrder_BestMoveTTHits = MoveOrder_BestMoveIIDInvokes = 0;
+#endif
 
             PVS_NumPVMoves = PVS_PVMoveIdxSum = PVS_NumResearches = PVS_NumCorrections = 0;
         }
@@ -98,6 +102,7 @@ public partial class MyBot {
             ZeroWindowStats.UpdateGlobalStats(in nestedTracker.ZeroWindowStats);
             QSearchStats.UpdateGlobalStats(in nestedTracker.QSearchStats);
 
+#if FSTATS
             TTRead_Misses += nestedTracker.TTRead_Misses;
             TTRead_DepthMisses += nestedTracker.TTRead_DepthMisses;
             TTRead_BoundMisses += nestedTracker.TTRead_BoundMisses;
@@ -110,6 +115,7 @@ public partial class MyBot {
             MoveOrder_BestMoveInvokes += nestedTracker.MoveOrder_BestMoveInvokes;
             MoveOrder_BestMoveTTHits += nestedTracker.MoveOrder_BestMoveTTHits;
             MoveOrder_BestMoveIIDInvokes += nestedTracker.MoveOrder_BestMoveIIDInvokes;
+#endif
 
             PVS_NumPVMoves += nestedTracker.PVS_NumPVMoves;
             PVS_PVMoveIdxSum += nestedTracker.PVS_PVMoveIdxSum;
@@ -149,6 +155,7 @@ public partial class MyBot {
             printStat("Q-search stats:");
             QSearchStats.DumpStats(in this, IncrIndent(printStat));
 
+#if FSTATS
             //TT stats
             int numTTReads = TTRead_Misses + TTRead_DepthMisses + TTRead_BoundMisses + TTRead_Hits;
             printStat($"TT reads: total {numTTReads} misses {FormatPercentageI(TTRead_Misses, numTTReads)} depth misses {FormatPercentageI(TTRead_DepthMisses, numTTReads)} bound misses {FormatPercentageI(TTRead_BoundMisses, numTTReads)} hits {FormatPercentageI(TTRead_Hits, numTTReads)}");
@@ -158,6 +165,7 @@ public partial class MyBot {
 
             //Move ordering stats
             printStat($"move ordering: best move: invocs {MoveOrder_BestMoveInvokes} TT hits {FormatPercentageI(MoveOrder_BestMoveTTHits, MoveOrder_BestMoveInvokes)} IID invocs {FormatPercentageI(MoveOrder_BestMoveIIDInvokes, MoveOrder_BestMoveInvokes)}");
+#endif
 
             //PVS stats
             printStat($"PVS: PV moves {FormatPercentageI(PVS_NumPVMoves, PVCandidateStats.AlphaBeta_SearchedMoves)} avg. PV move idx {FormatFloat((double) PVS_PVMoveIdxSum / PVS_NumPVMoves, 4)} researches {FormatPercentageI(PVS_NumResearches, PVS_NumPVMoves)} anomalies {FormatPercentageI(PVS_NumResearches - PVS_NumCorrections, PVS_NumResearches)}");
@@ -233,6 +241,7 @@ public partial class MyBot {
         }
     }
 
+#if FSTATS
     [MethodImpl(StatMImpl)] private void STAT_TTRead_Miss_I() => depthStats.TTRead_Misses++;
     [MethodImpl(StatMImpl)] private void STAT_TTRead_DepthMiss_I() => depthStats.TTRead_DepthMisses++;
     [MethodImpl(StatMImpl)] private void STAT_TTRead_BoundMiss_I() => depthStats.TTRead_BoundMisses++;
@@ -245,6 +254,7 @@ public partial class MyBot {
     [MethodImpl(StatMImpl)] private void STAT_MoveOrder_BestMoveInvoke_I() => depthStats.MoveOrder_BestMoveInvokes++;
     [MethodImpl(StatMImpl)] private void STAT_MoveOrder_BestMoveTTHit_I() => depthStats.MoveOrder_BestMoveTTHits++;
     [MethodImpl(StatMImpl)] private void STAT_MoveOrder_BestMoveIIDInvoke_I() => depthStats.MoveOrder_BestMoveIIDInvokes++;
+#endif
 
     [MethodImpl(StatMImpl)] private void STAT_PVS_Research_I() => depthStats.PVS_NumResearches++;
     [MethodImpl(StatMImpl)] private void STAT_PVS_FoundPVMove_I(int moveIdx, bool hadPVMove) {
