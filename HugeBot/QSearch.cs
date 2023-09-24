@@ -46,7 +46,7 @@ public partial class MyBot {
             Move move = moves[i];
 
             //Apply delta-pruning
-            if(ApplyDeltaPruning_I(move, alpha, standPatScore)) {
+            if(ShouldApplyDeltaPruning_I(move, alpha, standPatScore)) {
 #if FSTATS
                 STAT_DeltaPruning_PrunedMove();
 #endif

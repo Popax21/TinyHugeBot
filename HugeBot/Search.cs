@@ -66,7 +66,7 @@ public partial class MyBot : IChessBot {
             //Do a NegaMax search with the current depth
             ushort iterBestMove = 0;
             try {
-                curBestEval = NegaMax(-0x10_0000, +0x10_0000, depth, 0, out iterBestMove);
+                curBestEval = NegaMax(Eval.MinSentinel, Eval.MaxSentinel, depth, 0, out iterBestMove);
                 curBestMove = iterBestMove;
 
 #if DEBUG
@@ -174,11 +174,15 @@ public partial class MyBot : IChessBot {
         //Reset any pruning special move values, as they might screw up future move ordering if not cleared
         ResetThreatMove_I(ply);
 
-        if(!isPvCandidateNode && beta < Eval.MaxMate && !isInCheck) {
+        //Apply pruning to non-PV candidates (otherwise we duplicate our work on researches I think?)
+        bool canFutilityPrune = false;
+        if(!isInCheck && !isPvCandidateNode && Eval.MinMate < alpha && beta < Eval.MaxMate) {
             //Determine the static evaluation of the position
             int staticEval = Eval.Evaluate(searchBoard);
 
-            //Apply pruning to non-PV candidates (otherwise we duplicate our work on researches I think?)
+            //Determine if we can futility prune
+            canFutilityPrune = CanFutilityPrune_I(staticEval, alpha, remDepth);
+
 #if FSTATS
             STAT_Pruning_CheckNonPVNode_I();
 #endif
@@ -259,7 +263,7 @@ public partial class MyBot : IChessBot {
         SortMoves(toBeOrderedMoves, ply);
 
         //Search for the best move
-        int bestScore = Eval.MinEval - 10;
+        int bestScore = Eval.MinSentinel;
         bool hasPvMove = false;
         TTBoundType ttBound = TTBoundType.Upper; //Until we surpass alpha we only have an upper bound
 
@@ -272,6 +276,12 @@ public partial class MyBot : IChessBot {
             int score;
             switch(hasPvMove) {
                 case true:
+                    //FP: Check if we can futility-prune this move
+                    if(IsMoveQuiet_I(move) && !searchBoard.IsInCheck() && canFutilityPrune) {
+                        searchBoard.UndoMove(move);
+                        continue;
+                    }
+
                     //LMR: Check if we allow Late Move Reduction for this move
                     int moveLmrIdx = -1;
                     if(!isInCheck && IsLMRAllowedForMove_I(move, i, remDepth)) {

@@ -23,7 +23,19 @@ public partial class MyBot {
         return true;
     }
 
+    private void ResetThreatMove_I(int ply) => threatMove = threatMoves[ply] = 0;
+    private bool IsThreatEscapeMove_I(Move move) {
+        //Check if the move is escaping the square attacked by the null move refutation
+        if(threatMove != 0 && move.StartSquare.Index == ((threatMove >> 6) & 63)) return true;
+
+        return false;
+    }
+
     private const int PruningSafetyMargin = 2*90; //~200 centipawns
+
+    public bool CanFutilityPrune_I(int staticEval, int alpha, int depth)
+        //One EG pawn per ply of depth 
+        => staticEval + PruningSafetyMargin + depth*94 <= alpha;
 
     public bool ApplyReverseFutilityPruning_I(int eval, int beta, int depth, ref int score) {
         //TODO Experiment with different values
@@ -43,14 +55,6 @@ public partial class MyBot {
     };
 
     //TODO Check if disabling near the endgame helps things
-    public bool ApplyDeltaPruning_I(Move move, int alpha, int standPatScore)
+    public bool ShouldApplyDeltaPruning_I(Move move, int alpha, int standPatScore)
         => standPatScore + DeltaPruningMargins[(int) move.CapturePieceType] < alpha;
-
-    private void ResetThreatMove_I(int ply) => threatMove = threatMoves[ply] = 0;
-    private bool IsThreatEscapeMove_I(Move move) {
-        //Check if the move is escaping the square attacked by the null move refutation
-        if(threatMove != 0 && move.StartSquare.Index == ((threatMove >> 6) & 63)) return true;
-
-        return false;
-    }
 }
