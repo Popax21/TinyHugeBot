@@ -24,7 +24,7 @@ public partial class MyBot {
     private bool CheckTTEntry_I(ulong entry, ulong boardHash, int alpha, int beta, int depth) {
         //Check if the hash bits match
         if((entry & ~TTIdxMask) != (boardHash & ~TTIdxMask)) {
-#if STATS && FSTATS
+#if FSTATS
             STAT_TTRead_Miss_I();
 #endif
             return false;
@@ -32,7 +32,7 @@ public partial class MyBot {
 
         //Check that the entry searched at least as deep as we would
         if((int) ((entry >> 18) & 0x3f) < depth) {
-#if STATS && FSTATS
+#if FSTATS
             STAT_TTRead_DepthMiss_I();
 #endif
             return false;
@@ -49,14 +49,14 @@ public partial class MyBot {
             _ => false
 #endif
         })) {
-#if STATS && FSTATS
+#if FSTATS
             STAT_TTRead_BoundMiss_I();
 #endif
 
             return false;
         }
 
-#if STATS && FSTATS
+#if FSTATS
         STAT_TTRead_Hit_I();
 #endif
 
@@ -70,7 +70,7 @@ public partial class MyBot {
         if(depth < 0 || depth >= (1 << 6)) throw new ArgumentException($"Out-of-bounds TT depth given: {depth}");
 #endif
 
-#if STATS && FSTATS
+#if FSTATS
         //Check for collisions
         ulong prevEntry = entrySlot;
         if((prevEntry & (ulong) TTBoundType.MASK) == (ulong) TTBoundType.None) STAT_TTWrite_NewSlot_I();

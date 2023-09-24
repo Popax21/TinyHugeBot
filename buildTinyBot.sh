@@ -11,7 +11,7 @@ else
     BUILD_FLAGS+="-c Release "
 fi
 
-if [[ "$@" == *"--fulltstats"* ]]; then
+if [[ "$@" == *"--fullstats"* ]]; then
     BUILD_FLAGS+="-p:FullStats=1 "
 elif [[ ! "$@" == *"--stats"* ]]; then
     BUILD_FLAGS+="-p:DisableStats=1 "

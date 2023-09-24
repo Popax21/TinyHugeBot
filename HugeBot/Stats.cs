@@ -64,6 +64,7 @@ public partial class MyBot {
 
         //Move order stats
         public int MoveOrder_BestMoveInvokes, MoveOrder_BestMoveTTHits, MoveOrder_BestMoveIIDInvokes;
+        public int MoveOrder_MovesScored, MoveOrder_NoisyMoves, MoveOrder_KillerMoves, MoveOrder_SpecialPruneMoves;
 #endif
 
         //PVS stats
@@ -88,6 +89,7 @@ public partial class MyBot {
             TTWrite_NewSlots = TTWrite_SlotUpdates = TTWrite_IdxCollisions = 0;
 
             MoveOrder_BestMoveInvokes = MoveOrder_BestMoveTTHits = MoveOrder_BestMoveIIDInvokes = 0;
+            MoveOrder_MovesScored = MoveOrder_NoisyMoves = MoveOrder_KillerMoves = MoveOrder_SpecialPruneMoves = 0;
 #endif
 
             PVS_NumPVMoves = PVS_PVMoveIdxSum = PVS_NumResearches = PVS_NumCorrections = 0;
@@ -115,6 +117,11 @@ public partial class MyBot {
             MoveOrder_BestMoveInvokes += nestedTracker.MoveOrder_BestMoveInvokes;
             MoveOrder_BestMoveTTHits += nestedTracker.MoveOrder_BestMoveTTHits;
             MoveOrder_BestMoveIIDInvokes += nestedTracker.MoveOrder_BestMoveIIDInvokes;
+
+            MoveOrder_MovesScored += nestedTracker.MoveOrder_MovesScored;
+            MoveOrder_NoisyMoves += nestedTracker.MoveOrder_NoisyMoves;
+            MoveOrder_KillerMoves += nestedTracker.MoveOrder_KillerMoves;
+            MoveOrder_SpecialPruneMoves += nestedTracker.MoveOrder_SpecialPruneMoves;
 #endif
 
             PVS_NumPVMoves += nestedTracker.PVS_NumPVMoves;
@@ -165,6 +172,7 @@ public partial class MyBot {
 
             //Move ordering stats
             printStat($"move ordering: best move: invocs {MoveOrder_BestMoveInvokes} TT hits {FormatPercentageI(MoveOrder_BestMoveTTHits, MoveOrder_BestMoveInvokes)} IID invocs {FormatPercentageI(MoveOrder_BestMoveIIDInvokes, MoveOrder_BestMoveInvokes)}");
+            printStat($"move scoring: moves scored: {MoveOrder_MovesScored} noisy moves {FormatPercentageI(MoveOrder_NoisyMoves, MoveOrder_MovesScored)} killer moves {FormatPercentageI(MoveOrder_KillerMoves, MoveOrder_MovesScored)} special prune moves {FormatPercentageI(MoveOrder_SpecialPruneMoves, MoveOrder_MovesScored)}");
 #endif
 
             //PVS stats
@@ -254,6 +262,11 @@ public partial class MyBot {
     [MethodImpl(StatMImpl)] private void STAT_MoveOrder_BestMoveInvoke_I() => depthStats.MoveOrder_BestMoveInvokes++;
     [MethodImpl(StatMImpl)] private void STAT_MoveOrder_BestMoveTTHit_I() => depthStats.MoveOrder_BestMoveTTHits++;
     [MethodImpl(StatMImpl)] private void STAT_MoveOrder_BestMoveIIDInvoke_I() => depthStats.MoveOrder_BestMoveIIDInvokes++;
+
+    [MethodImpl(StatMImpl)] private void STAT_MoveOrder_ScoreMove_I() => depthStats.MoveOrder_MovesScored++;
+    [MethodImpl(StatMImpl)] private void STAT_MoveOrder_ScoredNoisyMove_I() => depthStats.MoveOrder_NoisyMoves++;
+    [MethodImpl(StatMImpl)] private void STAT_MoveOrder_ScoredKillerMove_I() => depthStats.MoveOrder_KillerMoves++;
+    [MethodImpl(StatMImpl)] private void STAT_MoveOrder_ScoredSpecialPruneMove_I() => depthStats.MoveOrder_SpecialPruneMoves++;
 #endif
 
     [MethodImpl(StatMImpl)] private void STAT_PVS_Research_I() => depthStats.PVS_NumResearches++;

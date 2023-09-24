@@ -16,7 +16,7 @@ public partial class MyBot {
     }
 
     public Span<Move> PlaceBestMoveFirst_I(int alpha, int beta, int remDepth, int ply, Span<Move> moves, ulong ttEntry, ulong boardHash) {
-#if STATS && FSTATS
+#if FSTATS
         STAT_MoveOrder_BestMoveInvoke_I();
 #endif
 
@@ -27,14 +27,14 @@ public partial class MyBot {
             //Place the move in the TT first
             bestMove = transposMoveTable[boardHash & TTIdxMask];
 
-#if STATS && FSTATS
+#if FSTATS
             STAT_MoveOrder_BestMoveTTHit_I();
 #endif
         } else if(beta > alpha-1 && remDepth >= 3) {
             //Perform IID to determine the move to place first
             NegaMax(alpha, beta, remDepth - 2, ply, out bestMove);
 
-#if STATS && FSTATS
+#if FSTATS
             STAT_MoveOrder_BestMoveIIDInvoke_I();
 #endif
         } else return moves;
@@ -53,7 +53,15 @@ public partial class MyBot {
 
     public void SortMoves(Span<Move> moves, int ply) {
         ulong DetermineMoveScore_I(Move move, int ply, bool isWhiteToMove) {
+#if FSTATS
+            STAT_MoveOrder_ScoreMove_I();
+#endif
+
             if(move.IsCapture | move.IsPromotion) {
+#if FSTATS
+                STAT_MoveOrder_ScoredNoisyMove_I();
+#endif
+
                 //Score by MVV-LAA (Most Valuable Victim - Least Valuable Aggressor)
                 //Promotions take priority over other moves
                 //TODO Try other metrics (e.g. SSE)
@@ -61,11 +69,21 @@ public partial class MyBot {
             } else {
                 //Check if the move is in the killer table
                 for(int i = 0; i < NumKillerTableSlots; i++) {
-                    if(killerTable[NumKillerTableSlots*ply + i] == move.RawValue) return (ulong) (8 - i) << 52;
+                    if(killerTable[NumKillerTableSlots*ply + i] == move.RawValue) {
+#if FSTATS
+                        STAT_MoveOrder_ScoredKillerMove_I();
+#endif
+                        return (ulong) (8 - i) << 52;
+                    }
                 }
 
                 //Check if pruning gave this move a special score
-                if(Pruning_IsSpecialMove_I(move)) return (ulong) (8 - NumKillerTableSlots) << 52;
+                if(Pruning_IsSpecialMove_I(move)) {
+#if FSTATS
+                    STAT_MoveOrder_ScoredSpecialPruneMove_I();
+#endif
+                    return (ulong) (8 - NumKillerTableSlots) << 52;
+                }
 
                 //Return a score based on the Relative History Heuristic
                 int butterflyIdx = GetMoveButterflyIndex_I(move, searchBoard.IsWhiteToMove);
