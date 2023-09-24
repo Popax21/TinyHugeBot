@@ -148,7 +148,7 @@ public partial class MyBot : IChessBot {
             int staticEval = Eval.Evaluate(searchBoard);
 
             //Apply Reverse Futility Pruning
-            if(ApplyReverseFutilityPruning(staticEval, beta, remDepth, ref prunedScore)) {
+            if(ApplyReverseFutilityPruning_I(staticEval, beta, remDepth, ref prunedScore)) {
 #if FSTATS
                 STAT_ReverseFutilityPruning_PrunedNode_I();
 #endif

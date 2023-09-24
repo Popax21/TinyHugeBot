@@ -27,7 +27,7 @@ public partial class MyBot {
 
     private const int PruningSafetyMargin = 2*90; //~200 centipawns
 
-    public bool ApplyReverseFutilityPruning(int eval, int beta, int depth, ref int prunedScore) {
+    public bool ApplyReverseFutilityPruning_I(int eval, int beta, int depth, ref int prunedScore) {
         //TODO Experiment with different values
         //TODO This relies on the Null Move Hypothesis, investigate potential Zugzwang issues
         prunedScore = eval - depth * 90 - (PruningSafetyMargin - 1*90);
