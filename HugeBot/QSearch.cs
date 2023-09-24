@@ -3,7 +3,7 @@ using ChessChallenge.API;
 using HugeBot;
 
 public partial class MyBot {
-    public int QSearch(int alpha, int beta) {
+    public int QSearch(int alpha, int beta, int ply) {
 #if STATS
         STAT_NewNode_I(false, true);
 #endif
@@ -41,13 +41,15 @@ public partial class MyBot {
 #endif
 
         //Move ordering
-        OrderBestMoveFirst_I(alpha, beta, 0, -1, moves, ttSlot, boardHash);
+        Span<Move> toBeOrderedMoves = PlaceBestMoveFirst_I(alpha, beta, 0, -1, moves, ttSlot, boardHash);
+        SortMoves_I(toBeOrderedMoves, ply);
 
         for(int i = 0; i < moves.Length; i++) {
             //Evaluate the move
-            searchBoard.MakeMove(moves[i]);
-            int score = -QSearch(-beta, -alpha);
-            searchBoard.UndoMove(moves[i]);
+            Move move = moves[i];
+            searchBoard.MakeMove(move);
+            int score = -QSearch(-beta, -alpha, ply+1);
+            searchBoard.UndoMove(move);
 
 #if STATS
             STAT_AlphaBeta_SearchedMove_I(false, true);
@@ -60,6 +62,9 @@ public partial class MyBot {
 #if STATS
                     STAT_AlphaBeta_FailHigh_I(false, true, i);
 #endif
+
+                    //Insert into the killer table if the move is quiet
+                    if(IsMoveQuiet_I(move)) InsertIntoKillerTable_I(ply, move); 
 
                     return score;
                 }

@@ -4,6 +4,7 @@ using HugeBot;
 
 public partial class MyBot : IChessBot {
     public const int MaxDepth = 63; //Limited by TT
+    public const int MaxPly = 256; //Limited by TT
 
     private Board searchBoard = null!;
     private Timer searchTimer = null!;
@@ -13,14 +14,17 @@ public partial class MyBot : IChessBot {
         //Determine search times
         searchBoard = board;
         searchTimer = timer;
-        searchAbortTime = timer.MillisecondsRemaining / 12;
+        searchAbortTime = timer.MillisecondsRemaining / 20;
 
-        int deepeningSearchTime = timer.MillisecondsRemaining / 30;
+        int deepeningSearchTime = timer.MillisecondsRemaining / 50;
 
 #if STATS
         //Notify the stats tracker that the search starts
         STAT_StartGlobalSearch();
 #endif
+
+        //Reset move order tables
+        MoveOrder_Reset_I();
 
         //Generate all legal moves for later lookup
         Span<Move> moves = stackalloc Move[256];
@@ -125,7 +129,7 @@ public partial class MyBot : IChessBot {
         //TODO Pruning
 
         //Check if we reached the bottom of the search tree
-        if(remDepth <= 0) return QSearch(alpha, beta);
+        if(remDepth <= 0) return QSearch(alpha, beta, ply);
 
         //Generate legal moves
         Span<Move> moves = stackalloc Move[256];
@@ -142,7 +146,8 @@ public partial class MyBot : IChessBot {
 #endif
 
         //Order moves
-        OrderBestMoveFirst_I(alpha, beta, remDepth, ply, moves, ttSlot, boardHash);
+        Span<Move> toBeOrderedMoves = PlaceBestMoveFirst_I(alpha, beta, remDepth, ply, moves, ttSlot, boardHash);
+        SortMoves_I(toBeOrderedMoves, ply);
 
         //Search for the best move
         int bestScore = Eval.MinEval;
@@ -150,7 +155,8 @@ public partial class MyBot : IChessBot {
         TTBoundType ttBound = TTBoundType.Upper; //Until we surpass alpha we only have an upper bound
 
         for(int i = 0; i < moves.Length; i++) {
-            searchBoard.MakeMove(moves[i]);
+            Move move = moves[i];
+            searchBoard.MakeMove(move);
 
             //PVS: If we already have a PV move (which should be early because of move ordering), do a ZWS on alpha first to ensure that this move doesn't fail low
             int score;
@@ -170,7 +176,7 @@ public partial class MyBot : IChessBot {
                     break;
             }
 
-            searchBoard.UndoMove(moves[i]); //This gets skipped on timeout - we don't care, as the board gets recreated every time a bot thinks
+            searchBoard.UndoMove(move); //This gets skipped on timeout - we don't care, as the board gets recreated every time a bot thinks
 
 #if STATS
             //Report that we searched a move
@@ -180,7 +186,7 @@ public partial class MyBot : IChessBot {
             //Update the best score
             if(score > bestScore) {
                 bestScore = score;
-                bestMove = moves[i].RawValue;
+                bestMove = move.RawValue;
             }
 
             //Update alpha/beta bounds
@@ -191,6 +197,9 @@ public partial class MyBot : IChessBot {
 #if STATS
                     STAT_AlphaBeta_FailHigh_I(isPvCandidateNode, false, i);
 #endif
+
+                    //Insert into the killer table if the move is quiet
+                    if(IsMoveQuiet_I(move)) InsertIntoKillerTable_I(ply, move); 
 
                     ttBound = TTBoundType.Lower;
                     break;
