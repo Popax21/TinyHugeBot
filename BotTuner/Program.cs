@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
+using BotTuner.Factories;
 using ChessChallenge.Chess;
 
 namespace BotTuner;
@@ -20,7 +21,14 @@ public static partial class Program {
             switch(args[0].ToLowerInvariant()) {
                 case "compare": {
                     if(args.Length < 3) throw new Exception("Not enough arguments for compare command");
-                    await RunCompare(LoadBot(args[1]), args.Length <= 2 ? LoadLatestBotVersion() : LoadBot(args[2]), args.Length <= 3 ? 60_000 : int.Parse(args[3]), args.Length <= 4 ? AllPositionCollections : args[4..]);
+
+                    IChessBotFactory opponent;
+                    if(Directory.Exists(args[2])) {
+                        BotDBPath = args[2];
+                        opponent = LoadLatestBotVersion();
+                    } else opponent = LoadBot(args[2]);
+        
+                    await RunCompare(LoadBot(args[1]), opponent, args.Length <= 3 ? 60_000 : int.Parse(args[3]), args.Length <= 4 ? AllPositionCollections : args[4..]);
                 } break;
 
                 case "benchmark": {
