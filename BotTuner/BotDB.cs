@@ -24,6 +24,9 @@ public static partial class Program {
         return Directory.GetFiles(dir).Order().Select(LoadBot).ToArray();
     }
 
+    public static IChessBotFactory LoadLatestBotVersion()
+        => LoadBot(Directory.GetFiles("PrevVers").Order().Last());
+
     public static IChessBotFactory[] LoadPrevBotVers()
         => LoadAllBots(Path.Combine(BotDBPath, "PrevVers"));
 

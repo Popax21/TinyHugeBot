@@ -20,7 +20,7 @@ public static partial class Program {
             switch(args[0].ToLowerInvariant()) {
                 case "compare": {
                     if(args.Length < 3) throw new Exception("Not enough arguments for compare command");
-                    await RunCompare(args[1], args[2], args.Length <= 3 ? 60_000 : int.Parse(args[3]), args.Length <= 4 ? AllPositionCollections : args[4..]);
+                    await RunCompare(LoadBot(args[1]), args.Length <= 2 ? LoadLatestBotVersion() : LoadBot(args[2]), args.Length <= 3 ? 60_000 : int.Parse(args[3]), args.Length <= 4 ? AllPositionCollections : args[4..]);
                 } break;
 
                 case "benchmark": {
