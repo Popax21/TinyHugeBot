@@ -1,4 +1,4 @@
-$BuildFlags = @{}
+$BuildFlags = @{"p:" = @()}
 $BotBuilderFlags = ""
 
 if ($args -match "--debug") {
@@ -11,13 +11,13 @@ if ($args -match "--debug") {
 }
 
 if (!($args -match "--bestmove")) {
-	$BuildFlags += @{"p:" = "DisableBestMoveDisplay=1"}
+	$BuildFlags["p:"] += "DisableBestMoveDisplay=1"
 }
 
 if (!($args -match "--fullstats")) {
-	$BuildFlags += @{"p:" = "DisableFullStats=1"}
+	$BuildFlags["p:"] += "DisableFullStats=1"
 	if (!($args -match "--stats")) {
-		$BuildFlags += @{"p:" = "DisableStats=1"}
+		$BuildFlags["p:"] += "DisableStats=1"
 	}
 }
 
