@@ -45,8 +45,14 @@ public partial class MyBot {
         for(int i = 0; i < moves.Length; i++) {
             Move move = moves[i];
 
-            //Apply delta-pruning
-            if(ApplyDeltaPruning_I(move, alpha, standPatScore)) continue;
+            //Apply move delta-pruning
+            if(ApplyDeltaPruning_I(move, alpha, standPatScore)) {
+#if FSTATS
+                STAT_DeltaPruning_PrunedMove();
+#endif
+
+                continue;
+            }
 
             //Evaluate the move
             searchBoard.MakeMove(move);

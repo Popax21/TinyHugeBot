@@ -64,6 +64,7 @@ public partial class MyBot {
 
         //Pruning stats
         public int NullMovePruning_Invokes, NullMovePruning_Cutoffs;
+        public int DeltaPruning_PrunedMoves;
 
         //Move order stats
         public int MoveOrder_BestMoveInvokes, MoveOrder_BestMoveTTHits, MoveOrder_BestMoveIIDInvokes;
@@ -92,6 +93,7 @@ public partial class MyBot {
             TTWrite_NewSlots = TTWrite_SlotUpdates = TTWrite_IdxCollisions = 0;
 
             NullMovePruning_Invokes = NullMovePruning_Cutoffs = 0;
+            DeltaPruning_PrunedMoves = 0;
 
             MoveOrder_BestMoveInvokes = MoveOrder_BestMoveTTHits = MoveOrder_BestMoveIIDInvokes = 0;
             MoveOrder_MovesScored = MoveOrder_NoisyMoves = MoveOrder_KillerMoves = MoveOrder_SpecialPruneMoves = 0;
@@ -121,6 +123,7 @@ public partial class MyBot {
 
             NullMovePruning_Invokes += nestedTracker.NullMovePruning_Invokes;
             NullMovePruning_Cutoffs += nestedTracker.NullMovePruning_Cutoffs;
+            DeltaPruning_PrunedMoves += nestedTracker.DeltaPruning_PrunedMoves;
 
             MoveOrder_BestMoveInvokes += nestedTracker.MoveOrder_BestMoveInvokes;
             MoveOrder_BestMoveTTHits += nestedTracker.MoveOrder_BestMoveTTHits;
@@ -180,6 +183,7 @@ public partial class MyBot {
 
             //Pruning stats
             printStat($"NMP: invokes {FormatPercentageI(NullMovePruning_Invokes, ZeroWindowStats.AlphaBeta_SearchedNodes)} cutoffs {FormatPercentageI(NullMovePruning_Cutoffs, NullMovePruning_Invokes)}");
+            printStat($"delta pruning: pruned moves {FormatPercentageI(DeltaPruning_PrunedMoves, QSearchStats.AlphaBeta_GeneratedMoves)}");
 
             //Move ordering stats
             printStat($"move ordering: best move: invocs {MoveOrder_BestMoveInvokes} TT hits {FormatPercentageI(MoveOrder_BestMoveTTHits, MoveOrder_BestMoveInvokes)} IID invocs {FormatPercentageI(MoveOrder_BestMoveIIDInvokes, MoveOrder_BestMoveInvokes)}");
@@ -272,6 +276,7 @@ public partial class MyBot {
 
     [MethodImpl(StatMImpl)] private void STAT_NullMovePruning_Invoke_I() => depthStats.NullMovePruning_Invokes++;
     [MethodImpl(StatMImpl)] private void STAT_NullMovePruning_Cutoff_I() => depthStats.NullMovePruning_Cutoffs++;
+    [MethodImpl(StatMImpl)] private void STAT_DeltaPruning_PrunedMove() => depthStats.DeltaPruning_PrunedMoves++;
 
     [MethodImpl(StatMImpl)] private void STAT_MoveOrder_BestMoveInvoke_I() => depthStats.MoveOrder_BestMoveInvokes++;
     [MethodImpl(StatMImpl)] private void STAT_MoveOrder_BestMoveTTHit_I() => depthStats.MoveOrder_BestMoveTTHits++;
