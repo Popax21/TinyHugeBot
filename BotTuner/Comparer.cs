@@ -35,6 +35,8 @@ public static partial class Program {
         Console.WriteLine();
         Console.WriteLine(">>>>>>>>>> RESULTS <<<<<<<<<<");
         Console.WriteLine();
+        Console.WriteLine($"{botA.Name} vs {botB.Name}");
+        Console.WriteLine();
         for(int i = 0; i < posCollections.Length; i++) {
             Console.WriteLine($"Position Collection '{posCollections[i]}': {scores[i].ToString("F5", CultureInfo.InvariantCulture)}");
         }
