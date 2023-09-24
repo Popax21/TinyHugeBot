@@ -309,6 +309,7 @@ public partial class Tinyfier {
             CilOpCode instrOpCode = instr.OpCode;
             CilInstruction branchInstr = instr;
             if(instrOpCode == CilOpCodes.Br || instrOpCode == CilOpCodes.Br_S) {
+                //If we have a fixed branch to another conditional branch, proxy the conditional branch to this branch
                 if(instrs.GetByOffset(GetJumpOffset(instr)) is CilInstruction targetInstr && targetInstr.IsConditionalBranch()) {
                     instrOpCode = targetInstr.OpCode;
                     branchInstr = targetInstr;
@@ -316,8 +317,15 @@ public partial class Tinyfier {
             }
 
             void HandleDeadBranch(bool takeBranch) {
+                //Pop branch condition arguments (the pop expression trimmer will remove them)
                 for(int i = branchInstr.GetStackPopCount(body); i > 0; i--) instrs.Insert(++instrIdx, CilOpCodes.Pop);
+
+                //Insert a fixed branch if the branch is taken
+                //Additionally, if the branch instruction is different, insert a jump to the actual next instruction
                 if(takeBranch) instrs.Insert(++instrIdx, new CilInstruction(CilOpCodes.Br, branchInstr.Operand));
+                else if(branchInstr != instr) instrs.Insert(++instrIdx, new CilInstruction(CilOpCodes.Br, new CilInstructionLabel(instrs[instrs.IndexOf(branchInstr)+1])));
+
+                //NOP out the old instruction (it remains at the start to anchor branches in places)
                 instr.ReplaceWithNop();
                 didModify = true;
             }
@@ -464,7 +472,10 @@ public partial class Tinyfier {
                 if(!exprStartInstrIdx.TryPop(out startIdx)) startIdx = -1;
             }
 
-            if(instr.OpCode.FlowControl == CilFlowControl.Call) startIdx = -1; //Calls might have side effects
+            //Calls might have side effects (assume that property getters have no side effects)
+            if(instr.OpCode.FlowControl == CilFlowControl.Call && instr.Operand is IMethodDescriptor calledMethod) {
+                if(!calledMethod.Name?.ToString()?.StartsWith("get_") ?? true) startIdx = -1;
+            }
 
             for(int i = instr.GetStackPushCount(); i > 0; i--) exprStartInstrIdx.Push(startIdx);
         }

@@ -31,7 +31,7 @@ public partial class MyBot {
 
     private bool Pruning_IsSpecialMove_I(Move move) {
         //Check if the move is escaping the square attacked by the null move refutation
-        if(nullMoveRefutation != 0 && move.TargetSquare.Index == ((nullMoveRefutation >> 6) & 63)) return true;
+        if(nullMoveRefutation != 0 && move.StartSquare.Index == ((nullMoveRefutation >> 6) & 63)) return true;
 
         return false;
     }
