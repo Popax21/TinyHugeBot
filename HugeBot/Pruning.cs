@@ -41,7 +41,7 @@ public partial class MyBot {
         PruningSafetyMargin + 340,     //Bishops
         PruningSafetyMargin + 500,     //Rooks
         PruningSafetyMargin + 1000,    //Queen
-        0                                   //Kings - just a placeholder
+        0                              //Kings - just a placeholder
     };
 
     //TODO Check if disabling near the endgame helps things
