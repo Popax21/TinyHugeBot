@@ -57,19 +57,22 @@ public partial class MyBot {
                 //Score by MVV-LAA (Most Valuable Victim - Least Valuable Aggressor)
                 //Promotions take priority over other moves
                 //TODO Try other metrics (e.g. SSE)
-                return (ulong) ((int) move.PromotionPieceType << 16 | (int) move.CapturePieceType << 4 | (15 - (int) move.MovePieceType)) << 40;
+                return (ulong) ((int) move.PromotionPieceType << 6 | (int) move.CapturePieceType << 3 | (7 - (int) move.MovePieceType)) << 55;
             } else {
                 //Check if the move is in the killer table
                 for(int i = 0; i < NumKillerTableSlots; i++) {
-                    if(killerTable[NumKillerTableSlots*ply + i] == move.RawValue) return (ulong) (NumKillerTableSlots - i) << 36;
+                    if(killerTable[NumKillerTableSlots*ply + i] == move.RawValue) return (ulong) (8 - i) << 52;
                 }
+
+                //Check if pruning gave this move a special score
+                if(Pruning_IsSpecialMove_I(move)) return (ulong) (8 - NumKillerTableSlots) << 52;
 
                 //Return a score based on the Relative History Heuristic
                 int butterflyIdx = GetMoveButterflyIndex_I(move, searchBoard.IsWhiteToMove);
-                ulong rhhScore = ((ulong) historyTable[butterflyIdx] << 8) / butterflyTable[butterflyIdx];
+                ulong rhhScore = ((ulong) historyTable[butterflyIdx] << 20) / butterflyTable[butterflyIdx];
 
 #if DEBUG
-                if(rhhScore >= (1UL << 36)) throw new Exception($"RHH score outside of intended bounds: 0x{rhhScore:x}");
+                if(rhhScore >= (1UL << 52)) throw new Exception($"RHH score outside of intended bounds: 0x{rhhScore:x}");
 #endif
 
                 return rhhScore;

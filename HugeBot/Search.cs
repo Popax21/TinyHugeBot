@@ -126,10 +126,16 @@ public partial class MyBot : IChessBot {
             return unchecked((short) ttSlot);
         }
 
-        //TODO Pruning
+        //Reset any pruning special move values, as they might screw up future move ordering if not cleared
+        Pruning_ResetSpecialMove_I();
 
         //Check if we reached the bottom of the search tree
         if(remDepth <= 0) return QSearch(alpha, beta, ply);
+
+        //Apply Null Move Pruning
+        //Only apply to non-PV candidates, otherwise we duplicate our work on researches (I think?)
+        int prunedScore = 0;
+        if(!isPvCandidateNode && TryNullMovePruning_I(alpha, beta, remDepth, ply, ref prunedScore)) return prunedScore;
 
         //Generate legal moves
         Span<Move> moves = stackalloc Move[256];
