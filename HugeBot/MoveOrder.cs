@@ -66,7 +66,13 @@ public partial class MyBot {
 
                 //Return a score based on the Relative History Heuristic
                 int butterflyIdx = GetMoveButterflyIndex_I(move, searchBoard.IsWhiteToMove);
-                return (historyTable[butterflyIdx] << 8) / butterflyTable[butterflyIdx];
+                ulong rhhScore = ((ulong) historyTable[butterflyIdx] << 8) / butterflyTable[butterflyIdx];
+
+#if DEBUG
+                if(rhhScore >= (1UL << 36)) throw new Exception($"RHH score outside of intended bounds: 0x{rhhScore:x}");
+#endif
+
+                return rhhScore;
             }
         }
 
