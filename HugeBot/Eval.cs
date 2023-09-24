@@ -15,7 +15,7 @@ public static class Eval {
 
     private static readonly int[] PhaseContributions = { 0, 1, 1, 2, 4, 0 };
 
-    public static int Evaluate_I(Board board) {
+    public static int Evaluate(Board board) {
         ulong eval = 0x8000_0000_8000_0000;
 
         //Evaluate PST and determine phase

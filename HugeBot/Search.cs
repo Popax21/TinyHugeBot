@@ -115,6 +115,9 @@ public partial class MyBot : IChessBot {
         //Handle repetition
         if(searchBoard.IsRepeatedPosition()) return 0;
 
+        //Check if we reached the bottom of the search tree
+        if(remDepth <= 0) return QSearch(alpha, beta, ply);
+
         //TODO Reductions / Extensions
 
         //Check if the position is in the TT
@@ -129,13 +132,33 @@ public partial class MyBot : IChessBot {
         //Reset any pruning special move values, as they might screw up future move ordering if not cleared
         Pruning_ResetSpecialMove_I();
 
-        //Check if we reached the bottom of the search tree
-        if(remDepth <= 0) return QSearch(alpha, beta, ply);
+        //Apply pruning to non-PV candidates (otherwise we duplicate our work on researches I think?)
+        if(!isPvCandidateNode) {
+            int prunedScore = 0;
 
-        //Apply Null Move Pruning
-        //Only apply to non-PV candidates, otherwise we duplicate our work on researches (I think?)
-        int prunedScore = 0;
-        if(!isPvCandidateNode && ApplyNullMovePruning_I(alpha, beta, remDepth, ply, ref prunedScore)) return prunedScore;
+#if FSTATS
+            STAT_Pruning_CheckNonPVNode_I();
+#endif
+
+            //Determine the static evaluation of the position
+            int staticEval = Eval.Evaluate(searchBoard);
+
+            //Apply Reverse Futility Pruning
+            if(ApplyReverseFutilityPruning(staticEval, beta, remDepth, ref prunedScore)) {
+#if FSTATS
+                STAT_ReverseFutilityPruning_PrunedNode_I();
+#endif
+                return prunedScore;
+            }
+
+            //Apply Null Move Pruning
+            if(ApplyNullMovePruning_I(alpha, beta, remDepth, ply, ref prunedScore)) {
+#if FSTATS
+                STAT_NullMovePruning_PrunedNode_I();
+#endif
+                return prunedScore;
+            }
+        }
 
         //Generate legal moves
         Span<Move> moves = stackalloc Move[256];

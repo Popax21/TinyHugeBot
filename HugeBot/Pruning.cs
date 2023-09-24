@@ -5,10 +5,6 @@ public partial class MyBot {
     private int numNullMoves = 0;
     private ushort nullMoveRefutation;
     public bool ApplyNullMovePruning_I(int alpha, int beta, int remDepth, int ply, ref int score) {
-#if FSTATS
-        STAT_NullMovePruning_Invoke_I();
-#endif
-
         //Check if we should apply NMP
         if(remDepth < 3 || beta >= Eval.MaxMate) return false;
 
@@ -29,21 +25,25 @@ public partial class MyBot {
         numNullMoves--;
         searchBoard.UndoSkipTurn(); 
 
-#if FSTATS
-        if(score >= beta) STAT_NullMovePruning_Cutoff_I();
-#endif
-
         return score >= beta;
     }
 
-    private const int DeltaPruningSafetyMargin = 2*90; //~200 centipawns
+    private const int PruningSafetyMargin = 2*90; //~200 centipawns
+
+    public bool ApplyReverseFutilityPruning(int eval, int beta, int depth, ref int prunedScore) {
+        //TODO Experiment with different values
+        //TODO This relies on the Null Move Hypothesis, investigate potential Zugzwang issues
+        prunedScore = eval - depth * 90 - (PruningSafetyMargin - 1*90);
+        return depth < 7 && prunedScore >= beta;
+    }
+
     private static readonly ushort[] DeltaPruningMargins = new ushort[] {
-        DeltaPruningSafetyMargin + 1000,    //None - as we only evaluate non-quiet moves this means that it's a pawn promition, so it has the same margin as a queen
-        DeltaPruningSafetyMargin + 90,      //Pawns
-        DeltaPruningSafetyMargin + 310,     //Knights
-        DeltaPruningSafetyMargin + 340,     //Bishops
-        DeltaPruningSafetyMargin + 500,     //Rooks
-        DeltaPruningSafetyMargin + 1000,    //Queen
+        PruningSafetyMargin + 1000,    //None - as we only evaluate non-quiet moves this means that it's a pawn promition, so it has the same margin as a queen
+        PruningSafetyMargin + 90,      //Pawns
+        PruningSafetyMargin + 310,     //Knights
+        PruningSafetyMargin + 340,     //Bishops
+        PruningSafetyMargin + 500,     //Rooks
+        PruningSafetyMargin + 1000,    //Queen
         0                                   //Kings - just a placeholder
     };
 

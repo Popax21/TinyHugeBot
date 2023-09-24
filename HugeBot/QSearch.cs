@@ -21,7 +21,7 @@ public partial class MyBot {
         }
 
         //Evaluate the current position as a stand-pat score, and update the window using it
-        int standPatScore = Eval.Evaluate_I(searchBoard);
+        int standPatScore = Eval.Evaluate(searchBoard);
         if(standPatScore > alpha) {
             if(standPatScore >= beta) return standPatScore;
             alpha = standPatScore;
