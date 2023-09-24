@@ -20,13 +20,22 @@ public partial class Tinyfier {
         foreach(TypeDefinition type in targetTypes) {
             foreach(MethodDefinition method in type.Methods) {
                 if(method.CilMethodBody is not { Instructions: CilInstructionCollection instrs } body) continue;
-                RemoveUnnecessaryCasts(body, instrs);
                 RemoveBaseCtorCalls(body, instrs);
-                DetectDeadBranches(body, instrs);
-                TrimPoppedValues(body, instrs);
-                TrimDeadCode(body, instrs);
-                TrimUnnecessaryBranches(body, instrs);
-                TrimNOPs(body, instrs);
+
+                while(true) {
+                    bool didModify = false;
+                    didModify |= RemoveUnnecessaryCasts(body, instrs);
+                    didModify |= RemoveProxyVariables(body, instrs);
+                    didModify |= SimplifyStaticBranchConditions(body, instrs);
+                    didModify |= FlattenChainedBranches(body, instrs);
+                    didModify |= TrimUnnecessaryBranches(body, instrs);
+                    didModify |= TrimPoppedExpressions(body, instrs);
+                    didModify |= TrimDeadCode(body, instrs);
+                    didModify |= TrimNOPs(body, instrs);
+
+                    if(!didModify) break;
+                }
+
                 instrs.OptimizeMacros();
                 numMethodBodies++;
             }
@@ -34,7 +43,18 @@ public partial class Tinyfier {
         Log($"Optimized {numMethodBodies} method bodies");
     }
 
-    private void RemoveUnnecessaryCasts(CilMethodBody body, CilInstructionCollection instrs) {
+    private void RemoveBaseCtorCalls(CilMethodBody body, CilInstructionCollection instrs) {
+        for(int i = 0; i < instrs.Count-1; i++) {
+            if(instrs[i].OpCode != CilOpCodes.Ldarg_0 || instrs[i+1].OpCode != CilOpCodes.Call) continue;
+            if(instrs[i+1].Operand is not IMethodDescriptor calledMethod) continue;
+            if(calledMethod.DeclaringType?.FullName != "System.Object" || calledMethod.Name != ".ctor") continue;
+            instrs[i].ReplaceWithNop();
+            instrs[i+1].ReplaceWithNop();
+        }
+    }
+
+    private bool RemoveUnnecessaryCasts(CilMethodBody body, CilInstructionCollection instrs) {
+        bool didModify = false;
         CilInstruction? lastCast = null;
         int lastCastSize = 0;
         foreach(CilInstruction instr in instrs) {
@@ -91,23 +111,108 @@ public partial class Tinyfier {
                     continue;
             }
 
-            if(lastCast != null && lastCastSize == castSize) lastCast.ReplaceWithNop();
+            if(lastCast != null && lastCastSize == castSize) {
+                lastCast.ReplaceWithNop();
+                didModify = true;
+            }
             lastCast = instr;
             lastCastSize = castSize;
         }
+        return didModify;
     }
 
-    private void RemoveBaseCtorCalls(CilMethodBody body, CilInstructionCollection instrs) {
-        for(int i = 0; i < instrs.Count-1; i++) {
-            if(instrs[i].OpCode != CilOpCodes.Ldarg_0 || instrs[i+1].OpCode != CilOpCodes.Call) continue;
-            if(instrs[i+1].Operand is not IMethodDescriptor calledMethod) continue;
-            if(calledMethod.DeclaringType?.FullName != "System.Object" || calledMethod.Name != ".ctor") continue;
-            instrs[i].ReplaceWithNop();
-            instrs[i+1].ReplaceWithNop();
+    private bool RemoveProxyVariables(CilMethodBody body, CilInstructionCollection instrs) {
+        bool didModify = false;
+        foreach(CilLocalVariable local in body.LocalVariables.ToArray()) {
+            //Ensure there's only one load and no address loads for this local
+            if(instrs.Any(instr => (instr.OpCode == CilOpCodes.Ldloca || instr.OpCode == CilOpCodes.Ldloca_S) && instr.GetLocalVariable(body.LocalVariables) == local)) continue;
+
+            int numLoads = 0;
+            int loadInstrIdx = -1;
+            for(int i = 0; i < instrs.Count; i++) {
+                if(instrs[i].IsLdloc() && instrs[i].GetLocalVariable(body.LocalVariables) == local) {
+                    numLoads++;
+                    loadInstrIdx = i;
+                }
+            }
+            if(numLoads > 1) continue;
+
+            //Determine the variable being proxied (if any)
+            CilLocalVariable? proxiedLocal = null;
+            if(loadInstrIdx >= 0 && loadInstrIdx < instrs.Count-1) {
+                if(instrs[loadInstrIdx + 1].IsStloc()) proxiedLocal = instrs[loadInstrIdx + 1].GetLocalVariable(body.LocalVariables);
+            }
+
+            //Ensure that replacing the variable would cause no harm by running a DFS from all loads points
+            if(proxiedLocal != null) {
+                Stack<int> dfsStack = new Stack<int>();
+                for(int i = 0; i < instrs.Count; i++) {
+                    if(!instrs[i].IsStloc() || instrs[i].GetLocalVariable(body.LocalVariables) != local) continue;
+                    dfsStack.Push(i);
+                }
+
+                bool replaceIsSafe = true;
+                bool[] visited = new bool[instrs.Count];
+                while(dfsStack.TryPop(out int instrIdx)) {
+                    if(visited[instrIdx]) continue;
+                    visited[instrIdx] = true;      
+
+                    //Find the next jump
+                    while(!instrs[instrIdx].IsBranch() && instrs[instrIdx].OpCode != CilOpCodes.Ret && instrs[instrIdx].OpCode != CilOpCodes.Throw) {
+                        if(instrIdx == loadInstrIdx) break;
+                        if(instrs[instrIdx].OpCode.OperandType is CilOperandType.InlineVar or CilOperandType.ShortInlineVar && instrs[instrIdx].GetLocalVariable(body.LocalVariables) == proxiedLocal) {
+                            replaceIsSafe = false;
+                            break;
+                        }
+
+                        visited[++instrIdx] = true;
+                    }
+                    if(!replaceIsSafe) break;
+                    if(!instrs[instrIdx].IsBranch()) continue;
+
+                    //Add to the DFS stack
+                    dfsStack.Push(instrs.GetIndexByOffset(GetJumpOffset(instrs[instrIdx])));
+                    if(instrs[instrIdx].IsConditionalBranch()) dfsStack.Push(instrIdx + 1);
+                }
+                if(!replaceIsSafe) continue;
+            } else if(loadInstrIdx >= 0) {
+                //This is only safe if all stores directly branch to the load
+                bool replaceIsSafe = true;
+                for(int i = 0; i < instrs.Count-1; i++) {
+                    if(!instrs[i].IsStloc() || instrs[i].GetLocalVariable(body.LocalVariables) != local) continue;
+                    if(i+1 == loadInstrIdx) continue;
+                    if((instrs[i+1].OpCode == CilOpCodes.Br || instrs[i+1].OpCode == CilOpCodes.Br_S) && GetJumpOffset(instrs[i+1]) == instrs[loadInstrIdx].Offset) continue;
+
+                    replaceIsSafe = false;
+                    break;
+                }
+                if(!replaceIsSafe) continue;
+            }
+
+            //Replace all store references
+            foreach(CilInstruction instr in instrs) {
+                if(instr.IsStloc() && instr.GetLocalVariable(body.LocalVariables) == local) {
+                    if(proxiedLocal != null) instr.Operand = proxiedLocal;
+                    else instr.ReplaceWithNop();
+                }
+            }
+
+            //Remove the proxy instruction pair
+            if(loadInstrIdx >= 0) {
+                instrs[loadInstrIdx].ReplaceWithNop();
+                if(proxiedLocal != null) instrs[loadInstrIdx+1].ReplaceWithNop();
+            }
+
+            //Remove the local
+            body.LocalVariables.Remove(local);
+            didModify = true;
         }
+        return didModify;
     }
 
-    private void DetectDeadBranches(CilMethodBody body, CilInstructionCollection instrs) {
+    private bool SimplifyStaticBranchConditions(CilMethodBody body, CilInstructionCollection instrs) {
+        bool didModify = false;
+
         //Parse the IL expression trees
         Stack<ExprValue> evalStack = new Stack<ExprValue>();
         ExprValue PopOrAny() => evalStack.TryPop(out ExprValue val) ? val : default;
@@ -123,6 +228,7 @@ public partial class Tinyfier {
                 for(int i = instr.GetStackPopCount(body); i > 0; i--) instrs.Insert(++instrIdx, CilOpCodes.Pop);
                 if(takeBranch) instrs.Insert(++instrIdx, new CilInstruction(CilOpCodes.Br, instr.Operand));
                 instr.ReplaceWithNop();
+                didModify = true;
             }
 
             CilOpCode instrOpCode = instr.OpCode;
@@ -213,9 +319,30 @@ public partial class Tinyfier {
             //Handle branches
             if(instr.IsBranch()) evalStack.Clear();
         }
+
+        return didModify;
     }
 
-    private void TrimPoppedValues(CilMethodBody body, CilInstructionCollection instrs) {
+    private bool FlattenChainedBranches(CilMethodBody body, CilInstructionCollection instrs) {
+        instrs.CalculateOffsets();
+
+        bool didModify = false;
+        foreach(CilInstruction instr in instrs) {
+            if(!instr.IsBranch()) continue;
+
+            CilInstruction targetInstr = instrs.GetByOffset(GetJumpOffset(instr)) ?? throw new Exception($"Invalid jump target offset: {instr}");
+            if(!targetInstr.IsUnconditionalBranch() || targetInstr.OpCode == CilOpCodes.Leave || targetInstr.OpCode == CilOpCodes.Leave_S) continue;
+
+            instr.Operand = targetInstr.Operand;
+            instrs.CalculateOffsets();
+            didModify = true;
+        }
+        return didModify;
+    }
+
+    private bool TrimPoppedExpressions(CilMethodBody body, CilInstructionCollection instrs) {
+        bool didModify = false;
+
         Stack<int> exprStartInstrIdx = new Stack<int>();
         for(int instrIdx = 0; instrIdx < instrs.Count; instrIdx++) {
             CilInstruction instr = instrs[instrIdx];
@@ -231,12 +358,13 @@ public partial class Tinyfier {
 
             //Handle pops
             if(instr.OpCode == CilOpCodes.Pop) {
-                if(!exprStartInstrIdx.TryPop(out int exprStartIdx) || exprStartIdx < 0) continue;                
+                if(!exprStartInstrIdx.TryPop(out int exprStartIdx) || exprStartIdx < 0) continue;
 
                 //NOP out the expression
                 for(int i = exprStartIdx; i <= instrIdx; i++) instrs[i].ReplaceWithNop();
                 instrs.CalculateOffsets();
 
+                didModify = true;
                 continue;
             }
 
@@ -250,9 +378,11 @@ public partial class Tinyfier {
 
             for(int i = instr.GetStackPushCount(); i > 0; i--) exprStartInstrIdx.Push(startIdx);
         }
+
+        return didModify;
     }
 
-    private void TrimDeadCode(CilMethodBody body, CilInstructionCollection instrs) {
+    private bool TrimDeadCode(CilMethodBody body, CilInstructionCollection instrs) {
         instrs.CalculateOffsets();
 
         //Run a DFS over the IL graph
@@ -279,24 +409,45 @@ public partial class Tinyfier {
         }
 
         //Trim out dead instructions
+        bool didModify = false;
         int newIdx = 0;
         for(int i = 0; i < visited.Length; i++) {
-            if(!visited[i]) instrs.RemoveAt(newIdx);
-            else newIdx++;
+            if(!visited[i]) {
+                instrs.RemoveAt(newIdx);
+                didModify = true;
+            } else newIdx++;
         }
+        return didModify;
     }
 
-    private void TrimUnnecessaryBranches(CilMethodBody body, CilInstructionCollection instrs) {
-        TrimNOPs(body, instrs);
-        foreach(CilInstruction instr in instrs) {
-            if(instr.OpCode != CilOpCodes.Br && instr.OpCode != CilOpCodes.Br_S) continue;
+    private bool TrimUnnecessaryBranches(CilMethodBody body, CilInstructionCollection instrs) {
+        bool didModify = false;
+        didModify |= TrimNOPs(body, instrs);
 
-            instrs.CalculateOffsets();
-            if(GetJumpOffset(instr) == instr.Offset + instr.Size) instr.ReplaceWithNop();
+        instrs.CalculateOffsets();
+        for(int instrIdx = 0; instrIdx < instrs.Count; instrIdx++) {
+            CilInstruction instr = instrs[instrIdx];
+            if(!instr.IsBranch() || instr.OpCode == CilOpCodes.Leave || instr.OpCode == CilOpCodes.Leave_S) continue;
+
+            bool isUnnecessary = false;
+            isUnnecessary |= GetJumpOffset(instr) == instr.Offset + instr.Size;
+            if(instr.IsConditionalBranch() && instrIdx < instrs.Count-1 && instrs[instrIdx+1] is CilInstruction nextInstr) {
+                isUnnecessary |= nextInstr.IsUnconditionalBranch() && GetJumpOffset(instr) == GetJumpOffset(nextInstr);
+            }
+
+            if(isUnnecessary) {
+                for(int i = instr.GetStackPopCount(body); i > 0; i--) instrs.Insert(++instrIdx, CilOpCodes.Pop);
+                instr.ReplaceWithNop();
+                instrs.CalculateOffsets();
+                didModify = true;
+            }
         }
+
+        return didModify;
     }
 
-    private void TrimNOPs(CilMethodBody body, CilInstructionCollection instrs) {
+    private bool TrimNOPs(CilMethodBody body, CilInstructionCollection instrs) {
+        bool didModify = false;
         CilInstructionLabel? nextInstrLabel = null;
         foreach(CilInstruction instr in instrs.ToArray()) {
             if(instr.OpCode == CilOpCodes.Nop) {
@@ -308,11 +459,13 @@ public partial class Tinyfier {
                     jumpInstr.Operand = nextInstrLabel ??= new CilInstructionLabel();
                 }
                 instrs.Remove(instr);
+                didModify = true;
             } else if(nextInstrLabel != null) {
                 nextInstrLabel.Instruction = instr;
                 nextInstrLabel = null;
             }
         }
+        return didModify;
     }
 
     private readonly record struct ExprValue {
