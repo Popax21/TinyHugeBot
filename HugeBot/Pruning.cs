@@ -5,6 +5,10 @@ public partial class MyBot {
     private int numNullMoves = 0;
     private ushort nullMoveRefutation;
     public bool TryNullMovePruning_I(int alpha, int beta, int remDepth, int ply, ref int score) {
+#if FSTATS
+        STAT_NullMovePruning_Invoke_I();
+#endif
+
         //Check if we should apply NMP
         if(remDepth < 3 || beta >= Eval.MaxMate) return false;
 
@@ -23,6 +27,10 @@ public partial class MyBot {
         score = -NegaMax(-beta, -beta + 1, remDepth - 1 - R, ply+1, out nullMoveRefutation);
         numNullMoves--;
         searchBoard.UndoSkipTurn(); 
+
+#if FSTATS
+        if(score >= beta) STAT_NullMovePruning_Cutoff_I();
+#endif
 
         return score >= beta;
     }

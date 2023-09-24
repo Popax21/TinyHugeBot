@@ -11,10 +11,11 @@ else
     BUILD_FLAGS+="-c Release "
 fi
 
-if [[ "$@" == *"--fullstats"* ]]; then
-    BUILD_FLAGS+="-p:FullStats=1 "
-elif [[ ! "$@" == *"--stats"* ]]; then
-    BUILD_FLAGS+="-p:DisableStats=1 "
+if [[ ! "$@" == *"--fullstats"* ]]; then
+    BUILD_FLAGS+="-p:DisableFullStats=1 "
+    if [[ ! "$@" == *"--stats"* ]]; then
+        BUILD_FLAGS+="-p:DisableStats=1 "
+    fi
 fi
 
 dotnet build HugeBot $BUILD_FLAGS

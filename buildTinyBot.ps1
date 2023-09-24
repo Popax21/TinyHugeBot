@@ -10,10 +10,11 @@ if ($args -match "--debug") {
 	$BuildFlags += @{c = "Release"}
 }
 
-if ($args -match "--fullstats") {
-	$BuildFlags += @{"p:" = "FullStats=1"}
-} elseif (!($args -match "--stats")) {
-	$BuildFlags += @{"p:" = "DisableStats=1"}
+if (!($args -match "--fullstats")) {
+	$BuildFlags += @{"p:" = "DisableFullStats=1"}
+	if (!($args -match "--stats")) {
+		$BuildFlags += @{"p:" = "DisableStats=1"}
+	}
 }
 
 dotnet build HugeBot @BuildFlags

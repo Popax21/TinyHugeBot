@@ -62,6 +62,9 @@ public partial class MyBot {
         public int TTRead_Misses, TTRead_DepthMisses, TTRead_BoundMisses, TTRead_Hits;
         public int TTWrite_NewSlots, TTWrite_SlotUpdates, TTWrite_IdxCollisions;
 
+        //Pruning stats
+        public int NullMovePruning_Invokes, NullMovePruning_Cutoffs;
+
         //Move order stats
         public int MoveOrder_BestMoveInvokes, MoveOrder_BestMoveTTHits, MoveOrder_BestMoveIIDInvokes;
         public int MoveOrder_MovesScored, MoveOrder_NoisyMoves, MoveOrder_KillerMoves, MoveOrder_SpecialPruneMoves;
@@ -88,6 +91,8 @@ public partial class MyBot {
             TTRead_Misses = TTRead_DepthMisses = TTRead_BoundMisses = TTRead_Hits = 0;
             TTWrite_NewSlots = TTWrite_SlotUpdates = TTWrite_IdxCollisions = 0;
 
+            NullMovePruning_Invokes = NullMovePruning_Cutoffs = 0;
+
             MoveOrder_BestMoveInvokes = MoveOrder_BestMoveTTHits = MoveOrder_BestMoveIIDInvokes = 0;
             MoveOrder_MovesScored = MoveOrder_NoisyMoves = MoveOrder_KillerMoves = MoveOrder_SpecialPruneMoves = 0;
 #endif
@@ -113,6 +118,9 @@ public partial class MyBot {
             TTWrite_NewSlots += nestedTracker.TTWrite_NewSlots;
             TTWrite_SlotUpdates += nestedTracker.TTWrite_SlotUpdates;
             TTWrite_IdxCollisions += nestedTracker.TTWrite_IdxCollisions;
+
+            NullMovePruning_Invokes += nestedTracker.NullMovePruning_Invokes;
+            NullMovePruning_Cutoffs += nestedTracker.NullMovePruning_Cutoffs;
 
             MoveOrder_BestMoveInvokes += nestedTracker.MoveOrder_BestMoveInvokes;
             MoveOrder_BestMoveTTHits += nestedTracker.MoveOrder_BestMoveTTHits;
@@ -169,6 +177,9 @@ public partial class MyBot {
 
             int numTTWrites = TTWrite_NewSlots + TTWrite_SlotUpdates + TTWrite_IdxCollisions;
             printStat($"TT writes: total {numTTWrites} new slots {FormatPercentageI(TTWrite_NewSlots, numTTWrites)} slot updates {FormatPercentageI(TTWrite_SlotUpdates, numTTWrites)} idx collisions {FormatPercentageI(TTWrite_IdxCollisions, numTTWrites)}");
+
+            //Pruning stats
+            printStat($"NMP: invokes {FormatPercentageI(NullMovePruning_Invokes, ZeroWindowStats.AlphaBeta_SearchedNodes)} cutoffs {FormatPercentageI(NullMovePruning_Cutoffs, NullMovePruning_Invokes)}");
 
             //Move ordering stats
             printStat($"move ordering: best move: invocs {MoveOrder_BestMoveInvokes} TT hits {FormatPercentageI(MoveOrder_BestMoveTTHits, MoveOrder_BestMoveInvokes)} IID invocs {FormatPercentageI(MoveOrder_BestMoveIIDInvokes, MoveOrder_BestMoveInvokes)}");
@@ -258,6 +269,9 @@ public partial class MyBot {
     [MethodImpl(StatMImpl)] private void STAT_TTWrite_NewSlot_I() => depthStats.TTWrite_NewSlots++;
     [MethodImpl(StatMImpl)] private void STAT_TTWrite_SlotUpdate_I() => depthStats.TTWrite_SlotUpdates++;
     [MethodImpl(StatMImpl)] private void STAT_TTWrite_IdxCollision_I() => depthStats.TTWrite_IdxCollisions++;
+
+    [MethodImpl(StatMImpl)] private void STAT_NullMovePruning_Invoke_I() => depthStats.NullMovePruning_Invokes++;
+    [MethodImpl(StatMImpl)] private void STAT_NullMovePruning_Cutoff_I() => depthStats.NullMovePruning_Cutoffs++;
 
     [MethodImpl(StatMImpl)] private void STAT_MoveOrder_BestMoveInvoke_I() => depthStats.MoveOrder_BestMoveInvokes++;
     [MethodImpl(StatMImpl)] private void STAT_MoveOrder_BestMoveTTHit_I() => depthStats.MoveOrder_BestMoveTTHits++;
