@@ -25,6 +25,7 @@ public partial class Tinyfier {
                 while(true) {
                     bool didModify = false;
                     didModify |= RemoveUnnecessaryCasts(body, instrs);
+                    didModify |= RemoveUnnecessaryIndirection(body, instrs);
                     didModify |= RemoveProxyVariables(body, instrs);
                     didModify |= SimplifyStaticBranchConditions(body, instrs);
                     didModify |= FlattenChainedBranches(body, instrs);
@@ -117,6 +118,87 @@ public partial class Tinyfier {
             }
             lastCast = instr;
             lastCastSize = castSize;
+        }
+        return didModify;
+    }
+
+    private static Dictionary<CilOpCode, CilOpCode> Ldind_Ldelem_Map = new Dictionary<CilOpCode, CilOpCode>() {
+        [CilOpCodes.Ldind_I]   = CilOpCodes.Ldelem_I,
+        [CilOpCodes.Ldind_I1]  = CilOpCodes.Ldelem_I1,
+        [CilOpCodes.Ldind_I2]  = CilOpCodes.Ldelem_I2,
+        [CilOpCodes.Ldind_I4]  = CilOpCodes.Ldelem_I4,
+        [CilOpCodes.Ldind_I8]  = CilOpCodes.Ldelem_I8,
+        [CilOpCodes.Ldind_U1]  = CilOpCodes.Ldelem_U1,
+        [CilOpCodes.Ldind_U2]  = CilOpCodes.Ldelem_U2,
+        [CilOpCodes.Ldind_U4]  = CilOpCodes.Ldelem_U4,
+        [CilOpCodes.Ldind_R4]  = CilOpCodes.Ldelem_R4,
+        [CilOpCodes.Ldind_R8]  = CilOpCodes.Ldelem_R8,
+        [CilOpCodes.Ldind_Ref] = CilOpCodes.Ldelem_Ref,
+    };
+    private static Dictionary<CilOpCode, CilOpCode> Stind_Stelem_Map = new Dictionary<CilOpCode, CilOpCode>() {
+        [CilOpCodes.Stind_I]   = CilOpCodes.Stelem_I,
+        [CilOpCodes.Stind_I1]  = CilOpCodes.Stelem_I1,
+        [CilOpCodes.Stind_I2]  = CilOpCodes.Stelem_I2,
+        [CilOpCodes.Stind_I4]  = CilOpCodes.Stelem_I4,
+        [CilOpCodes.Stind_I8]  = CilOpCodes.Stelem_I8,
+        [CilOpCodes.Stind_R4]  = CilOpCodes.Stelem_R4,
+        [CilOpCodes.Stind_R8]  = CilOpCodes.Stelem_R8,
+        [CilOpCodes.Stind_Ref] = CilOpCodes.Stelem_Ref,
+    };
+
+    private bool RemoveUnnecessaryIndirection(CilMethodBody body, CilInstructionCollection instrs) {
+        bool didModify = false;
+        Stack<CilInstruction> evalEmitterStack = new Stack<CilInstruction>();
+        foreach(CilInstruction instr in instrs) {
+            //Check if a jump lands here
+            if(instrs.Any(i => i.IsBranch() && GetJumpOffset(i) == instr.Offset)) evalEmitterStack.Clear();
+
+            //Handle indirect loads/stores
+            if(Ldind_Ldelem_Map.TryGetValue(instr.OpCode, out CilOpCode ldelemOp)) {
+                if(evalEmitterStack.TryPop(out CilInstruction? emitterInstr)) {
+                    if(emitterInstr.OpCode == CilOpCodes.Ldelema) {
+                        instr.OpCode = ldelemOp;
+                        emitterInstr.ReplaceWithNop();
+                        didModify = true;
+                    } else if(emitterInstr.OpCode == CilOpCodes.Ldarga || emitterInstr.OpCode == CilOpCodes.Ldarga_S) {
+                        instr.OpCode = CilOpCodes.Ldarg;
+                        instr.Operand = emitterInstr.GetParameter(body.Owner.Parameters);
+                        emitterInstr.ReplaceWithNop();
+                        didModify = true;
+                    } else if(emitterInstr.OpCode == CilOpCodes.Ldloca || emitterInstr.OpCode == CilOpCodes.Ldloca_S) {
+                        instr.OpCode = CilOpCodes.Ldloc;
+                        instr.Operand = emitterInstr.GetLocalVariable(body.LocalVariables);
+                        emitterInstr.ReplaceWithNop();
+                        didModify = true;
+                    }
+                }
+                evalEmitterStack.Push(instr);
+                continue;
+            } else if(Stind_Stelem_Map.TryGetValue(instr.OpCode, out CilOpCode stelemOp)) {
+                evalEmitterStack.TryPop(out _);
+                if(evalEmitterStack.TryPop(out CilInstruction? emitterInstr)) {
+                    if(emitterInstr.OpCode == CilOpCodes.Ldelema) {
+                        instr.OpCode = stelemOp;
+                        emitterInstr.ReplaceWithNop();
+                        didModify = true;
+                    } else if(emitterInstr.OpCode == CilOpCodes.Ldarga || emitterInstr.OpCode == CilOpCodes.Ldarga_S) {
+                        instr.OpCode = CilOpCodes.Starg;
+                        instr.Operand = emitterInstr.GetParameter(body.Owner.Parameters);
+                        emitterInstr.ReplaceWithNop();
+                        didModify = true;
+                    } else if(emitterInstr.OpCode == CilOpCodes.Ldloca || emitterInstr.OpCode == CilOpCodes.Ldloca_S) {
+                        instr.OpCode = CilOpCodes.Stloc;
+                        instr.Operand = emitterInstr.GetLocalVariable(body.LocalVariables);
+                        emitterInstr.ReplaceWithNop();
+                        didModify = true;
+                    }
+                }
+                continue;
+            }
+
+            //Handle stack behavior
+            for(int i = instr.GetStackPopCount(body); i > 0; i--) evalEmitterStack.TryPop(out _);
+            for(int i = instr.GetStackPushCount(); i > 0; i--) evalEmitterStack.Push(instr);
         }
         return didModify;
     }
@@ -224,14 +306,22 @@ public partial class Tinyfier {
             if(instrs.Any(i => i.IsBranch() && GetJumpOffset(i) == instr.Offset)) evalStack.Clear();
 
             //Handle the instruction behavior
+            CilOpCode instrOpCode = instr.OpCode;
+            CilInstruction branchInstr = instr;
+            if(instrOpCode == CilOpCodes.Br || instrOpCode == CilOpCodes.Br_S) {
+                if(instrs.GetByOffset(GetJumpOffset(instr)) is CilInstruction targetInstr && targetInstr.IsConditionalBranch()) {
+                    instrOpCode = targetInstr.OpCode;
+                    branchInstr = targetInstr;
+                }
+            }
+
             void HandleDeadBranch(bool takeBranch) {
-                for(int i = instr.GetStackPopCount(body); i > 0; i--) instrs.Insert(++instrIdx, CilOpCodes.Pop);
-                if(takeBranch) instrs.Insert(++instrIdx, new CilInstruction(CilOpCodes.Br, instr.Operand));
+                for(int i = branchInstr.GetStackPopCount(body); i > 0; i--) instrs.Insert(++instrIdx, CilOpCodes.Pop);
+                if(takeBranch) instrs.Insert(++instrIdx, new CilInstruction(CilOpCodes.Br, branchInstr.Operand));
                 instr.ReplaceWithNop();
                 didModify = true;
             }
 
-            CilOpCode instrOpCode = instr.OpCode;
             if(instr.IsLdcI4()) evalStack.Push(instr.GetLdcI4Constant());
             else if(instrOpCode == CilOpCodes.Ldc_I8) evalStack.Push((long) instr.Operand!);
             else if(instrOpCode == CilOpCodes.Conv_I1) evalStack.Push(PopOrAny().Convert(8, true));
