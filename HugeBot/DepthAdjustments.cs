@@ -8,10 +8,6 @@ public partial class MyBot {
     private ushort[] threatMoves = new ushort[MaxPlies];
 
     public bool ApplyBotvinnikMarkoffExtension_I(ushort threatMove, int ply) {
-#if DEBUG
-        if(threatMove == 0) throw new Exception("Invalid threat move given to the Botvinnik-Markoff extension");
-#endif
-
         threatMoves[ply] = threatMove;
 
         //Check if the same threat move was played twice in a row
@@ -19,7 +15,7 @@ public partial class MyBot {
     }
 
     public bool IsLMRAllowedForMove_I(Move move, int moveIdx, int depth)
-        => depth >= 3 && moveIdx >= 4 && IsMoveQuiet_I(move) && !IsSpecialPruningMove_I(move);
+        => depth >= 3 && moveIdx >= 4 && IsMoveQuiet_I(move) && !IsThreatEscapeMove_I(move);
 
     public void ApplyLMR_I(int lmrIdx, int depth, ref int extension) {
         //Determine and apply the depth reduction

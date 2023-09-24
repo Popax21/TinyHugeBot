@@ -77,10 +77,10 @@ public partial class MyBot {
                     }
                 }
 
-                //Check if pruning gave this move a special score
-                if(IsSpecialPruningMove_I(move)) {
+                //Check if this move is a threat escape move
+                if(IsThreatEscapeMove_I(move)) {
 #if FSTATS
-                    STAT_MoveOrder_ScoredSpecialPruneMove_I();
+                    STAT_MoveOrder_ScoredThreatEscapeMove_I();
 #endif
                     return (ulong) (8 - NumKillerTableSlots) << 52;
                 }

@@ -2,7 +2,7 @@ using ChessChallenge.API;
 
 public partial class MyBot {
     private int numNullMoves = 0;
-    private ushort nullMoveRefutation;
+    private ushort threatMove;
     public bool ApplyNullMovePruning_I(int alpha, int beta, int remDepth, int ply, int curExtension, ref int score) {
         //Check if we should apply NMP
         //Allow two null moves in a row to mitigate Zugzwang
@@ -16,7 +16,7 @@ public partial class MyBot {
         //Evaluate the null move using a ZWS
         searchBoard.ForceSkipTurn();
         numNullMoves++;
-        score = -NegaMax(-beta, -beta + 1, remDepth - 1 - R, ply+1, out nullMoveRefutation, curExtension);
+        score = -NegaMax(-beta, -beta + 1, remDepth - 1 - R, ply+1, out threatMove, curExtension);
         numNullMoves--;
         searchBoard.UndoSkipTurn(); 
 
@@ -46,10 +46,10 @@ public partial class MyBot {
     public bool ApplyDeltaPruning_I(Move move, int alpha, int standPatScore)
         => standPatScore + DeltaPruningMargins[(int) move.CapturePieceType] < alpha;
 
-    private void ResetSpecialPruningMove_I() => nullMoveRefutation = 0;
-    private bool IsSpecialPruningMove_I(Move move) {
+    private void ResetThreatMove_I(int ply) => threatMove = threatMoves[ply] = 0;
+    private bool IsThreatEscapeMove_I(Move move) {
         //Check if the move is escaping the square attacked by the null move refutation
-        if(nullMoveRefutation != 0 && move.StartSquare.Index == ((nullMoveRefutation >> 6) & 63)) return true;
+        if(threatMove != 0 && move.StartSquare.Index == ((threatMove >> 6) & 63)) return true;
 
         return false;
     }

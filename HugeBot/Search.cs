@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using ChessChallenge.API;
 using HugeBot;
 
@@ -43,6 +43,10 @@ public partial class MyBot : IChessBot {
 #endif
         }
 
+#if DEBUG
+        string boardFen = board.GetFenString();
+#endif
+
         //Do a NegaMax search with iterative deepening
         //TODO Look into aspiration windows (maybe even MTD(f))
         int curBestEval = 0;
@@ -64,7 +68,10 @@ public partial class MyBot : IChessBot {
             try {
                 curBestEval = NegaMax(-0x10_0000, +0x10_0000, depth, 0, out iterBestMove);
                 curBestMove = iterBestMove;
+
 #if DEBUG
+                //Check that the board has been properly reset
+                if(board.GetFenString() != boardFen) throw new Exception($"Board has not been properly reset after search to depth {depth}: '{boardFen}' != '{board.GetFenString()}'");
             } catch(TimeoutException) {
 #else
             } catch(Exception) {
@@ -125,6 +132,14 @@ public partial class MyBot : IChessBot {
         bool isPvCandidateNode = alpha+1 < beta; //Because of PVS, all nodes without a zero window are considered candidate nodes
         int extension = 0;
 
+#if DEBUG
+        if(ply == 0) {
+            if(remDepth <= 0) throw new Exception("Root node can't immediately enter Q-search");
+            if(!isPvCandidateNode) throw new Exception("Root node can't be searched with a ZW");
+            if(lmrIdx >= 0) throw new Exception("Root node can't have an LMR applied");
+        }
+#endif
+
 #if STATS
         STAT_NewNode_I(isPvCandidateNode, false);
 #endif
@@ -148,11 +163,16 @@ public partial class MyBot : IChessBot {
         if(CheckTTEntry_I(ttSlot, boardHash, alpha, beta, remDepth)) {
             //The evaluation is stored in the lower 16 bits of the entry
             bestMove = transposMoveTable[boardHash & TTIdxMask];
+
+#if DEBUG
+            if(ply == 0 && bestMove == 0) throw new Exception("Root TT entry has no best move");
+#endif
+
             return unchecked((short) ttSlot);
         }
 
         //Reset any pruning special move values, as they might screw up future move ordering if not cleared
-        ResetSpecialPruningMove_I();
+        ResetThreatMove_I(ply);
 
         if(!isPvCandidateNode && beta < Eval.MaxMate && !isInCheck) {
             //Determine the static evaluation of the position
@@ -186,7 +206,7 @@ public partial class MyBot : IChessBot {
 #if FSTATS
                     STAT_MateThreatExtension_I();
 #endif
-                } else if(ApplyBotvinnikMarkoffExtension_I(nullMoveRefutation, ply)) {
+                } else if(threatMove != 0 && ApplyBotvinnikMarkoffExtension_I(threatMove, ply)) {
                     extension += OnePlyExtension / 3;
 
 #if FSTATS
@@ -222,6 +242,9 @@ public partial class MyBot : IChessBot {
         searchBoard.GetLegalMovesNonAlloc(ref moves);
 
         if(moves.Length == 0) {
+#if DEBUG
+            if(ply == 0) throw new Exception("Root node has no valid moves");
+#endif
             //Handle checkmate / stalemate
             return searchBoard.IsInCheck() ? Eval.MinEval + ply : 0;
         }
@@ -236,7 +259,7 @@ public partial class MyBot : IChessBot {
         SortMoves(toBeOrderedMoves, ply);
 
         //Search for the best move
-        int bestScore = Eval.MinEval;
+        int bestScore = Eval.MinEval - 10;
         bool hasPvMove = false;
         TTBoundType ttBound = TTBoundType.Upper; //Until we surpass alpha we only have an upper bound
 
@@ -284,6 +307,9 @@ public partial class MyBot : IChessBot {
                 bestScore = score;
                 bestMove = move.RawValue;
             }
+#if DEBUG
+            else if(i == 0) throw new Exception($"First move failed to raise best score: {move} {score}");
+#endif
 
             //Update alpha/beta bounds
             //Do this after the best score update to implement a fail-soft alpha-beta search
@@ -332,6 +358,10 @@ public partial class MyBot : IChessBot {
         //TODO Currently always replaces, investigate potential other strategies
         StoreTTEntry_I(ref ttSlot, (short) bestScore, ttBound, remDepth, boardHash);
         transposMoveTable[boardHash & TTIdxMask] = bestMove;
+
+#if DEBUG
+        if(bestScore < Eval.MinEval) throw new Exception($"Found no best move in node search: best score {bestScore} best move {bestMove} num moves {moves.Length}");
+#endif
 
         return bestScore;
     }
