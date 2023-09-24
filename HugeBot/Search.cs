@@ -198,8 +198,19 @@ public partial class MyBot : IChessBot {
                     STAT_AlphaBeta_FailHigh_I(isPvCandidateNode, false, i);
 #endif
 
-                    //Insert into the killer table if the move is quiet
-                    if(IsMoveQuiet_I(move)) InsertIntoKillerTable_I(ply, move); 
+                    //Check if the move is quiet
+                    if(IsMoveQuiet_I(move)) {
+                        //Insert into the killer table
+                        InsertIntoKillerTable_I(ply, move);
+
+                        //Update the butterfly and history tables
+                        bool isWhite = searchBoard.IsWhiteToMove;
+                        for(int pi = 0; pi < i; pi++) {
+                            Move prevMove = moves[pi];
+                            UpdateButterflyTable_I(prevMove, isWhite, remDepth);
+                        }
+                        UpdateHistoryTable_I(move, isWhite, remDepth);
+                    }
 
                     ttBound = TTBoundType.Lower;
                     break;

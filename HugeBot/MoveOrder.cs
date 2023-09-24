@@ -5,8 +5,15 @@ public partial class MyBot {
     private const int NumKillerTableSlots = 4;
 
     private ushort[] killerTable = new ushort[MaxPly * NumKillerTableSlots];
+    private int[] historyTable = new int[2 * 8 * 64], butterflyTable = new int[2 * 8 * 64];
 
-    public void MoveOrder_Reset_I() => Array.Clear(killerTable);
+    private int GetMoveButterflyIndex_I(Move move, bool isWhite) => (isWhite ? 0 : 8*64) | (int) move.MovePieceType << 6 | move.TargetSquare.Index;
+
+    public void MoveOrder_Reset_I() {
+        Array.Fill(killerTable, (ushort) 0);
+        Array.Fill(historyTable, 0);
+        Array.Fill(butterflyTable, 1);
+    }
 
     public Span<Move> PlaceBestMoveFirst_I(int alpha, int beta, int remDepth, int ply, Span<Move> moves, ulong ttEntry, ulong boardHash) {
 #if STATS
@@ -44,7 +51,7 @@ public partial class MyBot {
         return moves;
     }
 
-    private static int curMoveOrderPly;
+    private int curMoveOrderPly;
     public void SortMoves_I(Span<Move> moves, int ply) {
         long GetMoveScore_I(Move move) {
             if(move.IsCapture | move.IsPromotion) {
@@ -55,10 +62,12 @@ public partial class MyBot {
             } else {
                 //Check if the move is in the killer table
                 for(int i = 0; i < NumKillerTableSlots; i++) {
-                    if(killerTable[NumKillerTableSlots*curMoveOrderPly + i] == move.RawValue) return (long) (NumKillerTableSlots - i) << 16;
+                    if(killerTable[NumKillerTableSlots*curMoveOrderPly + i] == move.RawValue) return (long) (NumKillerTableSlots - i) << 28;
                 }
 
-                return 0;
+                //Return a score based on the Relative History Heuristic
+                int butterflyIdx = GetMoveButterflyIndex_I(move, searchBoard.IsWhiteToMove);
+                return (historyTable[butterflyIdx] << 8) / butterflyTable[butterflyIdx];
             }
         }
         int CompareMoves(Move a, Move b) => GetMoveScore_I(b).CompareTo(GetMoveScore_I(a));
@@ -82,4 +91,11 @@ public partial class MyBot {
 
         killerTable[NumKillerTableSlots*ply + 0] = moveVal;
     }
+
+    //TODO Experiment with other increments
+    public void UpdateButterflyTable_I(Move move, bool isWhite, int depth)
+        => butterflyTable[GetMoveButterflyIndex_I(move, isWhite)]++;
+
+    public void UpdateHistoryTable_I(Move move, bool isWhite, int depth)
+        => historyTable[GetMoveButterflyIndex_I(move, isWhite)] += depth*depth;
 }
