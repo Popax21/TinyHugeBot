@@ -5,14 +5,14 @@ public partial class MyBot {
     private const int NumKillerTableSlots = 4;
 
     private ushort[] killerTable = new ushort[MaxPly * NumKillerTableSlots];
-    private int[] historyTable = new int[2 * 8 * 64], butterflyTable = new int[2 * 8 * 64];
+    private uint[] historyTable = new uint[2 * 8 * 64], butterflyTable = new uint[2 * 8 * 64];
 
     private int GetMoveButterflyIndex_I(Move move, bool isWhite) => (isWhite ? 0 : 8*64) | (int) move.MovePieceType << 6 | move.TargetSquare.Index;
 
     public void MoveOrder_Reset_I() {
         Array.Fill(killerTable, (ushort) 0);
-        Array.Fill(historyTable, 0);
-        Array.Fill(butterflyTable, 1);
+        Array.Fill(historyTable, 0U);
+        Array.Fill(butterflyTable, 1U);
     }
 
     public Span<Move> PlaceBestMoveFirst_I(int alpha, int beta, int remDepth, int ply, Span<Move> moves, ulong ttEntry, ulong boardHash) {
@@ -51,18 +51,17 @@ public partial class MyBot {
         return moves;
     }
 
-    private int curMoveOrderPly;
-    public void SortMoves_I(Span<Move> moves, int ply) {
-        long GetMoveScore_I(Move move) {
+    public void SortMoves(Span<Move> moves, int ply) {
+        ulong DetermineMoveScore_I(Move move, int ply, bool isWhiteToMove) {
             if(move.IsCapture | move.IsPromotion) {
                 //Score by MVV-LAA (Most Valuable Victim - Least Valuable Aggressor)
                 //Promotions take priority over other moves
                 //TODO Try other metrics (e.g. SSE)
-                return (long) ((int) move.PromotionPieceType << 16 | (int) move.CapturePieceType << 4 | (15 - (int) move.MovePieceType)) << 32;
+                return (ulong) ((int) move.PromotionPieceType << 16 | (int) move.CapturePieceType << 4 | (15 - (int) move.MovePieceType)) << 40;
             } else {
                 //Check if the move is in the killer table
                 for(int i = 0; i < NumKillerTableSlots; i++) {
-                    if(killerTable[NumKillerTableSlots*curMoveOrderPly + i] == move.RawValue) return (long) (NumKillerTableSlots - i) << 28;
+                    if(killerTable[NumKillerTableSlots*ply + i] == move.RawValue) return (ulong) (NumKillerTableSlots - i) << 36;
                 }
 
                 //Return a score based on the Relative History Heuristic
@@ -70,10 +69,14 @@ public partial class MyBot {
                 return (historyTable[butterflyIdx] << 8) / butterflyTable[butterflyIdx];
             }
         }
-        int CompareMoves(Move a, Move b) => GetMoveScore_I(b).CompareTo(GetMoveScore_I(a));
 
-        curMoveOrderPly = ply;
-        moves.Sort(CompareMoves);
+        //Assign each move a score, then sort by that score
+        Span<ulong> moveScores = stackalloc ulong[moves.Length];
+        for(int i = 0; i < moves.Length; i++) {
+            Move move = moves[i];
+            moveScores[i] = ~DetermineMoveScore_I(move, ply, searchBoard.IsWhiteToMove);
+        }
+        moveScores.Sort(moves);
     }
 
     public bool IsMoveQuiet_I(Move move) => !move.IsCapture && !move.IsPromotion;
@@ -97,5 +100,5 @@ public partial class MyBot {
         => butterflyTable[GetMoveButterflyIndex_I(move, isWhite)]++;
 
     public void UpdateHistoryTable_I(Move move, bool isWhite, int depth)
-        => historyTable[GetMoveButterflyIndex_I(move, isWhite)] += depth*depth;
+        => historyTable[GetMoveButterflyIndex_I(move, isWhite)] += (uint) (depth*depth);
 }

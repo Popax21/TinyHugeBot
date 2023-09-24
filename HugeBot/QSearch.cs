@@ -42,7 +42,7 @@ public partial class MyBot {
 
         //Move ordering
         Span<Move> toBeOrderedMoves = PlaceBestMoveFirst_I(alpha, beta, 0, -1, moves, ttSlot, boardHash);
-        SortMoves_I(toBeOrderedMoves, ply);
+        SortMoves(toBeOrderedMoves, ply);
 
         for(int i = 0; i < moves.Length; i++) {
             //Evaluate the move

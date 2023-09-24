@@ -147,7 +147,7 @@ public partial class MyBot : IChessBot {
 
         //Order moves
         Span<Move> toBeOrderedMoves = PlaceBestMoveFirst_I(alpha, beta, remDepth, ply, moves, ttSlot, boardHash);
-        SortMoves_I(toBeOrderedMoves, ply);
+        SortMoves(toBeOrderedMoves, ply);
 
         //Search for the best move
         int bestScore = Eval.MinEval;
