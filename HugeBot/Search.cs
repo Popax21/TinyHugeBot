@@ -95,13 +95,13 @@ public partial class MyBot : IChessBot {
         }
     }
 
-    //alpha / beta are exclusive lower / upper bounds
+    private int timeoutCheckNodeCounter = 0;
     public int NegaMax(int alpha, int beta, int remDepth, int ply, out ushort bestMove) {
         bool isPvCandidateNode = alpha+1 < beta; //Because of PVS, all nodes without a zero window are considered candidate nodes
         bestMove = 0;
 
         //Check if time is up
-        if(searchTimer.MillisecondsElapsedThisTurn >= searchAbortTime)
+        if((++timeoutCheckNodeCounter & 0xfff) == 0 && searchTimer.MillisecondsElapsedThisTurn >= searchAbortTime)
 #if DEBUG
             throw new TimeoutException();
 #else
