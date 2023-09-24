@@ -13,6 +13,7 @@ public partial class MyBot {
         if(remDepth < 3 || beta >= Eval.MaxMate) return false;
 
         //Allow two null moves in a row to mitigate Zugzwang
+        //TODO Find better ways to do this
         if(numNullMoves >= 2) return false;
         
         //TODO Experiment with other values for X 
@@ -46,6 +47,7 @@ public partial class MyBot {
         0                                   //Kings - just a placeholder
     };
 
+    //TODO Check if disabling near the endgame helps things
     public bool ApplyDeltaPruning_I(Move move, int alpha, int standPatScore)
         => standPatScore + DeltaPruningMargins[(int) move.CapturePieceType] < alpha;
 
