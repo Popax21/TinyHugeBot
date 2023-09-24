@@ -4,7 +4,7 @@ using ChessChallenge.API;
 public partial class MyBot {
     private const int NumKillerTableSlots = 4;
 
-    private ushort[] killerTable = new ushort[MaxPly * NumKillerTableSlots];
+    private ushort[] killerTable = new ushort[MaxPlies * NumKillerTableSlots];
     private uint[] historyTable = new uint[2 * 8 * 64], butterflyTable = new uint[2 * 8 * 64];
 
     private int GetMoveButterflyIndex_I(Move move, bool isWhite) => (isWhite ? 0 : 8*64) | (int) move.MovePieceType << 6 | move.TargetSquare.Index;

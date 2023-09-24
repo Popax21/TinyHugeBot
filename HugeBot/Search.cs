@@ -1,10 +1,10 @@
-﻿using System;
+using System;
 using ChessChallenge.API;
 using HugeBot;
 
 public partial class MyBot : IChessBot {
     public const int MaxDepth = 63; //Limited by TT
-    public const int MaxPly = 256; //Limited by TT
+    public const int MaxPlies = 256;
 
     private Board searchBoard = null!;
     private Timer searchTimer = null!;
@@ -99,6 +99,11 @@ public partial class MyBot : IChessBot {
     public int NegaMax(int alpha, int beta, int remDepth, int ply, out ushort bestMove, int lmrIdx = -1) {
         bestMove = 0;
 
+#if DEBUG
+        if(remDepth < 0 || remDepth > MaxDepth) throw new Exception($"Out-of-range depth: {remDepth}");
+        if(ply < 0 || ply >= MaxPlies) throw new Exception($"Out-of-range ply: {ply}");
+#endif
+
         //Check if time is up
         if((++timeoutCheckNodeCounter & 0xfff) == 0 && searchTimer.MillisecondsElapsedThisTurn >= searchAbortTime)
 #if DEBUG
@@ -110,19 +115,19 @@ public partial class MyBot : IChessBot {
         //Handle repetition
         if(searchBoard.IsRepeatedPosition()) return 0;
 
-        //Check if we reached the bottom of the search tree
-        if(remDepth <= 0) return QSearch(alpha, beta, ply);
-
         //Start a new node
-        bool isPvCandidateNode = alpha+1 < beta; //Because of PVS, all nodes without a zero window are considered candidate nodes
         bool isInCheck = searchBoard.IsInCheck();
+        bool isPvCandidateNode = alpha+1 < beta; //Because of PVS, all nodes without a zero window are considered candidate nodes
 
 #if STATS
         STAT_NewNode_I(isPvCandidateNode, false);
 #endif
 
-        //Apply Late-Move Reduction (LMR)
-        if(!isInCheck && lmrIdx >= 0) ApplyLMR_I(isPvCandidateNode, lmrIdx, ref remDepth);
+        //Check if we reached the bottom of the search tree
+        if(remDepth <= 0) {
+            //TODO Our current Q-Search is not check aware
+            if(!isInCheck) return QSearch(alpha, beta, ply);
+        }
 
         //Check if the position is in the TT
         ulong boardHash = searchBoard.ZobristKey;
@@ -164,6 +169,16 @@ public partial class MyBot : IChessBot {
             }
         }
 
+        //Apply Late-Move Reduction (LMR)
+        if(!isInCheck && lmrIdx >= 0) ApplyLMR_I(isPvCandidateNode, lmrIdx, ref remDepth);
+
+        //Re-check if we reached the bottom of the search tree because of reductions
+        if(remDepth <= 0) {
+            //TODO Our current Q-Search is not check aware
+            if(!isInCheck) return QSearch(alpha, beta, ply);
+            remDepth = 1;
+        }
+
         //Generate legal moves
         Span<Move> moves = stackalloc Move[256];
         searchBoard.GetLegalMovesNonAlloc(ref moves);
@@ -187,7 +202,7 @@ public partial class MyBot : IChessBot {
         bool hasPvMove = false;
         TTBoundType ttBound = TTBoundType.Upper; //Until we surpass alpha we only have an upper bound
 
-        int moveLmrIdx = -1;
+        int prevLmrIdx = -1;
         for(int i = 0; i < moves.Length; i++) {
             Move move = moves[i];
             searchBoard.MakeMove(move);
@@ -197,15 +212,13 @@ public partial class MyBot : IChessBot {
             switch(hasPvMove) {
                 case true:
                     //LMR: Check if we allow Late Move Reduction for this move
+                    int moveLmrIdx = -1;
                     if(!isInCheck && IsLMRAllowedForMove_I(move, i, remDepth)) {
-                        moveLmrIdx++;
+                        moveLmrIdx = ++prevLmrIdx;
 #if FSTATS
                         STAT_LMR_AllowReduction_I();
 #endif
                     }
-#if DEBUG
-                    else if(moveLmrIdx >= 0) throw new Exception("Non-LMR allowed move after LMR-allowed move");
-#endif
 
                     score = -NegaMax(-alpha - 1, -alpha, remDepth-1, ply+1, out _, moveLmrIdx);
                     if(score <= alpha || score >= beta) break; //We check the beta bound as well as we can fail-high because of our fail-soft search

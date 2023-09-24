@@ -11,9 +11,7 @@ public partial class MyBot {
         
         //TODO Experiment with other values for X 
         //TODO Transition to Null Move Reductions once we get near the endgame
-        //R = 2.5 + depth / 4 = 2 + (depth + 2) / 4
-        //http://www.talkchess.com/forum3/viewtopic.php?t=31436#p314767
-        int R = 2 + (remDepth + 2) / 4;
+        int R = 2 + remDepth / 4;
 
         //Evaluate the null move using a ZWS
         searchBoard.ForceSkipTurn();
