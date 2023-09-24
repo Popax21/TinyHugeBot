@@ -48,9 +48,8 @@ public partial class MyBot {
     public bool ApplyDeltaPruning_I(Move move, int alpha, int standPatScore)
         => standPatScore + DeltaPruningMargins[(int) move.CapturePieceType] < alpha;
 
-    private void Pruning_ResetSpecialMove_I() => nullMoveRefutation = 0;
-
-    private bool Pruning_IsSpecialMove_I(Move move) {
+    private void ResetSpecialPruningMove_I() => nullMoveRefutation = 0;
+    private bool IsSpecialPruningMove_I(Move move) {
         //Check if the move is escaping the square attacked by the null move refutation
         if(nullMoveRefutation != 0 && move.StartSquare.Index == ((nullMoveRefutation >> 6) & 63)) return true;
 

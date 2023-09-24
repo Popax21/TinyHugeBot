@@ -62,6 +62,9 @@ public partial class MyBot {
         public int TTRead_Misses, TTRead_DepthMisses, TTRead_BoundMisses, TTRead_Hits;
         public int TTWrite_NewSlots, TTWrite_SlotUpdates, TTWrite_IdxCollisions;
 
+        //Depth adjustment stats
+        public int LMR_AllowedReductions, LMR_AppliedReductions;
+
         //Pruning stats
         public int Pruning_CheckedNonPVNodes;
         public int ReverseFutilityPruning_PrunedNodes, NullMovePruning_PrunedNodes;
@@ -93,6 +96,8 @@ public partial class MyBot {
             TTRead_Misses = TTRead_DepthMisses = TTRead_BoundMisses = TTRead_Hits = 0;
             TTWrite_NewSlots = TTWrite_SlotUpdates = TTWrite_IdxCollisions = 0;
 
+            LMR_AllowedReductions = LMR_AppliedReductions = 0;
+
             Pruning_CheckedNonPVNodes = 0;
             ReverseFutilityPruning_PrunedNodes = NullMovePruning_PrunedNodes = 0;
             DeltaPruning_PrunedMoves = 0;
@@ -122,6 +127,9 @@ public partial class MyBot {
             TTWrite_NewSlots += nestedTracker.TTWrite_NewSlots;
             TTWrite_SlotUpdates += nestedTracker.TTWrite_SlotUpdates;
             TTWrite_IdxCollisions += nestedTracker.TTWrite_IdxCollisions;
+
+            LMR_AllowedReductions += nestedTracker.LMR_AllowedReductions;
+            LMR_AppliedReductions += nestedTracker.LMR_AppliedReductions;
 
             Pruning_CheckedNonPVNodes += nestedTracker.Pruning_CheckedNonPVNodes;
             ReverseFutilityPruning_PrunedNodes += nestedTracker.ReverseFutilityPruning_PrunedNodes;
@@ -183,6 +191,10 @@ public partial class MyBot {
 
             int numTTWrites = TTWrite_NewSlots + TTWrite_SlotUpdates + TTWrite_IdxCollisions;
             printStat($"TT writes: total {numTTWrites} new slots {FormatPercentageI(TTWrite_NewSlots, numTTWrites)} slot updates {FormatPercentageI(TTWrite_SlotUpdates, numTTWrites)} idx collisions {FormatPercentageI(TTWrite_IdxCollisions, numTTWrites)}");
+
+            //Depth adjustment stats
+            int totalSearchedMoves = PVCandidateStats.AlphaBeta_SearchedMoves + ZeroWindowStats.AlphaBeta_SearchedMoves;
+            printStat($"LMR: allowed reductions {FormatPercentageI(LMR_AllowedReductions, totalSearchedMoves)} applied reductions {FormatPercentageI(LMR_AppliedReductions, LMR_AllowedReductions)}");
 
             //Pruning stats
             printStat($"non-PV pruning: checked nodes {FormatPercentageI(Pruning_CheckedNonPVNodes, ZeroWindowStats.AlphaBeta_SearchedNodes)} NPM {FormatPercentageI(NullMovePruning_PrunedNodes, Pruning_CheckedNonPVNodes)} RFP {FormatPercentageI(ReverseFutilityPruning_PrunedNodes, Pruning_CheckedNonPVNodes)}");
@@ -276,6 +288,9 @@ public partial class MyBot {
     [MethodImpl(StatMImpl)] private void STAT_TTWrite_NewSlot_I() => depthStats.TTWrite_NewSlots++;
     [MethodImpl(StatMImpl)] private void STAT_TTWrite_SlotUpdate_I() => depthStats.TTWrite_SlotUpdates++;
     [MethodImpl(StatMImpl)] private void STAT_TTWrite_IdxCollision_I() => depthStats.TTWrite_IdxCollisions++;
+
+    [MethodImpl(StatMImpl)] private void STAT_LMR_AllowReduction_I() => depthStats.LMR_AllowedReductions++;
+    [MethodImpl(StatMImpl)] private void STAT_LMR_ApplyReduction_I() => depthStats.LMR_AppliedReductions++;
 
     [MethodImpl(StatMImpl)] private void STAT_Pruning_CheckNonPVNode_I() => depthStats.Pruning_CheckedNonPVNodes++;
     [MethodImpl(StatMImpl)] private void STAT_ReverseFutilityPruning_PrunedNode_I() => depthStats.ReverseFutilityPruning_PrunedNodes++;

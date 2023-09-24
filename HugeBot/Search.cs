@@ -96,8 +96,7 @@ public partial class MyBot : IChessBot {
     }
 
     private int timeoutCheckNodeCounter = 0;
-    public int NegaMax(int alpha, int beta, int remDepth, int ply, out ushort bestMove) {
-        bool isPvCandidateNode = alpha+1 < beta; //Because of PVS, all nodes without a zero window are considered candidate nodes
+    public int NegaMax(int alpha, int beta, int remDepth, int ply, out ushort bestMove, int lmrIdx = -1) {
         bestMove = 0;
 
         //Check if time is up
@@ -108,17 +107,22 @@ public partial class MyBot : IChessBot {
             throw new Exception();
 #endif
 
-#if STATS
-        STAT_NewNode_I(isPvCandidateNode, false);
-#endif
-
         //Handle repetition
         if(searchBoard.IsRepeatedPosition()) return 0;
 
         //Check if we reached the bottom of the search tree
         if(remDepth <= 0) return QSearch(alpha, beta, ply);
 
-        //TODO Reductions / Extensions
+        //Start a new node
+        bool isPvCandidateNode = alpha+1 < beta; //Because of PVS, all nodes without a zero window are considered candidate nodes
+        bool isInCheck = searchBoard.IsInCheck();
+
+#if STATS
+        STAT_NewNode_I(isPvCandidateNode, false);
+#endif
+
+        //Apply Late-Move Reduction (LMR)
+        if(!isInCheck && lmrIdx >= 0) ApplyLMR_I(isPvCandidateNode, lmrIdx, ref remDepth);
 
         //Check if the position is in the TT
         ulong boardHash = searchBoard.ZobristKey;
@@ -130,7 +134,7 @@ public partial class MyBot : IChessBot {
         }
 
         //Reset any pruning special move values, as they might screw up future move ordering if not cleared
-        Pruning_ResetSpecialMove_I();
+        ResetSpecialPruningMove_I();
 
         //Apply pruning to non-PV candidates (otherwise we duplicate our work on researches I think?)
         if(!isPvCandidateNode && beta < Eval.MaxMate && !searchBoard.IsInCheck()) {
@@ -183,6 +187,7 @@ public partial class MyBot : IChessBot {
         bool hasPvMove = false;
         TTBoundType ttBound = TTBoundType.Upper; //Until we surpass alpha we only have an upper bound
 
+        int moveLmrIdx = -1;
         for(int i = 0; i < moves.Length; i++) {
             Move move = moves[i];
             searchBoard.MakeMove(move);
@@ -191,7 +196,18 @@ public partial class MyBot : IChessBot {
             int score;
             switch(hasPvMove) {
                 case true:
-                    score = -NegaMax(-alpha - 1, -alpha, remDepth-1, ply+1, out _);
+                    //LMR: Check if we allow Late Move Reduction for this move
+                    if(!isInCheck && IsLMRAllowedForMove_I(move, i, remDepth)) {
+                        moveLmrIdx++;
+#if FSTATS
+                        STAT_LMR_AllowReduction_I();
+#endif
+                    }
+#if DEBUG
+                    else if(moveLmrIdx >= 0) throw new Exception("Non-LMR allowed move after LMR-allowed move");
+#endif
+
+                    score = -NegaMax(-alpha - 1, -alpha, remDepth-1, ply+1, out _, moveLmrIdx);
                     if(score <= alpha || score >= beta) break; //We check the beta bound as well as we can fail-high because of our fail-soft search
 
                     //Research with the full window
@@ -201,6 +217,7 @@ public partial class MyBot : IChessBot {
 
                     goto default;
                 default:
+                    //TODO Does allowing LMR here help? 
                     score = -NegaMax(-beta, -alpha, remDepth-1, ply+1, out _);
                     break;
             }

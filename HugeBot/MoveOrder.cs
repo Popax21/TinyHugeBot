@@ -78,7 +78,7 @@ public partial class MyBot {
                 }
 
                 //Check if pruning gave this move a special score
-                if(Pruning_IsSpecialMove_I(move)) {
+                if(IsSpecialPruningMove_I(move)) {
 #if FSTATS
                     STAT_MoveOrder_ScoredSpecialPruneMove_I();
 #endif
