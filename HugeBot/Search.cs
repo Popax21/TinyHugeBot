@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using ChessChallenge.API;
 using HugeBot;
 
@@ -9,6 +9,8 @@ public partial class MyBot : IChessBot {
     private Board searchBoard = null!;
     private Timer searchTimer = null!;
     private int searchAbortTime;
+
+    private int maxExtension;
 
     public Move Think(Board board, Timer timer) {
         //Determine search times
@@ -54,6 +56,9 @@ public partial class MyBot : IChessBot {
             bool didTimeOut = false;
 #endif
 
+            //Update the maximum extension amount
+            maxExtension = MaxExtension - depth*MaxExtensionReductionPerIter;
+
             //Do a NegaMax search with the current depth
             ushort iterBestMove = 0;
             try {
@@ -96,7 +101,7 @@ public partial class MyBot : IChessBot {
     }
 
     private int timeoutCheckNodeCounter = 0;
-    public int NegaMax(int alpha, int beta, int remDepth, int ply, out ushort bestMove, int lmrIdx = -1) {
+    public int NegaMax(int alpha, int beta, int remDepth, int ply, out ushort bestMove, int prevExtensions = 0, int lmrIdx = -1) {
         bestMove = 0;
 
 #if DEBUG
@@ -118,16 +123,24 @@ public partial class MyBot : IChessBot {
         //Start a new node
         bool isInCheck = searchBoard.IsInCheck();
         bool isPvCandidateNode = alpha+1 < beta; //Because of PVS, all nodes without a zero window are considered candidate nodes
+        int extension = 0;
 
 #if STATS
         STAT_NewNode_I(isPvCandidateNode, false);
 #endif
 
-        //Check if we reached the bottom of the search tree
-        if(remDepth <= 0) {
-            //TODO Our current Q-Search is not check aware
-            if(!isInCheck) return QSearch(alpha, beta, ply);
+        //Apply a search extension if in check
+        //We don't use the fractional extension variable here because this is before the Q-search check / TT lookup
+        //TODO Use a better check extension here (maybe using SSE?)
+        if(isInCheck) {
+            remDepth++;
+#if FSTATS
+            STAT_CheckExtension_I();
+#endif
         }
+    
+        //Check if we reached the bottom of the search tree
+        if(remDepth <= 0) return QSearch(alpha, beta, ply);
 
         //Check if the position is in the TT
         ulong boardHash = searchBoard.ZobristKey;
@@ -141,16 +154,15 @@ public partial class MyBot : IChessBot {
         //Reset any pruning special move values, as they might screw up future move ordering if not cleared
         ResetSpecialPruningMove_I();
 
-        //Apply pruning to non-PV candidates (otherwise we duplicate our work on researches I think?)
-        if(!isPvCandidateNode && beta < Eval.MaxMate && !searchBoard.IsInCheck()) {
-            int prunedScore = 0;
+        if(!isPvCandidateNode && beta < Eval.MaxMate && !isInCheck) {
+            //Determine the static evaluation of the position
+            int staticEval = Eval.Evaluate(searchBoard);
 
+            //Apply pruning to non-PV candidates (otherwise we duplicate our work on researches I think?)
 #if FSTATS
             STAT_Pruning_CheckNonPVNode_I();
 #endif
-
-            //Determine the static evaluation of the position
-            int staticEval = Eval.Evaluate(searchBoard);
+            int prunedScore = 0;
 
             //Apply Reverse Futility Pruning
             if(ApplyReverseFutilityPruning_I(staticEval, beta, remDepth, ref prunedScore)) {
@@ -161,20 +173,46 @@ public partial class MyBot : IChessBot {
             }
 
             //Apply Null Move Pruning
-            if(ApplyNullMovePruning_I(alpha, beta, remDepth, ply, ref prunedScore)) {
+            if(ApplyNullMovePruning_I(alpha, beta, remDepth, ply, prevExtensions, ref prunedScore)) {
+                if(prunedScore >= beta) { 
 #if FSTATS
-                STAT_NullMovePruning_PrunedNode_I();
+                    STAT_NullMovePruning_PrunedNode_I();
 #endif
-                return prunedScore;
+                    return prunedScore;
+                } else if(prunedScore <= Eval.MinMate) {
+                    //Mate threat extension
+                    extension += OnePlyExtension / 2;
+
+#if FSTATS
+                    STAT_MateThreatExtension_I();
+#endif
+                } else if(ApplyBotvinnikMarkoffExtension_I(nullMoveRefutation, ply)) {
+                    extension += OnePlyExtension / 3;
+
+#if FSTATS
+                    STAT_BotvinnikMarkoffExtension_I();
+#endif
+                }
             }
         }
 
         //Apply Late-Move Reduction (LMR)
-        if(!isInCheck && lmrIdx >= 0) ApplyLMR_I(lmrIdx, ref remDepth);
+        if(!isInCheck && extension <= 0 && lmrIdx >= 0) ApplyLMR_I(lmrIdx, remDepth, ref extension);
+
+        //Apply extensions / reductions
+        if(prevExtensions + extension > maxExtension) {
+            extension = maxExtension - prevExtensions;
+#if FSTATS
+            if(prevExtensions < maxExtension) STAT_ExtensionLimitHit_I(remDepth);
+#endif
+        }
+
+        remDepth += (((prevExtensions + extension) & ~ExtensionFractMask) - (prevExtensions & ~ExtensionFractMask)) >> ExtensionFractBits;
+        prevExtensions += extension;
 
         //Re-check if we reached the bottom of the search tree because of reductions
         if(remDepth <= 0) {
-            //TODO Our current Q-Search is not check aware
+            //TODO Our current Q-search is not check aware
             if(!isInCheck) return QSearch(alpha, beta, ply);
             remDepth = 1;
         }
@@ -220,7 +258,7 @@ public partial class MyBot : IChessBot {
 #endif
                     }
 
-                    score = -NegaMax(-alpha - 1, -alpha, remDepth-1, ply+1, out _, moveLmrIdx);
+                    score = -NegaMax(-alpha - 1, -alpha, remDepth-1, ply+1, out _, prevExtensions, moveLmrIdx);
                     if(score <= alpha || score >= beta) break; //We check the beta bound as well as we can fail-high because of our fail-soft search
 
                     //Research with the full window
@@ -230,8 +268,7 @@ public partial class MyBot : IChessBot {
 
                     goto default;
                 default:
-                    //TODO Does allowing LMR here help? 
-                    score = -NegaMax(-beta, -alpha, remDepth-1, ply+1, out _);
+                    score = -NegaMax(-beta, -alpha, remDepth-1, ply+1, out _, prevExtensions);
                     break;
             }
 

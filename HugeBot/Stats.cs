@@ -63,6 +63,8 @@ public partial class MyBot {
         public int TTWrite_NewSlots, TTWrite_SlotUpdates, TTWrite_IdxCollisions;
 
         //Depth adjustment stats
+        public int CheckExtensions, MateThreatExtensions, BotvinnikMarkoffExtensions;
+        public int ExtensionLimitHits, ExtensionLimitHitDepthSum;
         public int LMR_AllowedReductions, LMR_AppliedReductions;
 
         //Pruning stats
@@ -96,6 +98,8 @@ public partial class MyBot {
             TTRead_Misses = TTRead_DepthMisses = TTRead_BoundMisses = TTRead_Hits = 0;
             TTWrite_NewSlots = TTWrite_SlotUpdates = TTWrite_IdxCollisions = 0;
 
+            CheckExtensions = MateThreatExtensions = BotvinnikMarkoffExtensions = 0;
+            ExtensionLimitHits = ExtensionLimitHitDepthSum = 0;
             LMR_AllowedReductions = LMR_AppliedReductions = 0;
 
             Pruning_CheckedNonPVNodes = 0;
@@ -127,6 +131,13 @@ public partial class MyBot {
             TTWrite_NewSlots += nestedTracker.TTWrite_NewSlots;
             TTWrite_SlotUpdates += nestedTracker.TTWrite_SlotUpdates;
             TTWrite_IdxCollisions += nestedTracker.TTWrite_IdxCollisions;
+
+            CheckExtensions += nestedTracker.CheckExtensions;
+            MateThreatExtensions += nestedTracker.MateThreatExtensions;
+            BotvinnikMarkoffExtensions += nestedTracker.BotvinnikMarkoffExtensions;
+
+            ExtensionLimitHits += nestedTracker.ExtensionLimitHits;
+            ExtensionLimitHitDepthSum += nestedTracker.ExtensionLimitHitDepthSum;
 
             LMR_AllowedReductions += nestedTracker.LMR_AllowedReductions;
             LMR_AppliedReductions += nestedTracker.LMR_AppliedReductions;
@@ -193,7 +204,10 @@ public partial class MyBot {
             printStat($"TT writes: total {numTTWrites} new slots {FormatPercentageI(TTWrite_NewSlots, numTTWrites)} slot updates {FormatPercentageI(TTWrite_SlotUpdates, numTTWrites)} idx collisions {FormatPercentageI(TTWrite_IdxCollisions, numTTWrites)}");
 
             //Depth adjustment stats
+            int totalExtensions = CheckExtensions + MateThreatExtensions + BotvinnikMarkoffExtensions;
             int totalSearchedMoves = PVCandidateStats.AlphaBeta_SearchedMoves + ZeroWindowStats.AlphaBeta_SearchedMoves;
+            printStat($"extensions: total {FormatPercentageI(totalExtensions, totalSearchedMoves)} check {FormatPercentageI(CheckExtensions, totalExtensions)} mate threat {FormatPercentageI(MateThreatExtensions, totalExtensions)} bm {FormatPercentageI(BotvinnikMarkoffExtensions, totalExtensions)}");
+            printStat($"extension limits: hits {FormatPercentageI(ExtensionLimitHits, totalExtensions)} avg. hit depth {FormatFloat((double) ExtensionLimitHitDepthSum / ExtensionLimitHits, 4)}");
             printStat($"LMR: allowed reductions {FormatPercentageI(LMR_AllowedReductions, totalSearchedMoves)} applied reductions {FormatPercentageI(LMR_AppliedReductions, LMR_AllowedReductions)}");
 
             //Pruning stats
@@ -288,6 +302,15 @@ public partial class MyBot {
     [MethodImpl(StatMImpl)] private void STAT_TTWrite_NewSlot_I() => depthStats.TTWrite_NewSlots++;
     [MethodImpl(StatMImpl)] private void STAT_TTWrite_SlotUpdate_I() => depthStats.TTWrite_SlotUpdates++;
     [MethodImpl(StatMImpl)] private void STAT_TTWrite_IdxCollision_I() => depthStats.TTWrite_IdxCollisions++;
+
+    [MethodImpl(StatMImpl)] private void STAT_CheckExtension_I() => depthStats.CheckExtensions++;
+    [MethodImpl(StatMImpl)] private void STAT_MateThreatExtension_I() => depthStats.MateThreatExtensions++;
+    [MethodImpl(StatMImpl)] private void STAT_BotvinnikMarkoffExtension_I() => depthStats.BotvinnikMarkoffExtensions++;
+
+    [MethodImpl(StatMImpl)] private void STAT_ExtensionLimitHit_I(int remDepth) {
+        depthStats.ExtensionLimitHits++;
+        depthStats.ExtensionLimitHitDepthSum += remDepth;
+    }
 
     [MethodImpl(StatMImpl)] private void STAT_LMR_AllowReduction_I() => depthStats.LMR_AllowedReductions++;
     [MethodImpl(StatMImpl)] private void STAT_LMR_ApplyReduction_I() => depthStats.LMR_AppliedReductions++;

@@ -3,7 +3,7 @@ using ChessChallenge.API;
 public partial class MyBot {
     private int numNullMoves = 0;
     private ushort nullMoveRefutation;
-    public bool ApplyNullMovePruning_I(int alpha, int beta, int remDepth, int ply, ref int score) {
+    public bool ApplyNullMovePruning_I(int alpha, int beta, int remDepth, int ply, int curExtension, ref int score) {
         //Check if we should apply NMP
         //Allow two null moves in a row to mitigate Zugzwang
         //TODO Find better ways to do this
@@ -16,20 +16,20 @@ public partial class MyBot {
         //Evaluate the null move using a ZWS
         searchBoard.ForceSkipTurn();
         numNullMoves++;
-        score = -NegaMax(-beta, -beta + 1, remDepth - 1 - R, ply+1, out nullMoveRefutation);
+        score = -NegaMax(-beta, -beta + 1, remDepth - 1 - R, ply+1, out nullMoveRefutation, curExtension);
         numNullMoves--;
         searchBoard.UndoSkipTurn(); 
 
-        return score >= beta;
+        return true;
     }
 
     private const int PruningSafetyMargin = 2*90; //~200 centipawns
 
-    public bool ApplyReverseFutilityPruning_I(int eval, int beta, int depth, ref int prunedScore) {
+    public bool ApplyReverseFutilityPruning_I(int eval, int beta, int depth, ref int score) {
         //TODO Experiment with different values
         //TODO This relies on the Null Move Hypothesis, investigate potential Zugzwang issues
-        prunedScore = eval - depth * 90 - (PruningSafetyMargin - 1*90);
-        return depth < 7 && prunedScore >= beta;
+        score = eval - depth * 90 - (PruningSafetyMargin - 1*90);
+        return depth < 7 && score >= beta;
     }
 
     private static readonly ushort[] DeltaPruningMargins = new ushort[] {
