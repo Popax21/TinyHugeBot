@@ -1,16 +1,13 @@
 using ChessChallenge.API;
-using HugeBot;
 
 public partial class MyBot {
     private int numNullMoves = 0;
     private ushort nullMoveRefutation;
     public bool ApplyNullMovePruning_I(int alpha, int beta, int remDepth, int ply, ref int score) {
         //Check if we should apply NMP
-        if(remDepth < 3 || beta >= Eval.MaxMate) return false;
-
         //Allow two null moves in a row to mitigate Zugzwang
         //TODO Find better ways to do this
-        if(numNullMoves >= 2) return false;
+        if(remDepth < 3 || numNullMoves >= 2) return false;
         
         //TODO Experiment with other values for X 
         //TODO Transition to Null Move Reductions once we get near the endgame
@@ -19,7 +16,7 @@ public partial class MyBot {
         int R = 2 + (remDepth + 2) / 4;
 
         //Evaluate the null move using a ZWS
-        if(!searchBoard.TrySkipTurn()) return false;
+        searchBoard.ForceSkipTurn();
         numNullMoves++;
         score = -NegaMax(-beta, -beta + 1, remDepth - 1 - R, ply+1, out nullMoveRefutation);
         numNullMoves--;

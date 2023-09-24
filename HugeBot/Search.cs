@@ -133,7 +133,7 @@ public partial class MyBot : IChessBot {
         Pruning_ResetSpecialMove_I();
 
         //Apply pruning to non-PV candidates (otherwise we duplicate our work on researches I think?)
-        if(!isPvCandidateNode) {
+        if(!isPvCandidateNode && beta < Eval.MaxMate && !searchBoard.IsInCheck()) {
             int prunedScore = 0;
 
 #if FSTATS
