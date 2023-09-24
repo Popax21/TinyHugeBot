@@ -7,6 +7,7 @@
     <Nullable>enable</Nullable>
     <LangVersion>11</LangVersion>
     <CheckForOverflowUnderflow Condition="'$(Configuration)' == 'Debug'">true</CheckForOverflowUnderflow>
+    <DefineConstants Condition="'$(DisableBestMoveDisplay)' == ''">$(DefineConstants);BESTMOVE</DefineConstants>
     <DefineConstants Condition="'$(DisableStats)' == ''">$(DefineConstants);STATS</DefineConstants>
     <DefineConstants Condition="'$(DisableFullStats)' == ''">$(DefineConstants);FSTATS</DefineConstants>
   </PropertyGroup>

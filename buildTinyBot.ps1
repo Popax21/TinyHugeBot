@@ -10,6 +10,10 @@ if ($args -match "--debug") {
 	$BuildFlags += @{c = "Release"}
 }
 
+if (!($args -match "--bestmove")) {
+	$BuildFlags += @{"p:" = "DisableBestMoveDisplay=1"}
+}
+
 if (!($args -match "--fullstats")) {
 	$BuildFlags += @{"p:" = "DisableFullStats=1"}
 	if (!($args -match "--stats")) {

@@ -50,7 +50,7 @@ public partial class MyBot : IChessBot {
             //Notify the stats tracker that the depth search starts
             STAT_StartDepthSearch(depth);
 #endif
-#if DEBUG || STATS
+#if BESTMOVE || STATS
             bool didTimeOut = false;
 #endif
 
@@ -64,7 +64,7 @@ public partial class MyBot : IChessBot {
 #else
             } catch(Exception) {
 #endif
-#if DEBUG || STATS
+#if BESTMOVE || STATS
                 didTimeOut = true;
 #endif
 
@@ -86,7 +86,7 @@ public partial class MyBot : IChessBot {
                 //Notify the stats tracker that the search ended
                 STAT_EndGlobalSearch(bestMove, curBestEval, depth - (didTimeOut && iterBestMove == 0 ? 1 : 0));
 #endif
-#if DEBUG
+#if BESTMOVE
                 //Log the best move
                 Console.WriteLine($"Searched to depth {depth - (didTimeOut && iterBestMove == 0 ? 1 : 0)} in {timer.MillisecondsElapsedThisTurn:d5}ms: best move {bestMove.ToString()[7..^1]} eval {(!didTimeOut ? curBestEval.ToString() : "????")}");
 #endif

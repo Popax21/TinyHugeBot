@@ -11,6 +11,10 @@ else
     BUILD_FLAGS+="-c Release "
 fi
 
+if [[ ! "$@" == *"--bestmove"* ]]; then
+    BUILD_FLAGS+="-p:DisableBestMoveDisplay=1 "
+fi
+
 if [[ ! "$@" == *"--fullstats"* ]]; then
     BUILD_FLAGS+="-p:DisableFullStats=1 "
     if [[ ! "$@" == *"--stats"* ]]; then
