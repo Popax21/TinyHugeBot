@@ -9,7 +9,7 @@ public partial class MyBot {
         //TODO Find better ways to do this
         if(remDepth < 3 || numNullMoves >= 2) return false;
         
-        //TODO Experiment with other values for X 
+        //TODO Experiment with other values for R
         //TODO Transition to Null Move Reductions once we get near the endgame
         int R = 2 + remDepth / 4;
 
@@ -31,26 +31,25 @@ public partial class MyBot {
         return false;
     }
 
-    private const int PruningSafetyMargin = 2*90; //~200 centipawns
 
     public bool CanFutilityPrune_I(int staticEval, int alpha, int depth)
-        //One EG pawn per ply of depth 
-        => staticEval + PruningSafetyMargin + depth*94 <= alpha;
+        => depth <= 4 && staticEval + 100*depth <= alpha;
 
     public bool ApplyReverseFutilityPruning_I(int eval, int beta, int depth, ref int score) {
         //TODO Experiment with different values
         //TODO This relies on the Null Move Hypothesis, investigate potential Zugzwang issues
-        score = eval - depth * 90 - (PruningSafetyMargin - 1*90);
+        score = eval - depth * 90 - (DeltaPruningSafetyMargin - 1*90);
         return depth < 7 && score >= beta;
     }
 
+    private const int DeltaPruningSafetyMargin = 2*90; //~200 centipawns
     private static readonly ushort[] DeltaPruningMargins = new ushort[] {
-        PruningSafetyMargin + 1000,    //None - as we only evaluate non-quiet moves this means that it's a pawn promition, so it has the same margin as a queen
-        PruningSafetyMargin + 90,      //Pawns
-        PruningSafetyMargin + 310,     //Knights
-        PruningSafetyMargin + 340,     //Bishops
-        PruningSafetyMargin + 500,     //Rooks
-        PruningSafetyMargin + 1000,    //Queen
+        DeltaPruningSafetyMargin + 1000,    //None - as we only evaluate non-quiet moves this means that it's a pawn promotion, so it has the same margin as a queen
+        DeltaPruningSafetyMargin + 90,      //Pawns
+        DeltaPruningSafetyMargin + 310,     //Knights
+        DeltaPruningSafetyMargin + 340,     //Bishops
+        DeltaPruningSafetyMargin + 500,     //Rooks
+        DeltaPruningSafetyMargin + 1000,    //Queen
         0                              //Kings - just a placeholder
     };
 

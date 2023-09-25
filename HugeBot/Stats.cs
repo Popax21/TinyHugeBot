@@ -70,6 +70,7 @@ public partial class MyBot {
         //Pruning stats
         public int Pruning_CheckedNonPVNodes;
         public int ReverseFutilityPruning_PrunedNodes, NullMovePruning_PrunedNodes;
+        public int FutilityPruning_AbleNodes, FutilityPruning_TotalMoves, FutilityPruning_PrunedMoves;
         public int DeltaPruning_PrunedMoves;
 
         //Move order stats
@@ -104,6 +105,7 @@ public partial class MyBot {
 
             Pruning_CheckedNonPVNodes = 0;
             ReverseFutilityPruning_PrunedNodes = NullMovePruning_PrunedNodes = 0;
+            FutilityPruning_AbleNodes = FutilityPruning_TotalMoves= FutilityPruning_PrunedMoves = 0;
             DeltaPruning_PrunedMoves = 0;
 
             MoveOrder_BestMoveInvokes = MoveOrder_BestMoveTTHits = MoveOrder_BestMoveIIDInvokes = 0;
@@ -145,6 +147,9 @@ public partial class MyBot {
             Pruning_CheckedNonPVNodes += nestedTracker.Pruning_CheckedNonPVNodes;
             ReverseFutilityPruning_PrunedNodes += nestedTracker.ReverseFutilityPruning_PrunedNodes;
             NullMovePruning_PrunedNodes += nestedTracker.NullMovePruning_PrunedNodes;
+            FutilityPruning_AbleNodes += nestedTracker.FutilityPruning_AbleNodes;
+            FutilityPruning_TotalMoves += nestedTracker.FutilityPruning_TotalMoves;
+            FutilityPruning_PrunedMoves += nestedTracker.FutilityPruning_PrunedMoves;
             DeltaPruning_PrunedMoves += nestedTracker.DeltaPruning_PrunedMoves;
 
             MoveOrder_BestMoveInvokes += nestedTracker.MoveOrder_BestMoveInvokes;
@@ -212,10 +217,11 @@ public partial class MyBot {
 
             //Pruning stats
             printStat($"non-PV pruning: checked nodes {FormatPercentageI(Pruning_CheckedNonPVNodes, ZeroWindowStats.AlphaBeta_SearchedNodes)} NPM {FormatPercentageI(NullMovePruning_PrunedNodes, Pruning_CheckedNonPVNodes)} RFP {FormatPercentageI(ReverseFutilityPruning_PrunedNodes, Pruning_CheckedNonPVNodes)}");
+            printStat($"futility pruning: able nodes {FormatPercentageI(FutilityPruning_AbleNodes, Pruning_CheckedNonPVNodes)} pruned moves {FormatPercentageI(FutilityPruning_PrunedMoves, FutilityPruning_TotalMoves)}");
             printStat($"delta pruning: pruned moves {FormatPercentageI(DeltaPruning_PrunedMoves, QSearchStats.AlphaBeta_GeneratedMoves)}");
 
             //Move ordering stats
-            printStat($"move ordering: best move: invocs {MoveOrder_BestMoveInvokes} TT hits {FormatPercentageI(MoveOrder_BestMoveTTHits, MoveOrder_BestMoveInvokes)} IID invocs {FormatPercentageI(MoveOrder_BestMoveIIDInvokes, MoveOrder_BestMoveInvokes)}");
+            printStat($"move ordering: best move invocs {MoveOrder_BestMoveInvokes} TT hits {FormatPercentageI(MoveOrder_BestMoveTTHits, MoveOrder_BestMoveInvokes)} IID invocs {FormatPercentageI(MoveOrder_BestMoveIIDInvokes, MoveOrder_BestMoveInvokes)}");
             printStat($"move scoring: moves scored: {MoveOrder_MovesScored} noisy moves {FormatPercentageI(MoveOrder_NoisyMoves, MoveOrder_MovesScored)} killer moves {FormatPercentageI(MoveOrder_KillerMoves, MoveOrder_MovesScored)} threat escape moves {FormatPercentageI(MoveOrder_ThreatEscapeMoves, MoveOrder_MovesScored)}");
 #endif
 
@@ -318,6 +324,9 @@ public partial class MyBot {
     [MethodImpl(StatMImpl)] private void STAT_Pruning_CheckNonPVNode_I() => depthStats.Pruning_CheckedNonPVNodes++;
     [MethodImpl(StatMImpl)] private void STAT_ReverseFutilityPruning_PrunedNode_I() => depthStats.ReverseFutilityPruning_PrunedNodes++;
     [MethodImpl(StatMImpl)] private void STAT_NullMovePruning_PrunedNode_I() => depthStats.NullMovePruning_PrunedNodes++;
+    [MethodImpl(StatMImpl)] private void STAT_FutilityPruning_AbleNode() => depthStats.FutilityPruning_AbleNodes++;
+    [MethodImpl(StatMImpl)] private void STAT_FutilityPruning_ReportMoves(int numMoves) => depthStats.FutilityPruning_TotalMoves += numMoves;
+    [MethodImpl(StatMImpl)] private void STAT_FutilityPruning_PrunedMove() => depthStats.FutilityPruning_PrunedMoves++;
     [MethodImpl(StatMImpl)] private void STAT_DeltaPruning_PrunedMove() => depthStats.DeltaPruning_PrunedMoves++;
 
     [MethodImpl(StatMImpl)] private void STAT_MoveOrder_BestMoveInvoke_I() => depthStats.MoveOrder_BestMoveInvokes++;

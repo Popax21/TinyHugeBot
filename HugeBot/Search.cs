@@ -146,7 +146,7 @@ public partial class MyBot : IChessBot {
 
         //Apply a search extension if in check
         //We don't use the fractional extension variable here because this is before the Q-search check / TT lookup
-        //TODO Use a better check extension here (maybe using SSE?)
+        //TODO Use a better check extension here (maybe using SEE?)
         if(isInCheck) {
             remDepth++;
 #if FSTATS
@@ -177,16 +177,19 @@ public partial class MyBot : IChessBot {
         //Apply pruning to non-PV candidates (otherwise we duplicate our work on researches I think?)
         bool canFutilityPrune = false;
         if(!isInCheck && !isPvCandidateNode && Eval.MinMate < alpha && beta < Eval.MaxMate) {
+            int prunedScore = 0;
+#if FSTATS
+            STAT_Pruning_CheckNonPVNode_I();
+#endif
+
             //Determine the static evaluation of the position
             int staticEval = Eval.Evaluate(searchBoard);
 
             //Determine if we can futility prune
             canFutilityPrune = CanFutilityPrune_I(staticEval, alpha, remDepth);
-
 #if FSTATS
-            STAT_Pruning_CheckNonPVNode_I();
+            if(canFutilityPrune) STAT_FutilityPruning_AbleNode();
 #endif
-            int prunedScore = 0;
 
             //Apply Reverse Futility Pruning
             if(ApplyReverseFutilityPruning_I(staticEval, beta, remDepth, ref prunedScore)) {
@@ -257,6 +260,9 @@ public partial class MyBot : IChessBot {
         //Report that we are starting to search a new node
         STAT_AlphaBeta_SearchNode_I(isPvCandidateNode, false, moves.Length);
 #endif
+#if FSTATS
+        if(canFutilityPrune) STAT_FutilityPruning_ReportMoves(moves.Length);
+#endif
 
         //Order moves
         Span<Move> toBeOrderedMoves = PlaceBestMoveFirst_I(alpha, beta, remDepth, ply, moves, ttSlot, boardHash);
@@ -270,18 +276,21 @@ public partial class MyBot : IChessBot {
         int prevLmrIdx = -1;
         for(int i = 0; i < moves.Length; i++) {
             Move move = moves[i];
+
+            //FP: Check if we can futility-prune this move
+            if(canFutilityPrune && bestMove != 0 && IsMoveQuiet_I(move)) {
+#if FSTATS
+                STAT_FutilityPruning_PrunedMove();
+#endif
+                continue;
+            }
+
             searchBoard.MakeMove(move);
 
             //PVS: If we already have a PV move (which should be early because of move ordering), do a ZWS on alpha first to ensure that this move doesn't fail low
             int score;
             switch(hasPvMove) {
                 case true:
-                    //FP: Check if we can futility-prune this move
-                    if(IsMoveQuiet_I(move) && !searchBoard.IsInCheck() && canFutilityPrune) {
-                        searchBoard.UndoMove(move);
-                        continue;
-                    }
-
                     //LMR: Check if we allow Late Move Reduction for this move
                     int moveLmrIdx = -1;
                     if(!isInCheck && IsLMRAllowedForMove_I(move, i, remDepth)) {
