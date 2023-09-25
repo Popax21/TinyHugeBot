@@ -6,14 +6,15 @@
     <TargetFramework>net6.0</TargetFramework>
     <Nullable>enable</Nullable>
     <LangVersion>11</LangVersion>
-    <Configuration Condition="'$(Configuration)' == ''">DebugDev</Configuration>
 
-    <CheckForOverflowUnderflow Condition="'$(Configuration)' == 'Debug'">true</CheckForOverflowUnderflow>
+    <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
+    <CheckForOverflowUnderflow Condition="'$(Configuration)' == 'Validate'">true</CheckForOverflowUnderflow>
 
-    <EnableBestMoveDisplay Condition="'$(Configuration)' == 'DebugDev'">true</EnableBestMoveDisplay>
-    <EnableStats Condition="'$(Configuration)' == 'DebugDev'">true</EnableStats>
-    <EnableFullStats Condition="'$(Configuration)' == 'DebugDev'">true</EnableFullStats>
+    <EnableBestMoveDisplay Condition="'$(Configuration)' == 'Debug'">true</EnableBestMoveDisplay>
+    <EnableStats Condition="'$(Configuration)' == 'Debug'">true</EnableStats>
+    <EnableFullStats Condition="'$(Configuration)' == 'Debug'">true</EnableFullStats>
 
+    <DefineConstants Condition="'$(Configuration)' == 'Debug' Or '$(Configuration)' == 'Validate'">$(DefineConstants);VALIDATE</DefineConstants>
     <DefineConstants Condition="'$(EnableBestMoveDisplay)' != ''">$(DefineConstants);BESTMOVE</DefineConstants>
     <DefineConstants Condition="'$(EnableStats)' != '' Or '$(EnableFullStats)' != ''">$(DefineConstants);STATS</DefineConstants>
     <DefineConstants Condition="'$(EnableFullStats)' != ''">$(DefineConstants);FSTATS</DefineConstants>

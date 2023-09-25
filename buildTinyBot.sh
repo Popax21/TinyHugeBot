@@ -2,11 +2,11 @@
 BOTBUILDER_FLAGS=
 BUILD_FLAGS=
 
-if [[ "$@" == *"--debug"* ]]; then
-    BUILD_FLAGS+="-c Debug "
+if [[ "$@" == *"--validate"* ]]; then
+    BUILD_FLAGS+="-c Validate "
     BOTBUILDER_FLAGS+="--debug "
-elif [[ "$@" == *"--tinydebug"* ]]; then
-    BUILD_FLAGS+="-c Debug "
+elif [[ "$@" == *"--tinyvalidate"* ]]; then
+    BUILD_FLAGS+="-c Validate "
 else
     BUILD_FLAGS+="-c Release "
 fi

@@ -1,11 +1,11 @@
 $BuildFlags = @{"p:" = @()}
 $BotBuilderFlags = ""
 
-if ($args -match "--debug") {
-	$BuildFlags += @{c = "Debug"}
+if ($args -match "--validate") {
+	$BuildFlags += @{c = "Validate"}
 	$BotBuilderFlags += "--debug"
-} elseif ($args -match "--tinydebug") {
-	$BuildFlags += @{c = "Debug"}
+} elseif ($args -match "--tinyvalidate") {
+	$BuildFlags += @{c = "Validate"}
 } else {
 	$BuildFlags += @{c = "Release"}
 }

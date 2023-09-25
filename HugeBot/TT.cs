@@ -43,7 +43,7 @@ public partial class MyBot {
             TTBoundType.Exact => true,
             TTBoundType.Lower => beta <= unchecked((short) entry),
             TTBoundType.Upper => unchecked((short) entry) <= alpha,
-#if DEBUG
+#if VALIDATE
             _ => throw new Exception($"Invalid TT entry bound type: entry 0x{entry:x16}")
 #else
             _ => false
@@ -64,7 +64,7 @@ public partial class MyBot {
     }
 
     private void StoreTTEntry_I(ref ulong entrySlot, short eval, TTBoundType bound, int depth, ulong boardHash) {
-#if DEBUG
+#if VALIDATE
         //Check for overflows
         if(bound < TTBoundType.Exact || bound > TTBoundType.Upper) throw new ArgumentException($"Garbage TT bound given: {bound}");
         if(depth < 0 || depth >= (1 << 6)) throw new ArgumentException($"Out-of-bounds TT depth given: {depth}");

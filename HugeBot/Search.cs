@@ -36,14 +36,14 @@ public partial class MyBot : IChessBot {
             for(int i = 0; i < moves.Length; i++) {
                 if(moves[i].RawValue == val) return moves[i];
             }
-#if DEBUG
+#if VALIDATE
             throw new Exception($"Search returned invalid root move: 0x{val:x4}");
 #else
             return default;
 #endif
         }
 
-#if DEBUG
+#if VALIDATE
         string boardFen = board.GetFenString();
 #endif
 
@@ -69,7 +69,7 @@ public partial class MyBot : IChessBot {
                 curBestEval = NegaMax(Eval.MinSentinel, Eval.MaxSentinel, depth, 0, out iterBestMove);
                 curBestMove = iterBestMove;
 
-#if DEBUG
+#if VALIDATE
                 //Check that the board has been properly reset
                 if(board.GetFenString() != boardFen) throw new Exception($"Board has not been properly reset after search to depth {depth}: '{boardFen}' != '{board.GetFenString()}'");
             } catch(TimeoutException) {
@@ -111,14 +111,14 @@ public partial class MyBot : IChessBot {
     public int NegaMax(int alpha, int beta, int remDepth, int ply, out ushort bestMove, int prevExtensions = 0, int lmrIdx = -1) {
         bestMove = 0;
 
-#if DEBUG
+#if VALIDATE
         if(remDepth < 0 || remDepth > MaxDepth) throw new Exception($"Out-of-range depth: {remDepth}");
         if(ply < 0 || ply >= MaxPlies) throw new Exception($"Out-of-range ply: {ply}");
 #endif
 
         //Check if time is up
         if((++timeoutCheckNodeCounter & 0xfff) == 0 && searchTimer.MillisecondsElapsedThisTurn >= searchAbortTime)
-#if DEBUG
+#if VALIDATE
             throw new TimeoutException();
 #else
             throw new Exception();
@@ -131,7 +131,7 @@ public partial class MyBot : IChessBot {
         bool isInCheck = searchBoard.IsInCheck();
         bool isPvCandidateNode = alpha+1 < beta; //Because of PVS, all nodes without a zero window are considered candidate nodes
 
-#if DEBUG
+#if VALIDATE
         if(ply == 0) {
             if(remDepth <= 0) throw new Exception("Root node can't immediately enter Q-search");
             if(!isPvCandidateNode) throw new Exception("Root node can't be searched with a ZW");
@@ -153,7 +153,7 @@ public partial class MyBot : IChessBot {
             //The evaluation is stored in the lower 16 bits of the entry
             bestMove = transposMoveTable[boardHash & TTIdxMask];
 
-#if DEBUG
+#if VALIDATE
             if(ply == 0 && bestMove == 0) throw new Exception("Root TT entry has no best move");
 #endif
 
@@ -226,7 +226,7 @@ public partial class MyBot : IChessBot {
         searchBoard.GetLegalMovesNonAlloc(ref moves);
 
         if(moves.Length == 0) {
-#if DEBUG
+#if VALIDATE
             if(ply == 0) throw new Exception("Root node has no valid moves");
 #endif
             //Handle checkmate / stalemate
@@ -321,7 +321,7 @@ public partial class MyBot : IChessBot {
                 bestScore = score;
                 bestMove = move.RawValue;
             }
-#if DEBUG
+#if VALIDATE
             else if(i == 0) throw new Exception($"First move failed to raise best score: {move} {score}");
 #endif
 
@@ -373,7 +373,7 @@ public partial class MyBot : IChessBot {
         StoreTTEntry_I(ref ttSlot, (short) bestScore, ttBound, remDepth, boardHash);
         transposMoveTable[boardHash & TTIdxMask] = bestMove;
 
-#if DEBUG
+#if VALIDATE
         if(bestScore < Eval.MinEval) throw new Exception($"Found no best move in node search: best score {bestScore} best move {bestMove} num moves {moves.Length}");
 #endif
 

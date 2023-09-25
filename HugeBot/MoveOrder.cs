@@ -89,7 +89,7 @@ public partial class MyBot {
                 int butterflyIdx = GetMoveButterflyIndex_I(move, searchBoard.IsWhiteToMove);
                 ulong rhhScore = ((ulong) historyTable[butterflyIdx] << 20) / butterflyTable[butterflyIdx];
 
-#if DEBUG
+#if VALIDATE
                 if(rhhScore >= (1UL << 52)) throw new Exception($"RHH score outside of intended bounds: 0x{rhhScore:x}");
 #endif
 

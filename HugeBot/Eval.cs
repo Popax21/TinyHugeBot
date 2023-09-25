@@ -32,7 +32,7 @@ public static class Eval {
             }
         }
 
-#if DEBUG
+#if VALIDATE
         try {
             //Check that the phase is in-range
             if(phase < 0) throw new Exception($"Unexpected evaluation phase value: {phase}");
