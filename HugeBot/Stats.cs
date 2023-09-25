@@ -60,7 +60,7 @@ public partial class MyBot {
 #if FSTATS
         //TT stats
         public int TTRead_Misses, TTRead_DepthMisses, TTRead_BoundMisses, TTRead_Hits;
-        public int TTWrite_NewSlots, TTWrite_SlotUpdates, TTWrite_IdxCollisions;
+        public int TTWrite_NewSlots, TTWrite_SlotUpdates, TTWrite_IdxCollisions, TTWrite_AgeBails;
 
         //Depth adjustment stats
         public int CheckExtensions, MateThreatExtensions, BotvinnikMarkoffExtensions;
@@ -97,7 +97,7 @@ public partial class MyBot {
 
 #if FSTATS
             TTRead_Misses = TTRead_DepthMisses = TTRead_BoundMisses = TTRead_Hits = 0;
-            TTWrite_NewSlots = TTWrite_SlotUpdates = TTWrite_IdxCollisions = 0;
+            TTWrite_NewSlots = TTWrite_SlotUpdates = TTWrite_IdxCollisions = TTWrite_AgeBails = 0;
 
             CheckExtensions = MateThreatExtensions = BotvinnikMarkoffExtensions = 0;
             ExtensionLimitHits = ExtensionLimitHitDepthSum = 0;
@@ -133,6 +133,7 @@ public partial class MyBot {
             TTWrite_NewSlots += nestedTracker.TTWrite_NewSlots;
             TTWrite_SlotUpdates += nestedTracker.TTWrite_SlotUpdates;
             TTWrite_IdxCollisions += nestedTracker.TTWrite_IdxCollisions;
+            TTWrite_AgeBails += nestedTracker.TTWrite_AgeBails;
 
             CheckExtensions += nestedTracker.CheckExtensions;
             MateThreatExtensions += nestedTracker.MateThreatExtensions;
@@ -205,8 +206,8 @@ public partial class MyBot {
             int numTTReads = TTRead_Misses + TTRead_DepthMisses + TTRead_BoundMisses + TTRead_Hits;
             printStat($"TT reads: total {numTTReads} misses {FormatPercentageI(TTRead_Misses, numTTReads)} depth misses {FormatPercentageI(TTRead_DepthMisses, numTTReads)} bound misses {FormatPercentageI(TTRead_BoundMisses, numTTReads)} hits {FormatPercentageI(TTRead_Hits, numTTReads)}");
 
-            int numTTWrites = TTWrite_NewSlots + TTWrite_SlotUpdates + TTWrite_IdxCollisions;
-            printStat($"TT writes: total {numTTWrites} new slots {FormatPercentageI(TTWrite_NewSlots, numTTWrites)} slot updates {FormatPercentageI(TTWrite_SlotUpdates, numTTWrites)} idx collisions {FormatPercentageI(TTWrite_IdxCollisions, numTTWrites)}");
+            int numTTWrites = TTWrite_NewSlots + TTWrite_SlotUpdates + TTWrite_IdxCollisions + TTWrite_AgeBails;
+            printStat($"TT writes: total {numTTWrites} new slots {FormatPercentageI(TTWrite_NewSlots, numTTWrites)} slot updates {FormatPercentageI(TTWrite_SlotUpdates, numTTWrites)} idx collisions {FormatPercentageI(TTWrite_IdxCollisions, numTTWrites)} age bails {FormatPercentageI(TTWrite_AgeBails, numTTWrites)}");
 
             //Depth adjustment stats
             int totalExtensions = CheckExtensions + MateThreatExtensions + BotvinnikMarkoffExtensions;
@@ -308,6 +309,7 @@ public partial class MyBot {
     [MethodImpl(StatMImpl)] private void STAT_TTWrite_NewSlot_I() => depthStats.TTWrite_NewSlots++;
     [MethodImpl(StatMImpl)] private void STAT_TTWrite_SlotUpdate_I() => depthStats.TTWrite_SlotUpdates++;
     [MethodImpl(StatMImpl)] private void STAT_TTWrite_IdxCollision_I() => depthStats.TTWrite_IdxCollisions++;
+    [MethodImpl(StatMImpl)] private void STAT_TTWrite_AgeBail_I() => depthStats.TTWrite_AgeBails++;
 
     [MethodImpl(StatMImpl)] private void STAT_CheckExtension_I() => depthStats.CheckExtensions++;
     [MethodImpl(StatMImpl)] private void STAT_MateThreatExtension_I() => depthStats.MateThreatExtensions++;

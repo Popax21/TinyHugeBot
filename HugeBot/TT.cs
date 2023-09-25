@@ -1,7 +1,7 @@
 using System;
 
 public partial class MyBot {
-    public const int TTSize = 1 << 24; //16k entries * 8b/e -> 128MB
+    public const int TTSize = 1 << 24; //16k entries * 12b/e -> 192MB
     private const ulong TTIdxMask = TTSize-1;
 
     private enum TTBoundType {
@@ -20,6 +20,7 @@ public partial class MyBot {
     //  bits 24-63: upper hash bits
     private ulong[] transposTable = new ulong[TTSize];
     private ushort[] transposMoveTable = new ushort[TTSize];
+    private ushort[] transposAgeTable = new ushort[TTSize];
 
     private bool CheckTTEntry_I(ulong entry, ulong boardHash, int alpha, int beta, int depth) {
         //Check if the hash bits match
@@ -63,27 +64,40 @@ public partial class MyBot {
         return true;
     }
 
-    private void StoreTTEntry_I(ref ulong entrySlot, short eval, TTBoundType bound, int depth, ulong boardHash) {
+    private void StoreTTEntry_I(ulong boardHash, short eval, TTBoundType bound, int depth, ushort bestMove) {
 #if VALIDATE
         //Check for overflows
         if(bound < TTBoundType.Exact || bound > TTBoundType.Upper) throw new ArgumentException($"Garbage TT bound given: {bound}");
         if(depth < 0 || depth >= (1 << 6)) throw new ArgumentException($"Out-of-bounds TT depth given: {depth}");
 #endif
 
+        ulong ttIdx = boardHash & TTIdxMask;
+        ulong prevEntry = transposTable[ttIdx];
+
+        //Check if we should update the existing entry
+        ushort ttAge = (ushort) (searchBoard.PlyCount + depth / 2);
+        if((prevEntry & ~TTIdxMask) != (boardHash & ~TTIdxMask) && transposAgeTable[ttIdx] > ttAge) {            
+#if FSTATS
+            STAT_TTWrite_AgeBail_I();
+#endif
+            return;
+        }
+
 #if FSTATS
         //Check for collisions
-        ulong prevEntry = entrySlot;
         if((prevEntry & (ulong) TTBoundType.MASK) == (ulong) TTBoundType.None) STAT_TTWrite_NewSlot_I();
         else if((prevEntry & ~TTIdxMask) != (boardHash & ~TTIdxMask)) STAT_TTWrite_IdxCollision_I();
         else STAT_TTWrite_SlotUpdate_I();
 #endif
 
         //Store the TT entry
-        entrySlot =
+        transposTable[ttIdx] =
             unchecked((ushort) eval) |
             (ulong) bound |
             ((ulong) depth << 18) |
             (boardHash & ~TTIdxMask)
         ;
+        transposMoveTable[ttIdx] = bestMove;
+        transposAgeTable[ttIdx] = ttAge;
     }
 }

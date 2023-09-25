@@ -148,8 +148,8 @@ public partial class MyBot : IChessBot {
 
         //Check if the position is in the TT
         ulong boardHash = searchBoard.ZobristKey;
-        ref ulong ttSlot = ref transposTable[boardHash & TTIdxMask];
-        if(CheckTTEntry_I(ttSlot, boardHash, alpha, beta, remDepth)) {
+        ulong ttEntry = transposTable[boardHash & TTIdxMask];
+        if(CheckTTEntry_I(ttEntry, boardHash, alpha, beta, remDepth)) {
             //The evaluation is stored in the lower 16 bits of the entry
             bestMove = transposMoveTable[boardHash & TTIdxMask];
 
@@ -157,7 +157,7 @@ public partial class MyBot : IChessBot {
             if(ply == 0 && bestMove == 0) throw new Exception("Root TT entry has no best move");
 #endif
 
-            return unchecked((short) ttSlot);
+            return unchecked((short) ttEntry);
         }
 
         //Reset any pruning special move values, as they might screw up future move ordering if not cleared
@@ -242,7 +242,7 @@ public partial class MyBot : IChessBot {
 #endif
 
         //Order moves
-        Span<Move> toBeOrderedMoves = PlaceBestMoveFirst_I(alpha, beta, remDepth, ply, moves, ttSlot, boardHash);
+        Span<Move> toBeOrderedMoves = PlaceBestMoveFirst_I(alpha, beta, remDepth, ply, moves, ttEntry, boardHash);
         SortMoves(toBeOrderedMoves, ply);
 
         //Search for the best move
@@ -369,9 +369,7 @@ public partial class MyBot : IChessBot {
 #endif
 
         //Insert the best move found into the transposition table (except when in Q-Search)
-        //TODO Currently always replaces, investigate potential other strategies
-        StoreTTEntry_I(ref ttSlot, (short) bestScore, ttBound, remDepth, boardHash);
-        transposMoveTable[boardHash & TTIdxMask] = bestMove;
+        StoreTTEntry_I(boardHash, (short) bestScore, ttBound, remDepth, bestMove);
 
 #if VALIDATE
         if(bestScore < Eval.MinEval) throw new Exception($"Found no best move in node search: best score {bestScore} best move {bestMove} num moves {moves.Length}");
