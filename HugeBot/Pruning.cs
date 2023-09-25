@@ -36,7 +36,6 @@ public partial class MyBot {
         => depth <= 4 && staticEval + 100*depth <= alpha;
 
     public bool ApplyReverseFutilityPruning_I(int eval, int beta, int depth, ref int score) {
-        //TODO Experiment with different values
         //TODO This relies on the Null Move Hypothesis, investigate potential Zugzwang issues
         score = eval - depth * 90 - (DeltaPruningSafetyMargin - 1*90);
         return depth < 7 && score >= beta;
@@ -50,7 +49,7 @@ public partial class MyBot {
         DeltaPruningSafetyMargin + 340,     //Bishops
         DeltaPruningSafetyMargin + 500,     //Rooks
         DeltaPruningSafetyMargin + 1000,    //Queen
-        0                              //Kings - just a placeholder
+        0                                   //Kings - just a placeholder
     };
 
     //TODO Check if disabling near the endgame helps things
