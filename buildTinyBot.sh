@@ -11,15 +11,14 @@ else
     BUILD_FLAGS+="-c Release "
 fi
 
-if [[ ! "$@" == *"--bestmove"* ]]; then
-    BUILD_FLAGS+="-p:DisableBestMoveDisplay=1 "
+if [[ "$@" == *"--bestmove"* ]]; then
+    BUILD_FLAGS+="-p:EnableBestMoveDisplay=1 "
 fi
 
-if [[ ! "$@" == *"--fullstats"* ]]; then
-    BUILD_FLAGS+="-p:DisableFullStats=1 "
-    if [[ ! "$@" == *"--stats"* ]]; then
-        BUILD_FLAGS+="-p:DisableStats=1 "
-    fi
+if [[ "$@" == *"--fullstats"* ]]; then
+    BUILD_FLAGS+="-p:EnableFullStats=1 "
+elif [[ "$@" == *"--stats"* ]]; then
+    BUILD_FLAGS+="-p:EnableStats=1 "
 fi
 
 dotnet build HugeBot $BUILD_FLAGS
