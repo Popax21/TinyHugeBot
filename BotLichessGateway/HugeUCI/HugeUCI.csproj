@@ -1,0 +1,25 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net7.0</TargetFramework>
+    <StartupObject>HugeUCI.Program</StartupObject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Chess-Challenge\Chess-Challenge\Chess-Challenge.csproj" />
+    <ProjectReference Include="..\..\HugeBot\HugeBot.csproj" Properties="Configuration='Release'" />
+  </ItemGroup>
+
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    
+    <Copy SourceFiles="$(OutputPath)HugeBot.dll" DestinationFolder="..\lichess\engines" />
+    <Copy SourceFiles="$(OutputPath)HugeUCI.dll" DestinationFolder="..\lichess\engines" />
+    <Copy SourceFiles="$(OutputPath)Chess-Challenge.dll" DestinationFolder="..\lichess\engines" />
+    <Copy SourceFiles="$(OutputPath)HugeUCI.runtimeconfig.json" DestinationFolder="..\lichess\engines" />
+    <Copy SourceFiles="$(OutputPath)HugeUCI" DestinationFolder="..\lichess\engines" ContinueOnError="true" />
+    <Copy SourceFiles="$(OutputPath)HugeUCI.exe" DestinationFiles="..\lichess\engines\HugeUCI" ContinueOnError="true" />
+    
+  </Target>
+
+</Project>

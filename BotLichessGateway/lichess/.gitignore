@@ -1,0 +1,7 @@
+__pycache__
+test_bot/__pycache__
+!/engines/README.md
+venv/*
+game_records/*
+engines/*
+lichess_bot_auto_logs/*

@@ -6,10 +6,17 @@
     <TargetFramework>net6.0</TargetFramework>
     <Nullable>enable</Nullable>
     <LangVersion>11</LangVersion>
+    <Configuration Condition="'$(Configuration)' == ''">DebugDev</Configuration>
+
     <CheckForOverflowUnderflow Condition="'$(Configuration)' == 'Debug'">true</CheckForOverflowUnderflow>
-    <DefineConstants Condition="'$(DisableBestMoveDisplay)' == ''">$(DefineConstants);BESTMOVE</DefineConstants>
-    <DefineConstants Condition="'$(DisableStats)' == ''">$(DefineConstants);STATS</DefineConstants>
-    <DefineConstants Condition="'$(DisableFullStats)' == ''">$(DefineConstants);FSTATS</DefineConstants>
+
+    <EnableBestMoveDisplay Condition="'$(Configuration)' == 'DebugDev'">true</EnableBestMoveDisplay>
+    <EnableStats Condition="'$(Configuration)' == 'DebugDev'">true</EnableStats>
+    <EnableFullStats Condition="'$(Configuration)' == 'DebugDev'">true</EnableFullStats>
+
+    <DefineConstants Condition="'$(EnableBestMoveDisplay)' != ''">$(DefineConstants);BESTMOVE</DefineConstants>
+    <DefineConstants Condition="'$(EnableStats)' != '' Or '$(EnableFullStats)' != ''">$(DefineConstants);STATS</DefineConstants>
+    <DefineConstants Condition="'$(EnableFullStats)' != ''">$(DefineConstants);FSTATS</DefineConstants>
   </PropertyGroup>
   
   <Target Name="CopyDLL" AfterTargets="Build">

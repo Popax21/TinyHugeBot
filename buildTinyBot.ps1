@@ -10,15 +10,14 @@ if ($args -match "--debug") {
 	$BuildFlags += @{c = "Release"}
 }
 
-if (!($args -match "--bestmove")) {
-	$BuildFlags["p:"] += "DisableBestMoveDisplay=1"
+if ($args -match "--bestmove") {
+	$BuildFlags["p:"] += "EnableBestMoveDisplay=1"
 }
 
-if (!($args -match "--fullstats")) {
-	$BuildFlags["p:"] += "DisableFullStats=1"
-	if (!($args -match "--stats")) {
-		$BuildFlags["p:"] += "DisableStats=1"
-	}
+if ($args -match "--fullstats") {
+	$BuildFlags["p:"] += "EnableFullStats=1"
+} elseif ($args -match "--stats") {
+	$BuildFlags["p:"] += "EnableStats=1"
 }
 
 dotnet build HugeBot @BuildFlags

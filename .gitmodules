@@ -1,3 +1,6 @@
 [submodule "Chess-Challenge"]
 	path = Chess-Challenge
 	url = https://github.com/SebLague/Chess-Challenge
+[submodule "lichess-bot"]
+	path = lichess-bot
+	url = https://github.com/lichess-bot-devs/lichess-bot
