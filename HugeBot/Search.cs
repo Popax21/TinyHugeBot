@@ -285,7 +285,11 @@ public partial class MyBot : IChessBot {
                         //Do a ZWS search with reduced depth
                         score = -NegaMax(-alpha - 1, -alpha, lmrDepth, ply+1, out _, lmrPrevExts);
                         if(score <= alpha) break; //If we reach alpha research with full depth
+
                         moveExts = 0;
+#if FSTATS
+                        STAT_LMR_Research_I();
+#endif
                     }
 
                     int moveDepth = remDepth-1, movePrevExts = prevExtensions;
