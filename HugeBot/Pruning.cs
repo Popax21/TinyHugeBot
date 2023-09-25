@@ -36,12 +36,13 @@ public partial class MyBot {
         => depth <= 4 && staticEval + 100*depth <= alpha;
 
     public bool ApplyReverseFutilityPruning_I(int eval, int beta, int depth, ref int score) {
+        //TODO Experiment with different values
         //TODO This relies on the Null Move Hypothesis, investigate potential Zugzwang issues
-        score = eval - (depth + 1) * 90;
+        score = eval - depth * 90 - (DeltaPruningSafetyMargin - 1*90);
         return depth < 7 && score >= beta;
     }
 
-    private const int DeltaPruningSafetyMargin = 200;
+    private const int DeltaPruningSafetyMargin = 2*90; //~200 centipawns
     private static readonly ushort[] DeltaPruningMargins = new ushort[] {
         DeltaPruningSafetyMargin + 1000,    //None - as we only evaluate non-quiet moves this means that it's a pawn promotion, so it has the same margin as a queen
         DeltaPruningSafetyMargin + 90,      //Pawns
@@ -49,7 +50,7 @@ public partial class MyBot {
         DeltaPruningSafetyMargin + 340,     //Bishops
         DeltaPruningSafetyMargin + 500,     //Rooks
         DeltaPruningSafetyMargin + 1000,    //Queen
-        0                                   //Kings - just a placeholder
+        0                              //Kings - just a placeholder
     };
 
     //TODO Check if disabling near the endgame helps things

@@ -47,5 +47,5 @@ public partial class MyBot {
         => depth >= 3 && moveIdx >= 6 && IsMoveQuiet_I(move) && !IsThreatEscapeMove_I(move);
 
     public int DetermineLMRReduction_I(int moveIdx, int depth)
-        => moveIdx + depth/3 < 10 ? 3*OnePlyExtension/2 : 2*OnePlyExtension;
+        => 2*OnePlyExtension;
 }
