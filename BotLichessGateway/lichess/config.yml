@@ -3,7 +3,7 @@ url: "https://lichess.org/"        # Lichess base URL.
 
 engine:                            # Engine settings.
   dir: "./engines/"                # Directory containing the engine. This can be an absolute path or one relative to lichess-bot/.
-  name: "TinyHugeBot"              # Binary name of the engine to use.
+  name: "HugeUCI"              # Binary name of the engine to use.
   working_dir: ""                  # Directory where the chess engine will read and write files. If blank or missing, the current directory is used.
                                    # NOTE: If working_dir is set, the engine will look for files and directories relative to this directory, not where lichess-bot was launched. Absolute paths are unaffected.
   protocol: "uci"                  # "uci", "xboard" or "homemade"
@@ -129,7 +129,7 @@ challenge:                         # Incoming challenges.
   only_bot: false                  # Accept challenges by bots only.
   max_increment: 0                 # Maximum amount of increment to accept a challenge in seconds. The max is 180. Set to 0 for no increment.
   min_increment: 0                 # Minimum amount of increment to accept a challenge in seconds.
-  max_base: 60                     # Maximum amount of base time to accept a challenge in seconds. The max is 10800 (3 hours).
+  max_base: 600                    # Maximum amount of base time to accept a challenge in seconds. The max is 10800 (3 hours).
   min_base: 60                     # Minimum amount of base time to accept a challenge in seconds.
   max_days: 14                     # Maximum number of days per move to accept a challenge for a correspondence game.
                                    # Unlimited games can be accepted by removing this field or specifying .inf
@@ -147,8 +147,8 @@ challenge:                         # Incoming challenges.
 #   - threeCheck
   time_controls:                   # Time controls to accept.
     - bullet
-#   - blitz
-#   - rapid
+    - blitz
+    - rapid
 #   - classical
 #   - correspondence
   modes:                           # Game modes to accept.
@@ -169,10 +169,10 @@ greeting:
   #   {opponent} to insert opponent's name
   #   {me} to insert bot's name
   # Any other words in curly braces will be removed.
-# hello: "Hi! I'm {me}. Good luck! Type !help for a list of commands I can respond to." # Message to send to opponent chat at the start of a game
-# goodbye: "Good game!" # Message to send to opponent chat at the end of a game
-# hello_spectators: "Hi! I'm {me}. Type !help for a list of commands I can respond to." # Message to send to spectator chat at the start of a game
-# goodbye_spectators: "Thanks for watching!" # Message to send to spectator chat at the end of a game
+  hello: "Good luck!" # Message to send to opponent chat at the start of a game
+  goodbye: "Good game!" # Message to send to opponent chat at the end of a game
+  hello_spectators: "Hi!" # Message to send to spectator chat at the start of a game
+  goodbye_spectators: "Thanks for watching!" # Message to send to spectator chat at the end of a game
 
   pgn_directory: "game_records"    # A directory where PGN-format records of the bot's games are kept
   pgn_file_grouping: "game"        # How to group games into files. Options are "game", "opponent", and "all"

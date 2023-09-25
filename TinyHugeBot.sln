@@ -11,7 +11,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HugeBot", "HugeBot\HugeBot.
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BotBuilder", "BotBuilder\BotBuilder.csproj", "{8F1ED48E-DFCF-4B11-B8AD-BF437CDB0D8E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BotTuner", "BotTuner\BotTuner.csproj", "{53B97E7F-E501-4B71-A54F-72570D041362}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BotTuner", "BotTuner\BotTuner.csproj", "{53B97E7F-E501-4B71-A54F-72570D041362}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HugeUCI", "BotLichessGateway\HugeUCI\HugeUCI.csproj", "{03862A96-F881-4C81-93B9-738FD546E3D7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -35,6 +37,10 @@ Global
 		{53B97E7F-E501-4B71-A54F-72570D041362}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{53B97E7F-E501-4B71-A54F-72570D041362}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{53B97E7F-E501-4B71-A54F-72570D041362}.Release|Any CPU.Build.0 = Release|Any CPU
+		{03862A96-F881-4C81-93B9-738FD546E3D7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{03862A96-F881-4C81-93B9-738FD546E3D7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{03862A96-F881-4C81-93B9-738FD546E3D7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{03862A96-F881-4C81-93B9-738FD546E3D7}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
