@@ -6,10 +6,8 @@ using BotTuner.Factories;
 namespace BotTuner;
 
 public static partial class Program {
-    public static async Task RunCompare(string botAPath, string botBPath, int timerMs, string[] posCollections) {
+    public static async Task RunCompare(IChessBotFactory botA, IChessBotFactory botB, int timerMs, string[] posCollections) {
         //Load bots
-        IChessBotFactory botA = LoadBot(botAPath), botB = LoadBot(botBPath);
-
         double[] scores = new double[posCollections.Length];
         for(int i = 0; i < posCollections.Length; i++) {
             Console.WriteLine($"Comparing against position collection '{posCollections[i]}'...");

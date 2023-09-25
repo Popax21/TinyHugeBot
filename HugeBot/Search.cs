@@ -1,14 +1,16 @@
-﻿using System;
+using System;
 using ChessChallenge.API;
 using HugeBot;
 
 public partial class MyBot : IChessBot {
     public const int MaxDepth = 63; //Limited by TT
-    public const int MaxPly = 256; //Limited by TT
+    public const int MaxPlies = 256;
 
     private Board searchBoard = null!;
     private Timer searchTimer = null!;
     private int searchAbortTime;
+
+    private int maxExtension;
 
     public Move Think(Board board, Timer timer) {
         //Determine search times
@@ -41,6 +43,10 @@ public partial class MyBot : IChessBot {
 #endif
         }
 
+#if DEBUG
+        string boardFen = board.GetFenString();
+#endif
+
         //Do a NegaMax search with iterative deepening
         //TODO Look into aspiration windows (maybe even MTD(f))
         int curBestEval = 0;
@@ -54,12 +60,18 @@ public partial class MyBot : IChessBot {
             bool didTimeOut = false;
 #endif
 
+            //Update the maximum extension amount
+            maxExtension = MaxExtension - depth*MaxExtensionReductionPerIter;
+
             //Do a NegaMax search with the current depth
             ushort iterBestMove = 0;
             try {
-                curBestEval = NegaMax(-0x10_0000, +0x10_0000, depth, 0, out iterBestMove);
+                curBestEval = NegaMax(Eval.MinSentinel, Eval.MaxSentinel, depth, 0, out iterBestMove);
                 curBestMove = iterBestMove;
+
 #if DEBUG
+                //Check that the board has been properly reset
+                if(board.GetFenString() != boardFen) throw new Exception($"Board has not been properly reset after search to depth {depth}: '{boardFen}' != '{board.GetFenString()}'");
             } catch(TimeoutException) {
 #else
             } catch(Exception) {
@@ -96,9 +108,13 @@ public partial class MyBot : IChessBot {
     }
 
     private int timeoutCheckNodeCounter = 0;
-    public int NegaMax(int alpha, int beta, int remDepth, int ply, out ushort bestMove) {
-        bool isPvCandidateNode = alpha+1 < beta; //Because of PVS, all nodes without a zero window are considered candidate nodes
+    public int NegaMax(int alpha, int beta, int remDepth, int ply, out ushort bestMove, int prevExtensions = 0, int lmrIdx = -1) {
         bestMove = 0;
+
+#if DEBUG
+        if(remDepth < 0 || remDepth > MaxDepth) throw new Exception($"Out-of-range depth: {remDepth}");
+        if(ply < 0 || ply >= MaxPlies) throw new Exception($"Out-of-range ply: {ply}");
+#endif
 
         //Check if time is up
         if((++timeoutCheckNodeCounter & 0xfff) == 0 && searchTimer.MillisecondsElapsedThisTurn >= searchAbortTime)
@@ -108,17 +124,38 @@ public partial class MyBot : IChessBot {
             throw new Exception();
 #endif
 
+        //Handle repetition
+        if(searchBoard.IsRepeatedPosition()) return 0;
+
+        //Start a new node
+        bool isInCheck = searchBoard.IsInCheck();
+        bool isPvCandidateNode = alpha+1 < beta; //Because of PVS, all nodes without a zero window are considered candidate nodes
+        int extension = 0;
+
+#if DEBUG
+        if(ply == 0) {
+            if(remDepth <= 0) throw new Exception("Root node can't immediately enter Q-search");
+            if(!isPvCandidateNode) throw new Exception("Root node can't be searched with a ZW");
+            if(lmrIdx >= 0) throw new Exception("Root node can't have an LMR applied");
+        }
+#endif
+
 #if STATS
         STAT_NewNode_I(isPvCandidateNode, false);
 #endif
 
-        //Handle repetition
-        if(searchBoard.IsRepeatedPosition()) return 0;
-
+        //Apply a search extension if in check
+        //We don't use the fractional extension variable here because this is before the Q-search check / TT lookup
+        //TODO Use a better check extension here (maybe using SEE?)
+        if(isInCheck) {
+            remDepth++;
+#if FSTATS
+            STAT_CheckExtension_I();
+#endif
+        }
+    
         //Check if we reached the bottom of the search tree
         if(remDepth <= 0) return QSearch(alpha, beta, ply);
-
-        //TODO Reductions / Extensions
 
         //Check if the position is in the TT
         ulong boardHash = searchBoard.ZobristKey;
@@ -126,16 +163,21 @@ public partial class MyBot : IChessBot {
         if(CheckTTEntry_I(ttSlot, boardHash, alpha, beta, remDepth)) {
             //The evaluation is stored in the lower 16 bits of the entry
             bestMove = transposMoveTable[boardHash & TTIdxMask];
+
+#if DEBUG
+            if(ply == 0 && bestMove == 0) throw new Exception("Root TT entry has no best move");
+#endif
+
             return unchecked((short) ttSlot);
         }
 
         //Reset any pruning special move values, as they might screw up future move ordering if not cleared
-        Pruning_ResetSpecialMove_I();
+        ResetThreatMove_I(ply);
 
         //Apply pruning to non-PV candidates (otherwise we duplicate our work on researches I think?)
-        if(!isPvCandidateNode && beta < Eval.MaxMate && !searchBoard.IsInCheck()) {
+        bool canFutilityPrune = false;
+        if(!isInCheck && !isPvCandidateNode && Eval.MinMate < alpha && beta < Eval.MaxMate) {
             int prunedScore = 0;
-
 #if FSTATS
             STAT_Pruning_CheckNonPVNode_I();
 #endif
@@ -143,8 +185,14 @@ public partial class MyBot : IChessBot {
             //Determine the static evaluation of the position
             int staticEval = Eval.Evaluate(searchBoard);
 
+            //Determine if we can futility prune
+            canFutilityPrune = CanFutilityPrune_I(staticEval, alpha, remDepth);
+#if FSTATS
+            if(canFutilityPrune) STAT_FutilityPruning_AbleNode();
+#endif
+
             //Apply Reverse Futility Pruning
-            if(ApplyReverseFutilityPruning(staticEval, beta, remDepth, ref prunedScore)) {
+            if(ApplyReverseFutilityPruning_I(staticEval, beta, remDepth, ref prunedScore)) {
 #if FSTATS
                 STAT_ReverseFutilityPruning_PrunedNode_I();
 #endif
@@ -152,12 +200,48 @@ public partial class MyBot : IChessBot {
             }
 
             //Apply Null Move Pruning
-            if(ApplyNullMovePruning_I(alpha, beta, remDepth, ply, ref prunedScore)) {
+            if(ApplyNullMovePruning_I(alpha, beta, remDepth, ply, prevExtensions, ref prunedScore)) {
+                if(prunedScore >= beta) { 
 #if FSTATS
-                STAT_NullMovePruning_PrunedNode_I();
+                    STAT_NullMovePruning_PrunedNode_I();
 #endif
-                return prunedScore;
+                    return prunedScore;
+                } else if(prunedScore <= Eval.MinMate) {
+                    //Mate threat extension
+                    extension += OnePlyExtension / 2;
+
+#if FSTATS
+                    STAT_MateThreatExtension_I();
+#endif
+                } else if(threatMove != 0 && ApplyBotvinnikMarkoffExtension_I(threatMove, ply)) {
+                    extension += OnePlyExtension / 3;
+
+#if FSTATS
+                    STAT_BotvinnikMarkoffExtension_I();
+#endif
+                }
             }
+        }
+
+        //Apply Late-Move Reduction (LMR)
+        if(!isInCheck && extension <= 0 && lmrIdx >= 0) ApplyLMR_I(lmrIdx, remDepth, ref extension);
+
+        //Apply extensions / reductions
+        if(prevExtensions + extension > maxExtension) {
+            extension = maxExtension - prevExtensions;
+#if FSTATS
+            if(prevExtensions < maxExtension) STAT_ExtensionLimitHit_I(remDepth);
+#endif
+        }
+
+        remDepth += (((prevExtensions + extension) & ~ExtensionFractMask) - (prevExtensions & ~ExtensionFractMask)) >> ExtensionFractBits;
+        prevExtensions += extension;
+
+        //Re-check if we reached the bottom of the search tree because of reductions
+        if(remDepth <= 0) {
+            //TODO Our current Q-search is not check aware
+            if(!isInCheck) return QSearch(alpha, beta, ply);
+            remDepth = 1;
         }
 
         //Generate legal moves
@@ -165,6 +249,9 @@ public partial class MyBot : IChessBot {
         searchBoard.GetLegalMovesNonAlloc(ref moves);
 
         if(moves.Length == 0) {
+#if DEBUG
+            if(ply == 0) throw new Exception("Root node has no valid moves");
+#endif
             //Handle checkmate / stalemate
             return searchBoard.IsInCheck() ? Eval.MinEval + ply : 0;
         }
@@ -173,25 +260,47 @@ public partial class MyBot : IChessBot {
         //Report that we are starting to search a new node
         STAT_AlphaBeta_SearchNode_I(isPvCandidateNode, false, moves.Length);
 #endif
+#if FSTATS
+        if(canFutilityPrune) STAT_FutilityPruning_ReportMoves(moves.Length);
+#endif
 
         //Order moves
         Span<Move> toBeOrderedMoves = PlaceBestMoveFirst_I(alpha, beta, remDepth, ply, moves, ttSlot, boardHash);
         SortMoves(toBeOrderedMoves, ply);
 
         //Search for the best move
-        int bestScore = Eval.MinEval;
+        int bestScore = Eval.MinSentinel;
         bool hasPvMove = false;
         TTBoundType ttBound = TTBoundType.Upper; //Until we surpass alpha we only have an upper bound
 
+        int prevLmrIdx = -1;
         for(int i = 0; i < moves.Length; i++) {
             Move move = moves[i];
+
+            //FP: Check if we can futility-prune this move
+            if(canFutilityPrune && bestMove != 0 && IsMoveQuiet_I(move)) {
+#if FSTATS
+                STAT_FutilityPruning_PrunedMove();
+#endif
+                continue;
+            }
+
             searchBoard.MakeMove(move);
 
             //PVS: If we already have a PV move (which should be early because of move ordering), do a ZWS on alpha first to ensure that this move doesn't fail low
             int score;
             switch(hasPvMove) {
                 case true:
-                    score = -NegaMax(-alpha - 1, -alpha, remDepth-1, ply+1, out _);
+                    //LMR: Check if we allow Late Move Reduction for this move
+                    int moveLmrIdx = -1;
+                    if(!isInCheck && IsLMRAllowedForMove_I(move, i, remDepth)) {
+                        moveLmrIdx = ++prevLmrIdx;
+#if FSTATS
+                        STAT_LMR_AllowReduction_I();
+#endif
+                    }
+
+                    score = -NegaMax(-alpha - 1, -alpha, remDepth-1, ply+1, out _, prevExtensions, moveLmrIdx);
                     if(score <= alpha || score >= beta) break; //We check the beta bound as well as we can fail-high because of our fail-soft search
 
                     //Research with the full window
@@ -201,7 +310,7 @@ public partial class MyBot : IChessBot {
 
                     goto default;
                 default:
-                    score = -NegaMax(-beta, -alpha, remDepth-1, ply+1, out _);
+                    score = -NegaMax(-beta, -alpha, remDepth-1, ply+1, out _, prevExtensions);
                     break;
             }
 
@@ -217,6 +326,9 @@ public partial class MyBot : IChessBot {
                 bestScore = score;
                 bestMove = move.RawValue;
             }
+#if DEBUG
+            else if(i == 0) throw new Exception($"First move failed to raise best score: {move} {score}");
+#endif
 
             //Update alpha/beta bounds
             //Do this after the best score update to implement a fail-soft alpha-beta search
@@ -265,6 +377,10 @@ public partial class MyBot : IChessBot {
         //TODO Currently always replaces, investigate potential other strategies
         StoreTTEntry_I(ref ttSlot, (short) bestScore, ttBound, remDepth, boardHash);
         transposMoveTable[boardHash & TTIdxMask] = bestMove;
+
+#if DEBUG
+        if(bestScore < Eval.MinEval) throw new Exception($"Found no best move in node search: best score {bestScore} best move {bestMove} num moves {moves.Length}");
+#endif
 
         return bestScore;
     }

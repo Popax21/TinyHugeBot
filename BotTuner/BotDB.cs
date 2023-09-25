@@ -13,6 +13,8 @@ public static partial class Program {
     };
 
     public static string BotDBPath = null!;
+    public static string PrevVersDDBPath => Path.Combine(BotDBPath, "PrevVers");
+    public static string ExtRefDBPath => Path.Combine(BotDBPath, "ExtRef");
 
     public static IChessBotFactory LoadBot(string path) {
         if(Path.GetExtension(path) == ".cs") return new CSChessBotFactory(path);
@@ -24,11 +26,14 @@ public static partial class Program {
         return Directory.GetFiles(dir).Order().Select(LoadBot).ToArray();
     }
 
+    public static IChessBotFactory LoadLatestBotVersion()
+        => LoadBot(Directory.GetFiles(PrevVersDDBPath).Order().Last());
+
     public static IChessBotFactory[] LoadPrevBotVers()
-        => LoadAllBots(Path.Combine(BotDBPath, "PrevVers"));
+        => LoadAllBots(PrevVersDDBPath);
 
     public static IChessBotFactory[] LoadExternalRefBots()
-        => LoadAllBots(Path.Combine(BotDBPath, "ExtRef"));
+        => LoadAllBots(ExtRefDBPath);
 
     public static void AddBotVersionToDB(string newBotPath) {
         //Determine the next version number for this bot

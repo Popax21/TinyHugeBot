@@ -4,7 +4,7 @@ using ChessChallenge.API;
 public partial class MyBot {
     private const int NumKillerTableSlots = 4;
 
-    private ushort[] killerTable = new ushort[MaxPly * NumKillerTableSlots];
+    private ushort[] killerTable = new ushort[MaxPlies * NumKillerTableSlots];
     private uint[] historyTable = new uint[2 * 8 * 64], butterflyTable = new uint[2 * 8 * 64];
 
     private int GetMoveButterflyIndex_I(Move move, bool isWhite) => (isWhite ? 0 : 8*64) | (int) move.MovePieceType << 6 | move.TargetSquare.Index;
@@ -77,10 +77,10 @@ public partial class MyBot {
                     }
                 }
 
-                //Check if pruning gave this move a special score
-                if(Pruning_IsSpecialMove_I(move)) {
+                //Check if this move is a threat escape move
+                if(IsThreatEscapeMove_I(move)) {
 #if FSTATS
-                    STAT_MoveOrder_ScoredSpecialPruneMove_I();
+                    STAT_MoveOrder_ScoredThreatEscapeMove_I();
 #endif
                     return (ulong) (8 - NumKillerTableSlots) << 52;
                 }

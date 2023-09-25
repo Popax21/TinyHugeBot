@@ -8,13 +8,13 @@ namespace BotTuner;
 
 public static partial class Program {
     public const int BenchmarkTimerMs = 7_500;
-    public const int NumBenchmarkLastVersions = 2;
+    public const int NumBenchmarkLastVersions = 3;
 
     public static async Task RunBenchmark(string targetBotPath, string[] posCollections) {
         //Load bots
         IChessBotFactory targetBot = new CSChessBotFactory(targetBotPath);
         IChessBotFactory[] prevBotVers = LoadPrevBotVers();
-        IChessBotFactory[] opponents = Enumerable.Range(0, prevBotVers.Length).Where(idx => idx == 0 || idx >= prevBotVers.Length - NumBenchmarkLastVersions).Select(idx => prevBotVers[idx]).ToArray();
+        IChessBotFactory[] opponents = Enumerable.Range(0, prevBotVers.Length).Where(idx => idx >= prevBotVers.Length - NumBenchmarkLastVersions).Select(idx => prevBotVers[idx]).ToArray();
 
         double[,] scores = new double[opponents.Length, posCollections.Length];
         for(int i = 0; i < posCollections.Length; i++) {

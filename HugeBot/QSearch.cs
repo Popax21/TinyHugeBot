@@ -45,8 +45,8 @@ public partial class MyBot {
         for(int i = 0; i < moves.Length; i++) {
             Move move = moves[i];
 
-            //Apply move delta-pruning
-            if(ApplyDeltaPruning_I(move, alpha, standPatScore)) {
+            //Apply delta-pruning
+            if(ShouldApplyDeltaPruning_I(move, alpha, standPatScore)) {
 #if FSTATS
                 STAT_DeltaPruning_PrunedMove();
 #endif
@@ -70,10 +70,6 @@ public partial class MyBot {
 #if STATS
                     STAT_AlphaBeta_FailHigh_I(false, true, i);
 #endif
-
-                    //Insert into the killer table if the move is quiet
-                    if(IsMoveQuiet_I(move)) InsertIntoKillerTable_I(ply, move); 
-
                     return score;
                 }
 
