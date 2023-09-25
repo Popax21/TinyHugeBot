@@ -65,7 +65,7 @@ public partial class MyBot {
         //Depth adjustment stats
         public int CheckExtensions, MateThreatExtensions, BotvinnikMarkoffExtensions;
         public int ExtensionLimitHits, ExtensionLimitHitDepthSum;
-        public int LMR_AllowedReductions, LMR_AppliedReductions;
+        public int LMR_AppliedReductions, LMR_Researches;
 
         //Pruning stats
         public int Pruning_CheckedNonPVNodes;
@@ -101,7 +101,7 @@ public partial class MyBot {
 
             CheckExtensions = MateThreatExtensions = BotvinnikMarkoffExtensions = 0;
             ExtensionLimitHits = ExtensionLimitHitDepthSum = 0;
-            LMR_AllowedReductions = LMR_AppliedReductions = 0;
+            LMR_AppliedReductions = LMR_Researches = 0;
 
             Pruning_CheckedNonPVNodes = 0;
             ReverseFutilityPruning_PrunedNodes = NullMovePruning_PrunedNodes = 0;
@@ -141,8 +141,8 @@ public partial class MyBot {
             ExtensionLimitHits += nestedTracker.ExtensionLimitHits;
             ExtensionLimitHitDepthSum += nestedTracker.ExtensionLimitHitDepthSum;
 
-            LMR_AllowedReductions += nestedTracker.LMR_AllowedReductions;
             LMR_AppliedReductions += nestedTracker.LMR_AppliedReductions;
+            LMR_Researches += nestedTracker.LMR_Researches;
 
             Pruning_CheckedNonPVNodes += nestedTracker.Pruning_CheckedNonPVNodes;
             ReverseFutilityPruning_PrunedNodes += nestedTracker.ReverseFutilityPruning_PrunedNodes;
@@ -213,7 +213,7 @@ public partial class MyBot {
             int totalSearchedMoves = PVCandidateStats.AlphaBeta_SearchedMoves + ZeroWindowStats.AlphaBeta_SearchedMoves;
             printStat($"extensions: total {FormatPercentageI(totalExtensions, totalSearchedMoves)} check {FormatPercentageI(CheckExtensions, totalExtensions)} mate threat {FormatPercentageI(MateThreatExtensions, totalExtensions)} bm {FormatPercentageI(BotvinnikMarkoffExtensions, totalExtensions)}");
             printStat($"extension limits: hits {FormatPercentageI(ExtensionLimitHits, totalExtensions)} avg. hit depth {FormatFloat((double) ExtensionLimitHitDepthSum / ExtensionLimitHits, 4)}");
-            printStat($"LMR: allowed reductions {FormatPercentageI(LMR_AllowedReductions, totalSearchedMoves)} applied reductions {FormatPercentageI(LMR_AppliedReductions, LMR_AllowedReductions)}");
+            printStat($"LMR: applied reductions {FormatPercentageI(LMR_AppliedReductions, PVCandidateStats.AlphaBeta_SearchedMoves)} researches {FormatPercentageI(LMR_Researches, LMR_AppliedReductions)}");
 
             //Pruning stats
             printStat($"non-PV pruning: checked nodes {FormatPercentageI(Pruning_CheckedNonPVNodes, ZeroWindowStats.AlphaBeta_SearchedNodes)} NPM {FormatPercentageI(NullMovePruning_PrunedNodes, Pruning_CheckedNonPVNodes)} RFP {FormatPercentageI(ReverseFutilityPruning_PrunedNodes, Pruning_CheckedNonPVNodes)}");
@@ -318,8 +318,8 @@ public partial class MyBot {
         depthStats.ExtensionLimitHitDepthSum += remDepth;
     }
 
-    [MethodImpl(StatMImpl)] private void STAT_LMR_AllowReduction_I() => depthStats.LMR_AllowedReductions++;
     [MethodImpl(StatMImpl)] private void STAT_LMR_ApplyReduction_I() => depthStats.LMR_AppliedReductions++;
+    [MethodImpl(StatMImpl)] private void STAT_LMR_Research_I() => depthStats.LMR_Researches++;
 
     [MethodImpl(StatMImpl)] private void STAT_Pruning_CheckNonPVNode_I() => depthStats.Pruning_CheckedNonPVNodes++;
     [MethodImpl(StatMImpl)] private void STAT_ReverseFutilityPruning_PrunedNode_I() => depthStats.ReverseFutilityPruning_PrunedNodes++;
