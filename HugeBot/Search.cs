@@ -126,7 +126,12 @@ public partial class MyBot : IChessBot {
 #endif
 
         //Handle repetition
-        if(searchBoard.IsRepeatedPosition()) return 0;
+        if(searchBoard.IsRepeatedPosition()) {
+#if VALIDATE
+            if(ply == 0) throw new Exception("Root node has repeated position");
+#endif
+            return 0;
+        }
 
         //Start a new node
         bool isInCheck = searchBoard.IsInCheck();
