@@ -1,3 +1,3 @@
 #!/bin/sh -e
-./buildTinyBot.sh --tinydebug
+./buildTinyBot.sh --tinyvalidate
 dotnet run --project BotTuner -- compare TinyBot.cs $@
