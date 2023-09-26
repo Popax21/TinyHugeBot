@@ -17,7 +17,7 @@ public partial class MyBot {
         Array.Fill(butterflyTable, 1U);
     }
 
-    public Span<Move> PlaceBestMoveFirst_I(int alpha, int beta, int remDepth, int ply, Span<Move> moves, ulong ttEntry, ulong boardHash) {
+    public Span<Move> PlaceBestMoveFirst_I(int alpha, int beta, int remDepth, int ply, int searchExtensions, Span<Move> moves, ulong ttEntry, ulong boardHash) {
 #if FSTATS
         STAT_MoveOrder_BestMoveInvoke_I();
 #endif
@@ -34,7 +34,7 @@ public partial class MyBot {
 #endif
         } else if(beta > alpha-1 && remDepth >= 3) {
             //Perform IID to determine the move to place first
-            NegaMax(alpha, beta, remDepth - 2, ply, out bestMove);
+            NegaMax(alpha, beta, remDepth - 2, ply, out bestMove, searchExtensions);
 
 #if FSTATS
             STAT_MoveOrder_BestMoveIIDInvoke_I();
@@ -80,7 +80,7 @@ public partial class MyBot {
                 }
 
                 //Check if this move is a threat escape move
-                if(IsThreatEscapeMove_I(move)) {
+                if(IsThreatEscapeMove_I(move, ply)) {
 #if FSTATS
                     STAT_MoveOrder_ScoredThreatEscapeMove_I();
 #endif

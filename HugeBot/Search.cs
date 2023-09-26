@@ -11,8 +11,6 @@ public partial class MyBot : IChessBot {
     private Timer searchTimer = null!;
     private int searchAbortTime;
 
-    private int maxExtension;
-
     public Move Think(Board board, Timer timer) {
         //Determine search times
         searchBoard = board;
@@ -61,9 +59,6 @@ public partial class MyBot : IChessBot {
             bool didTimeOut = false;
 #endif
 
-            //Update the maximum extension amount
-            maxExtension = MaxExtension - depth*MaxExtensionReductionPerIter;
-
             //Do a NegaMax search with the current depth
             ushort iterBestMove = 0;
             try {
@@ -109,11 +104,11 @@ public partial class MyBot : IChessBot {
     }
 
     private int timeoutCheckNodeCounter = 0;
-    public int NegaMax(int alpha, int beta, int remDepth, int ply, out ushort bestMove, int prevExtensions = 0, int lmrIdx = -1) {
+    public int NegaMax(int alpha, int beta, int remDepth, int ply, out ushort bestMove, int searchExtensions=0) {
         bestMove = 0;
 
 #if VALIDATE
-        if(remDepth < 0 || remDepth > MaxDepth) throw new Exception($"Out-of-range depth: {remDepth}");
+        if(remDepth > MaxDepth) throw new Exception($"Out-of-range depth: {remDepth}");
         if(ply < 0 || ply >= MaxPlies) throw new Exception($"Out-of-range ply: {ply}");
 #endif
 
@@ -125,9 +120,6 @@ public partial class MyBot : IChessBot {
             throw new Exception();
 #endif
 
-        //Handle repetition
-        if(ply > 0 && searchBoard.IsRepeatedPosition()) return 0;
-
         //Start a new node
         bool isInCheck = searchBoard.IsInCheck();
         bool isPvCandidateNode = alpha+1 < beta; //Because of PVS, all nodes without a zero window are considered candidate nodes
@@ -136,7 +128,6 @@ public partial class MyBot : IChessBot {
         if(ply == 0) {
             if(remDepth <= 0) throw new Exception("Root node can't immediately enter Q-search");
             if(!isPvCandidateNode) throw new Exception("Root node can't be searched with a ZW");
-            if(lmrIdx >= 0) throw new Exception("Root node can't have an LMR applied");
         }
 #endif
 
@@ -146,6 +137,9 @@ public partial class MyBot : IChessBot {
 
         //Check if we reached the bottom of the search tree
         if(remDepth <= 0) return QSearch(alpha, beta, ply);
+
+        //Handle repetition
+        if(ply > 0 && searchBoard.IsRepeatedPosition()) return 0;
 
         //Check if the position is in the TT
         ulong boardHash = searchBoard.ZobristKey;
@@ -189,37 +183,24 @@ public partial class MyBot : IChessBot {
                 return prunedScore;
             }
 
-            //Apply Null Move Pruning
-            if(ApplyNullMovePruning_I(alpha, beta, remDepth, ply, prevExtensions, ref prunedScore)) {
-                int extension = 0;
+            //Apply Null Move Pruning   
+            if(ApplyNullMovePruning_I(alpha, beta, remDepth, ply, staticEval, searchExtensions, ref prunedScore)) {
                 if(prunedScore >= beta) { 
 #if FSTATS
                     STAT_NullMovePruning_PrunedNode_I();
 #endif
                     return prunedScore;
-                } else if(prunedScore <= Eval.MinMate) {
-                    //Mate threat extension
-                    extension = OnePlyExtension / 2;
+                }
+
+                //Mate threat extension
+                if(remDepth <= 3 && prunedScore <= Eval.MinMate && staticEval >= beta) {
+                    ApplyExtension_I(1, ref searchExtensions, ref remDepth);
 
 #if FSTATS
                     STAT_MateThreatExtension_I();
 #endif
-                } else if(threatMove != 0 && ApplyBotvinnikMarkoffExtension_I(threatMove, ply)) {
-                    extension = OnePlyExtension / 3;
-
-#if FSTATS
-                    STAT_BotvinnikMarkoffExtension_I();
-#endif
                 }
-                if(extension != 0) ApplyFractExtension_I(extension, ref remDepth, ref prevExtensions);
             }
-        }
-
-        //Re-check if we reached the bottom of the search tree because of reductions
-        if(remDepth <= 0) {
-            //TODO Our current Q-search is not check aware
-            if(!isInCheck) return QSearch(alpha, beta, ply);
-            remDepth = 1;
         }
 
         //Generate legal moves
@@ -243,7 +224,7 @@ public partial class MyBot : IChessBot {
 #endif
 
         //Order moves
-        Span<Move> toBeOrderedMoves = PlaceBestMoveFirst_I(alpha, beta, remDepth, ply, moves, ttEntry, boardHash);
+        Span<Move> toBeOrderedMoves = PlaceBestMoveFirst_I(alpha, beta, remDepth, ply, searchExtensions, moves, ttEntry, boardHash);
         SortMoves(toBeOrderedMoves, ply);
 
         //Search for the best move
@@ -271,20 +252,17 @@ public partial class MyBot : IChessBot {
                 case true:
                     //Determine extensions / reductions for this move
                     int moveExts = DetermineMoveZWExtensions_I(move, gaveCheck, remDepth-1);
+                    if(searchExtensions + moveExts > MaxExtension) moveExts = MaxExtension - searchExtensions;
 
                     //LMR: Check if we allow Late Move Reduction for this move
-                    if(!isInCheck && !gaveCheck && moveExts <= 0 && IsLMRAllowedForMove_I(move, i, remDepth)) {
+                    if(!isInCheck && !gaveCheck && moveExts <= 0 && IsLMRAllowedForMove_I(move, i, remDepth, ply)) {
 #if FSTATS
                         STAT_LMR_ApplyReduction_I();
 #endif
 
-                        //Apply the LMR reduction
-                        int lmrDepth = remDepth-1, lmrPrevExts = prevExtensions;
-                        moveExts -= DetermineLMRReduction_I(i, lmrDepth);
-                        ApplyFractExtension_I(moveExts, ref lmrDepth, ref lmrPrevExts);
-
                         //Do a ZWS search with reduced depth
-                        score = -NegaMax(-alpha - 1, -alpha, lmrDepth, ply+1, out _, lmrPrevExts);
+                        moveExts -= DetermineLMRReduction_I(i, remDepth-1);
+                        score = -NegaMax(-alpha - 1, -alpha, remDepth-1 + moveExts, ply+1, out _, searchExtensions);
                         if(score <= alpha) break; //If we reach alpha research with full depth
 
                         moveExts = 0;
@@ -293,9 +271,7 @@ public partial class MyBot : IChessBot {
 #endif
                     }
 
-                    int moveDepth = remDepth-1, movePrevExts = prevExtensions;
-                    ApplyFractExtension_I(moveExts, ref moveDepth, ref movePrevExts);
-                    score = -NegaMax(-alpha - 1, -alpha, moveDepth, ply+1, out _, moveExts);
+                    score = -NegaMax(-alpha - 1, -alpha, remDepth-1 + moveExts, ply+1, out _, searchExtensions + moveExts);
                     if(score <= alpha || score >= beta) break; //We check the beta bound as well as we can fail-high because of our fail-soft search
 
                     //Research with the full window
@@ -306,7 +282,7 @@ public partial class MyBot : IChessBot {
                     goto default;
                 default:
                     //Don't apply any extensions / reductions except for a full ply when in check
-                    score = -NegaMax(-beta, -alpha, remDepth - (gaveCheck ? 0 : 1), ply+1, out _, prevExtensions);
+                    score = -NegaMax(-beta, -alpha, remDepth - (gaveCheck ? 0 : 1), ply+1, out _, searchExtensions);
                     break;
             }
 

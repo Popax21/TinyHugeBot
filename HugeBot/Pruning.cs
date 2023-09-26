@@ -3,32 +3,26 @@ using ChessChallenge.API;
 namespace HugeBot;
 
 public partial class MyBot {
-    private int numNullMoves = 0;
-    private ushort threatMove;
-    public bool ApplyNullMovePruning_I(int alpha, int beta, int remDepth, int ply, int curExtension, ref int score) {
-        //Check if we should apply NMP
-        //Allow two null moves in a row to mitigate Zugzwang
-        //TODO Find better ways to do this
-        if(remDepth < 3 || numNullMoves >= 2) return false;
-        
-        //TODO Experiment with other values for R
+    private ushort[] threatMoves = new ushort[MaxPlies];
+    public bool ApplyNullMovePruning_I(int alpha, int beta, int remDepth, int ply, int staticEval, int searchExtensions, ref int score) {
+        //Determine the reduction R
+        //Use a bigger reduction if the static evaluation already fails high
         //TODO Transition to Null Move Reductions once we get near the endgame
-        int R = 2 + remDepth / 4;
+        int R = 2 + remDepth/4;
+        if(staticEval >= beta && remDepth > 1) R = 1 + remDepth*3/8 + (staticEval - beta) / 80;
 
         //Evaluate the null move using a ZWS
         searchBoard.ForceSkipTurn();
-        numNullMoves++;
-        score = -NegaMax(-beta, -beta + 1, remDepth - 1 - R, ply+1, out threatMove, curExtension);
-        numNullMoves--;
+        score = -NegaMax(-beta, -beta+1, remDepth - 1 - R, ply+1, out threatMoves[ply], searchExtensions);
         searchBoard.UndoSkipTurn(); 
 
         return true;
     }
 
-    private void ResetThreatMove_I(int ply) => threatMove = threatMoves[ply] = 0;
-    private bool IsThreatEscapeMove_I(Move move) {
+    private void ResetThreatMove_I(int ply) => threatMoves[ply] = 0;
+    private bool IsThreatEscapeMove_I(Move move, int ply) {
         //Check if the move is escaping the square attacked by the null move refutation
-        if(threatMove != 0 && move.StartSquare.Index == ((threatMove >> 6) & 63)) return true;
+        if(threatMoves[ply] != 0 && move.StartSquare.Index == ((threatMoves[ply] >> 6) & 63)) return true;
 
         return false;
     }

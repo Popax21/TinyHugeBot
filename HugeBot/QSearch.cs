@@ -39,7 +39,7 @@ public partial class MyBot {
 #endif
 
         //Move ordering
-        Span<Move> toBeOrderedMoves = PlaceBestMoveFirst_I(alpha, beta, 0, -1, moves, ttEntry, boardHash);
+        Span<Move> toBeOrderedMoves = PlaceBestMoveFirst_I(alpha, beta, 0, -1, 0, moves, ttEntry, boardHash);
         SortMoves(toBeOrderedMoves, ply);
 
         ushort bestMove = 0;
