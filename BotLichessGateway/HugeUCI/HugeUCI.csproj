@@ -8,7 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Chess-Challenge\Chess-Challenge\Chess-Challenge.csproj" />
-    <ProjectReference Include="..\..\HugeBot\HugeBot.csproj" Properties="Configuration='Release'" />
+    <ProjectReference Include="..\..\HugeBot\HugeBot.csproj" />
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">

@@ -3,6 +3,8 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using ChessChallenge.API;
 
+namespace HugeBot;
+
 #if STATS
 public partial class MyBot {
     private const MethodImplOptions StatMImpl = MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization;

@@ -1,5 +1,7 @@
 using System;
 
+namespace HugeBot;
+
 public partial class MyBot {
     public const int TTSize = 1 << 24; //16k entries * 12b/e -> 192MB
     private const ulong TTIdxMask = TTSize-1;

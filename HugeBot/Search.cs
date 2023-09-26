@@ -1,6 +1,7 @@
 using System;
 using ChessChallenge.API;
-using HugeBot;
+
+namespace HugeBot;
 
 public partial class MyBot : IChessBot {
     public const int MaxDepth = 63; //Limited by TT

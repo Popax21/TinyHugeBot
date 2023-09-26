@@ -1,6 +1,7 @@
 using System;
 using ChessChallenge.API;
-using HugeBot;
+
+namespace HugeBot;
 
 public partial class MyBot {
     public int QSearch(int alpha, int beta, int ply) {

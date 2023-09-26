@@ -1,5 +1,7 @@
 using ChessChallenge.API;
 
+namespace HugeBot;
+
 public partial class MyBot {
     public const int ExtensionFractBits = 8, ExtensionFractMask = (1 << ExtensionFractBits) - 1, OnePlyExtension = 1 << ExtensionFractBits;
     public const int MaxExtension = 3 * OnePlyExtension, MaxExtensionReductionPerIter = OnePlyExtension / 5;

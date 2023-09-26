@@ -1,7 +1,6 @@
 ﻿using ChessChallenge.API;
 using System;
-using System.IO;
-using System.Linq;
+using HugeBot;
 
 namespace HugeUCI {
     class Program {

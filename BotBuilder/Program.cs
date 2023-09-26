@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -18,7 +17,7 @@ string asmPath, botClass;
 if(!DEBUG) {
     //Read the huge bot DLL
     ModuleDefinition botMod = ModuleDefinition.FromFile(hugeBotDllPath, new ModuleReaderParameters(AppDomain.CurrentDomain.BaseDirectory));
-    TypeDefinition botType = botMod.TopLevelTypes.First(t => t.FullName == "MyBot");
+    TypeDefinition botType = botMod.TopLevelTypes.First(t => t.FullName == "HugeBot.MyBot");
 
     //Tinyfy and write the tiny bot DLL to disk
     new Tinyfier(botMod).AddExternalReference(botType).TinyfyEverything().WithNamePriority(botType, 1000).Build().Write(tinyBotDllPath);

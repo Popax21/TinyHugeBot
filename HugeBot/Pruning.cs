@@ -1,5 +1,7 @@
 using ChessChallenge.API;
 
+namespace HugeBot;
+
 public partial class MyBot {
     private int numNullMoves = 0;
     private ushort threatMove;

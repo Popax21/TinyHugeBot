@@ -1,6 +1,8 @@
 using System;
 using ChessChallenge.API;
 
+namespace HugeBot;
+
 public partial class MyBot {
     private const int NumKillerTableSlots = 4;
 
