@@ -36,7 +36,7 @@ if(!DEBUG) {
 } else {
     //Use HugeBot.dll directly
     asmPath = hugeBotDllPath;
-    botClass = "MyBot";
+    botClass = "HugeBot.MyBot";
     Console.WriteLine("Skipping tiny bot build as --debug flag was given");
 }
 

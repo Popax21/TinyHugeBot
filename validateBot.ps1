@@ -1,2 +1,2 @@
-./buildTinyBot.ps1 --tinyvalidate
+./buildTinyBot.ps1 --validate
 dotnet run --project BotTuner -- compare TinyBot.cs $args
