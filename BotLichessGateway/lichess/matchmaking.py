@@ -52,7 +52,7 @@ class Matchmaking:
         self.last_challenge_created_delay = Timer(seconds(25))  # Challenges expire after 20 seconds.
         self.last_game_ended_delay = Timer(minutes(self.matchmaking_cfg.challenge_timeout))
         self.last_user_profile_update_time = Timer(minutes(5))
-        self.min_wait_time = seconds(60)  # Wait before new challenge to avoid api rate limits.
+        self.min_wait_time = seconds(15)  # Wait before new challenge to avoid api rate limits.
         self.challenge_id: str = ""
         self.daily_challenges: DAILY_TIMERS_TYPE = read_daily_challenges()
 
@@ -124,7 +124,7 @@ class Matchmaking:
         """
         self.daily_challenges = [timer for timer in self.daily_challenges if not timer.is_expired()]
         self.daily_challenges.append(Timer(days(1)))
-        self.min_wait_time = seconds(60) * ((len(self.daily_challenges) // 50) + 1)
+        self.min_wait_time = seconds(15) * ((len(self.daily_challenges) // 50) + 1)
         write_daily_challenges(self.daily_challenges)
 
     def perf(self) -> dict[str, dict[str, Any]]:
