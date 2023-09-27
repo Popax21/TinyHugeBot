@@ -5,19 +5,23 @@ namespace HugeBot;
 
 public partial class MyBot {
     private const int NumKillerTableSlots = 4;
+    private const int NumButterflyIndices = 2 * 8 * 64, NumButterflyBits = 1 + 3 + 6;
 
     private ushort[] killerTable = new ushort[MaxPlies * NumKillerTableSlots];
-    private uint[] historyTable = new uint[2 * 8 * 64], butterflyTable = new uint[2 * 8 * 64];
+    private uint[] historyTable = new uint[NumButterflyIndices], contHistoryTable = new uint[NumButterflyIndices*NumButterflyIndices], followupHistoryTable = new uint[NumButterflyIndices*NumButterflyIndices];
+    private uint[] butterflyTable = new uint[NumButterflyIndices];
 
     private int GetMoveButterflyIndex_I(Move move, bool isWhite) => (isWhite ? 0 : 8*64) | (int) move.MovePieceType << 6 | move.TargetSquare.Index;
 
     public void MoveOrder_Reset_I() {
         Array.Fill(killerTable, (ushort) 0);
         Array.Fill(historyTable, 0U);
+        Array.Fill(contHistoryTable, 0U);
+        Array.Fill(followupHistoryTable, 0U);
         Array.Fill(butterflyTable, 1U);
     }
 
-    public Span<Move> PlaceBestMoveFirst_I(int alpha, int beta, int remDepth, int ply, int searchExtensions, Span<Move> moves, ulong ttEntry, ulong boardHash) {
+    public int PlaceBestMoveFirst_I(int alpha, int beta, int remDepth, int ply, int searchExtensions, Span<Move> moves, ulong ttEntry, ulong boardHash) {
 #if FSTATS
         STAT_MoveOrder_BestMoveInvoke_I();
 #endif
@@ -39,7 +43,7 @@ public partial class MyBot {
 #if FSTATS
             STAT_MoveOrder_BestMoveIIDInvoke_I();
 #endif
-        } else return moves;
+        } else return 0;
 
         //Place the best move first
         for(int i = 0; i < moves.Length; i++) {
@@ -47,10 +51,10 @@ public partial class MyBot {
                 Move tmp = moves[i];
                 moves[i] = moves[0];
                 moves[0] = tmp;
-                return moves.Slice(1); //Don't use range operators, those bloat the IL
+                return 1;
             }
         }
-        return moves;
+        return 0;
     }
 
     public void SortMoves(Span<Move> moves, int ply) {
@@ -88,8 +92,11 @@ public partial class MyBot {
                 }
 
                 //Return a score based on the Relative History Heuristic
-                int butterflyIdx = GetMoveButterflyIndex_I(move, searchBoard.IsWhiteToMove);
-                ulong rhhScore = ((ulong) historyTable[butterflyIdx] << 20) / butterflyTable[butterflyIdx];
+                int moveButterfly = GetMoveButterflyIndex_I(move, searchBoard.IsWhiteToMove);
+                ulong moveHistory = historyTable[moveButterfly];
+                if(ply > 0) moveHistory += contHistoryTable[(plyMoveButterflies[ply-1] << NumButterflyBits) | moveButterfly];
+                if(ply > 1) moveHistory += followupHistoryTable[(plyMoveButterflies[ply-2] << NumButterflyBits) | moveButterfly];
+                ulong rhhScore = (moveHistory << 20) / butterflyTable[moveButterfly];
 
 #if VALIDATE
                 if(rhhScore >= (1UL << 52)) throw new Exception($"RHH score outside of intended bounds: 0x{rhhScore:x}");
@@ -124,10 +131,16 @@ public partial class MyBot {
         killerTable[NumKillerTableSlots*ply + 0] = moveVal;
     }
 
-    //TODO Experiment with other increments
-    public void UpdateButterflyTable_I(Move move, bool isWhite, int depth)
-        => butterflyTable[GetMoveButterflyIndex_I(move, isWhite)]++;
+    public void UpdateButterflyTable_I(Move move, bool isWhite, int depth, int ply) {
+        int moveButterfly = GetMoveButterflyIndex_I(move, isWhite);
+        butterflyTable[moveButterfly]++;
+    }
 
-    public void UpdateHistoryTable_I(Move move, bool isWhite, int depth)
-        => historyTable[GetMoveButterflyIndex_I(move, isWhite)] += (uint) (depth*depth);
+    public void UpdateHistoryTable_I(Move move, bool isWhite, int depth, int ply)  {
+        uint incr = (uint) (depth*depth);
+        int moveButterfly = GetMoveButterflyIndex_I(move, isWhite);
+        historyTable[moveButterfly] += incr; 
+        if(ply > 0) contHistoryTable[(plyMoveButterflies[ply-1] << NumButterflyBits) | moveButterfly] += incr;
+        if(ply > 1) followupHistoryTable[(plyMoveButterflies[ply-2] << NumButterflyBits) | moveButterfly] += incr;
+    }
 }

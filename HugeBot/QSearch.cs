@@ -39,8 +39,8 @@ public partial class MyBot {
 #endif
 
         //Move ordering
-        Span<Move> toBeOrderedMoves = PlaceBestMoveFirst_I(alpha, beta, 0, -1, 0, moves, ttEntry, boardHash);
-        SortMoves(toBeOrderedMoves, ply);
+        int sortedMovesStartIdx = PlaceBestMoveFirst_I(alpha, beta, 0, -1, 0, moves, ttEntry, boardHash);
+        SortMoves(moves.Slice(sortedMovesStartIdx), ply);
 
         ushort bestMove = 0;
         for(int i = 0; i < moves.Length; i++) {

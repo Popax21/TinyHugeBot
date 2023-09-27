@@ -7,6 +7,8 @@ public partial class MyBot : IChessBot {
     public const int MaxDepth = 63; //Limited by TT
     public const int MaxPlies = 256;
 
+    private int[] plyMoveButterflies = new int[MaxPlies];
+
     private int timeoutCheckNodeCounter = 0;
     public int NegaMax(int alpha, int beta, int remDepth, int ply, out ushort bestMove, int searchExtensions=0) {
         bestMove = 0;
@@ -25,6 +27,7 @@ public partial class MyBot : IChessBot {
 #endif
 
         //Start a new node
+        bool isWhite = searchBoard.IsWhiteToMove;
         bool isInCheck = searchBoard.IsInCheck();
         bool isPvCandidateNode = alpha+1 < beta; //Because of PVS, all nodes without a zero window are considered candidate nodes
 
@@ -128,25 +131,34 @@ public partial class MyBot : IChessBot {
 #endif
 
         //Order moves
-        Span<Move> toBeOrderedMoves = PlaceBestMoveFirst_I(alpha, beta, remDepth, ply, searchExtensions, moves, ttEntry, boardHash);
-        SortMoves(toBeOrderedMoves, ply);
+        int sortedMovesStartIdx = PlaceBestMoveFirst_I(alpha, beta, remDepth, ply, searchExtensions, moves, ttEntry, boardHash);
+        SortMoves(moves.Slice(sortedMovesStartIdx), ply);
 
         //Search for the best move
         int bestScore = Eval.MinSentinel;
         bool hasPvMove = false;
         TTBoundType ttBound = TTBoundType.Upper; //Until we surpass alpha we only have an upper bound
 
+        bool sortedQuietMoves = false;
         for(int i = 0; i < moves.Length; i++) {
             Move move = moves[i];
 
+            //Sort quiet moves if we haven't already
+            if(i >= sortedMovesStartIdx && IsMoveQuiet_I(move) && !sortedQuietMoves) {
+                SortMoves(moves.Slice(i), ply);
+                sortedQuietMoves = true;
+                move = moves[i];
+            }
+
             //FP: Check if we can futility-prune this move
-            if(canFutilityPrune && bestMove != 0 && IsMoveQuiet_I(move)) {
+            if(canFutilityPrune && bestMove != 0 && IsMoveQuiet_I(move) && !IsThreatEscapeMove_I(move, ply)) {
 #if FSTATS
                 STAT_FutilityPruning_PrunedMove();
 #endif
                 continue;
             }
 
+            plyMoveButterflies[ply] = GetMoveButterflyIndex_I(move, isWhite);
             searchBoard.MakeMove(move);
             bool gaveCheck = searchBoard.IsInCheck();
 
@@ -221,12 +233,11 @@ public partial class MyBot : IChessBot {
                         InsertIntoKillerTable_I(ply, move);
 
                         //Update the butterfly and history tables
-                        bool isWhite = searchBoard.IsWhiteToMove;
                         for(int pi = 0; pi < i; pi++) {
                             Move prevMove = moves[pi];
-                            UpdateButterflyTable_I(prevMove, isWhite, remDepth);
+                            UpdateButterflyTable_I(prevMove, isWhite, remDepth, ply);
                         }
-                        UpdateHistoryTable_I(move, isWhite, remDepth);
+                        UpdateHistoryTable_I(move, isWhite, remDepth, ply);
                     }
 
                     ttBound = TTBoundType.Lower;

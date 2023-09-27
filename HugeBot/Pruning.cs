@@ -12,6 +12,7 @@ public partial class MyBot {
         if(staticEval >= beta && remDepth > 1) R = 1 + remDepth*3/8 + (staticEval - beta) / 80;
 
         //Evaluate the null move using a ZWS
+        plyMoveButterflies[ply] = 0;
         searchBoard.ForceSkipTurn();
         score = -NegaMax(-beta, -beta+1, remDepth - 1 - R, ply+1, out threatMoves[ply], searchExtensions);
         searchBoard.UndoSkipTurn(); 

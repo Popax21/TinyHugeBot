@@ -56,7 +56,10 @@ public partial class MyBot : IChessBot {
 #endif
 
             //Do a NegaMax search with the current depth
+#if BESTMOVE || STATS
             bool didTimeOut = false;
+#endif
+
             ushort iterBestMove = 0;
             try {
                 curBestEval = NegaMax(Eval.MinSentinel, Eval.MaxSentinel, depth, 0, out iterBestMove);
@@ -69,7 +72,9 @@ public partial class MyBot : IChessBot {
 #else
             } catch(Exception) {
 #endif
+#if BESTMOVE || STATS
                 didTimeOut = true;
+#endif
 
                 //Recycle partial search results
                 //Note that we can't recycle our evaluation, but that's fine (except for some log output)
