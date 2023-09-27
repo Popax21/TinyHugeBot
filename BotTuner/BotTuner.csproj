@@ -11,7 +11,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="nunn.pgn" LogicalName="nunn2" />
-    <EmbeddedResource Include="silversuite.pgn" LogicalName="silversuite" />
+    <EmbeddedResource Include="PosCollections\challenge.fen" LogicalName="challenge" />
+    <EmbeddedResource Include="PosCollections\nunn.pgn" LogicalName="nunn" />
+    <EmbeddedResource Include="PosCollections\silversuite.pgn" LogicalName="silversuite" />
   </ItemGroup>
 </Project>

@@ -45,7 +45,7 @@ public static partial class Program {
     }
 
     public static string[] AllPositionCollections = new string[] {
-        "nunn2", "silversuite"
+        "challenge", "nunn", "silversuite"
     };
 
     public static string[] LoadPositionCollection(string name) {
@@ -58,14 +58,21 @@ public static partial class Program {
             if(line.Length <= 0) continue;
             if(line[0] == '[') continue;
 
-            //Parse the PGN
-            Move[] moves = PGNLoader.MovesFromPGN(line);
+            //Check if the line is a PGN or a FEN
+            if(line.StartsWith("1.")) {
+                //Read the entire PGN
+                string pgn = line;
+                while(reader.ReadLine() is string pgnLine && pgnLine.Length > 0) pgn += " " + pgnLine.Trim();
 
-            //Replay the moves, and save the FEN
-            Board board = new Board();
-            board.LoadStartPosition();
-            foreach(Move move in moves) board.MakeMove(move, false);
-            fens.Add(FenUtility.CurrentFen(board));
+                //Parse the PGN
+                Move[] moves = PGNLoader.MovesFromPGN(pgn);
+
+                //Replay the moves, and save the FEN
+                Board board = new Board();
+                board.LoadStartPosition();
+                foreach(Move move in moves) board.MakeMove(move, false);
+                fens.Add(FenUtility.CurrentFen(board));
+            } else fens.Add(line);
         }
 
         Console.WriteLine($"Loaded {fens.Count} FENs from position collection '{name}'");
