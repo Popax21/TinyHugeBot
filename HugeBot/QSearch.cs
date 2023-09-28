@@ -16,13 +16,13 @@ public partial class MyBot {
         //TODO Is storing our result back into the TT worth it?
         ulong boardHash = searchBoard.ZobristKey;
         ulong ttEntry = transposTable[boardHash & TTIdxMask];
-        if(CheckTTEntry_I(ttEntry, boardHash, alpha, beta, 0)) {
+        if(CheckTTEntry_I(ttEntry, boardHash, alpha, beta, 0, out bool ttEntryValid)) {
             //The evaluation is stored in the lower 16 bits of the entry
             return unchecked((short) ttEntry);
         }
 
         //Evaluate the current position as a stand-pat score, and update the window using it
-        int standPatScore = Eval.Evaluate(searchBoard);
+        int standPatScore = GetTTScoreOrEvaluate_I(ttEntryValid, ttEntry);
         if(standPatScore > alpha) {
             if(standPatScore >= beta) return standPatScore;
             alpha = standPatScore;
@@ -39,7 +39,7 @@ public partial class MyBot {
 #endif
 
         //Move ordering
-        int sortedMovesStartIdx = PlaceBestMoveFirst_I(alpha, beta, 0, -1, 0, moves, ttEntry, boardHash);
+        int sortedMovesStartIdx = PlaceBestMoveFirst_I(alpha, beta, 0, -1, 0, moves, ttEntryValid, boardHash);
         SortMoves(moves.Slice(sortedMovesStartIdx), ply);
 
         ushort bestMove = 0;
@@ -56,6 +56,7 @@ public partial class MyBot {
             }
 
             //Evaluate the move
+            //TODO Try PVS here
             searchBoard.MakeMove(move);
             int score = -QSearch(-beta, -alpha, ply+1);
             searchBoard.UndoMove(move);
@@ -82,7 +83,7 @@ public partial class MyBot {
 
 #if STATS
         //Report if we failed low
-        if(bestMove != 0) STAT_AlphaBeta_FailLow_I(false, true);
+        if(bestMove == 0) STAT_AlphaBeta_FailLow_I(false, true);
 #endif
 
         //Store the score in the TT if we didn't fail low

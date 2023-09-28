@@ -23,15 +23,17 @@ public partial class MyBot {
     private ulong[] transposTable = new ulong[TTSize];
     private ushort[] transposMoveTable = new ushort[TTSize];
     private ushort[] transposAgeTable = new ushort[TTSize];
-
-    private bool CheckTTEntry_I(ulong entry, ulong boardHash, int alpha, int beta, int depth) {
+ 
+    private bool CheckTTEntry_I(ulong entry, ulong boardHash, int alpha, int beta, int depth, out bool validHash) {
         //Check if the hash bits match
         if((entry & ~TTIdxMask) != (boardHash & ~TTIdxMask)) {
 #if FSTATS
             STAT_TTRead_Miss_I();
 #endif
+            validHash = false;
             return false;
         }
+        validHash = true;
 
         //Check that the entry searched at least as deep as we would
         if((int) ((entry >> 18) & 0x3f) < depth) {
@@ -42,6 +44,7 @@ public partial class MyBot {
         }
 
         //Check the node bound type
+        //TODO ice4 checks whether the node is a PV node for exact scores
         if(!((TTBoundType) (entry & (ulong) TTBoundType.MASK) switch {
             TTBoundType.Exact => true,
             TTBoundType.Lower => beta <= unchecked((short) entry),
@@ -66,6 +69,13 @@ public partial class MyBot {
         return true;
     }
 
+    private int GetTTScoreOrEvaluate_I(bool entryValid, ulong entry) {
+        //TODO Investigate additional TT checks
+        short ttScore = unchecked((short) entry);
+        if(entryValid && Eval.MinMate < ttScore && ttScore < Eval.MaxMate) return ttScore;
+        else return Eval.Evaluate(searchBoard);
+    }
+
     private void StoreTTEntry_I(ulong boardHash, short eval, TTBoundType bound, int depth, ushort bestMove) {
 #if VALIDATE
         //Check for overflows
@@ -75,10 +85,12 @@ public partial class MyBot {
 
         ulong ttIdx = boardHash & TTIdxMask;
         ulong prevEntry = transposTable[ttIdx];
+        bool isUpdate = (prevEntry & ~TTIdxMask) == (boardHash & ~TTIdxMask);
 
         //Check if we should update the existing entry
+        //TODO Implement depth-preferred
         ushort ttAge = (ushort) (searchBoard.PlyCount + depth / 2);
-        if((prevEntry & ~TTIdxMask) != (boardHash & ~TTIdxMask) && transposAgeTable[ttIdx] > ttAge) {            
+        if(isUpdate && transposAgeTable[ttIdx] > ttAge) {            
 #if FSTATS
             STAT_TTWrite_AgeBail_I();
 #endif
@@ -99,7 +111,7 @@ public partial class MyBot {
             ((ulong) depth << 18) |
             (boardHash & ~TTIdxMask)
         ;
-        transposMoveTable[ttIdx] = bestMove;
+        if(!isUpdate || bound != TTBoundType.Upper) transposMoveTable[ttIdx] = bestMove; //Don't overwrite the old move if we failed low
         transposAgeTable[ttIdx] = ttAge;
     }
 }

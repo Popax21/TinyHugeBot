@@ -51,15 +51,13 @@ public partial class MyBot : IChessBot {
         //Check if the position is in the TT
         ulong boardHash = searchBoard.ZobristKey;
         ulong ttEntry = transposTable[boardHash & TTIdxMask];
-        if(CheckTTEntry_I(ttEntry, boardHash, alpha, beta, remDepth)) {
-            //The evaluation is stored in the lower 16 bits of the entry
-            bestMove = transposMoveTable[boardHash & TTIdxMask];
-
+        if(CheckTTEntry_I(ttEntry, boardHash, alpha, beta, remDepth, out bool ttEntryValid)) {
 #if VALIDATE
             if(ply == 0 && bestMove == 0) throw new Exception("Root TT entry has no best move");
 #endif
 
-            return unchecked((short) ttEntry);
+            bestMove = transposMoveTable[boardHash & TTIdxMask];
+            return unchecked((short) ttEntry); //The evaluation is stored in the lower 16 bits of the entry
         }
 
         //Reset any pruning special move values, as they might screw up future move ordering if not cleared
@@ -67,27 +65,21 @@ public partial class MyBot : IChessBot {
 
         //Apply pruning to non-PV candidates (otherwise we duplicate our work on researches I think?)
         bool canFutilityPrune = false;
-        if(!isInCheck && !isPvCandidateNode && Eval.MinMate < alpha && beta < Eval.MaxMate) {
+        if(!isInCheck && !isPvCandidateNode && beta > Eval.MinMate) {
             int prunedScore = 0;
 #if FSTATS
             STAT_Pruning_CheckNonPVNode_I();
 #endif
 
             //Determine the static evaluation of the position
-            int staticEval = Eval.Evaluate(searchBoard);
-
-            //Determine if we can futility prune
-            canFutilityPrune = CanFutilityPrune_I(staticEval, alpha, remDepth);
-#if FSTATS
-            if(canFutilityPrune) STAT_FutilityPruning_AbleNode();
-#endif
+            int staticEval = GetTTScoreOrEvaluate_I(ttEntryValid, ttEntry);
 
             //Apply Reverse Futility Pruning
             if(ApplyReverseFutilityPruning_I(staticEval, beta, remDepth, ref prunedScore)) {
 #if FSTATS
                 STAT_ReverseFutilityPruning_PrunedNode_I();
 #endif
-                return prunedScore;
+                return prunedScore; //TODO Does returning staticEval here help things?
             }
 
             //Apply Null Move Pruning   
@@ -108,6 +100,12 @@ public partial class MyBot : IChessBot {
 #endif
                 }
             }
+
+            //Determine if we can futility prune
+            canFutilityPrune = CanFutilityPrune_I(staticEval, alpha, remDepth);
+#if FSTATS
+            if(canFutilityPrune) STAT_FutilityPruning_AbleNode();
+#endif
         }
 
         //Generate legal moves
@@ -119,7 +117,7 @@ public partial class MyBot : IChessBot {
             if(ply == 0) throw new Exception("Root node has no valid moves");
 #endif
             //Handle checkmate / stalemate
-            return searchBoard.IsInCheck() ? Eval.MinEval + ply : 0;
+            return isInCheck ? Eval.MinEval + ply : 0;
         }
 
 #if STATS
@@ -131,27 +129,32 @@ public partial class MyBot : IChessBot {
 #endif
 
         //Order moves
-        int sortedMovesStartIdx = PlaceBestMoveFirst_I(alpha, beta, remDepth, ply, searchExtensions, moves, ttEntry, boardHash);
+        int sortedMovesStartIdx = PlaceBestMoveFirst_I(alpha, beta, remDepth, ply, searchExtensions, moves, ttEntryValid, boardHash);
         SortMoves(moves.Slice(sortedMovesStartIdx), ply);
 
         //Search for the best move
-        int bestScore = Eval.MinSentinel;
+#if STATS
         bool hasPvMove = false;
-        TTBoundType ttBound = TTBoundType.Upper; //Until we surpass alpha we only have an upper bound
+#endif
 
+        int bestScore = Eval.MinSentinel;
+        TTBoundType ttBound = TTBoundType.Upper; //Until we surpass alpha we only have an upper bound
         bool sortedQuietMoves = false;
         for(int i = 0; i < moves.Length; i++) {
             Move move = moves[i];
+            bool isQuietMove = IsMoveQuiet_I(move);
 
             //Sort quiet moves if we haven't already
-            if(i >= sortedMovesStartIdx && IsMoveQuiet_I(move) && !sortedQuietMoves) {
+            if(i >= sortedMovesStartIdx && isQuietMove && !sortedQuietMoves) {
                 SortMoves(moves.Slice(i), ply);
                 sortedQuietMoves = true;
+
                 move = moves[i];
+                isQuietMove = IsMoveQuiet_I(move);
             }
 
             //FP: Check if we can futility-prune this move
-            if(canFutilityPrune && bestMove != 0 && IsMoveQuiet_I(move) && !IsThreatEscapeMove_I(move, ply)) {
+            if(canFutilityPrune && isQuietMove && bestMove != 0) {
 #if FSTATS
                 STAT_FutilityPruning_PrunedMove();
 #endif
@@ -164,14 +167,14 @@ public partial class MyBot : IChessBot {
 
             //PVS: If we already have a PV move (which should be early because of move ordering), do a ZWS on alpha first to ensure that this move doesn't fail low
             int score;
-            switch(hasPvMove) {
+            switch(bestMove != 0) {
                 case true:
                     //Determine extensions / reductions for this move
                     int moveExts = DetermineMoveZWExtensions_I(move, gaveCheck, remDepth-1);
                     if(searchExtensions + moveExts > MaxExtension) moveExts = MaxExtension - searchExtensions;
 
                     //LMR: Check if we allow Late Move Reduction for this move
-                    if(!isInCheck && !gaveCheck && moveExts <= 0 && IsLMRAllowedForMove_I(move, i, remDepth, ply)) {
+                    if(isQuietMove && !isInCheck && !gaveCheck && moveExts <= 0 && IsLMRAllowedForMove_I(move, i, remDepth, ply)) {
 #if FSTATS
                         STAT_LMR_ApplyReduction_I();
 #endif
@@ -228,7 +231,7 @@ public partial class MyBot : IChessBot {
 #endif
 
                     //Check if the move is quiet
-                    if(IsMoveQuiet_I(move)) {
+                    if(isQuietMove) {
                         //Insert into the killer table
                         InsertIntoKillerTable_I(ply, move);
 
@@ -250,11 +253,8 @@ public partial class MyBot : IChessBot {
 
 #if STATS
                 STAT_PVS_FoundPVMove_I(i, hasPvMove);
-#endif
                 hasPvMove = true;
-            } else if(i == 0 && ply == 0) {
-                //If the first move already failed low on the root node, then immediately bail out to update the aspiration window
-                break;
+#endif
             }
         }
 

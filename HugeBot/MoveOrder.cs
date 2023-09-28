@@ -21,7 +21,7 @@ public partial class MyBot {
         Array.Fill(butterflyTable, 1U);
     }
 
-    public int PlaceBestMoveFirst_I(int alpha, int beta, int remDepth, int ply, int searchExtensions, Span<Move> moves, ulong ttEntry, ulong boardHash) {
+    public int PlaceBestMoveFirst_I(int alpha, int beta, int remDepth, int ply, int searchExtensions, Span<Move> moves, bool ttEntryValid, ulong boardHash) {
 #if FSTATS
         STAT_MoveOrder_BestMoveInvoke_I();
 #endif
@@ -29,7 +29,7 @@ public partial class MyBot {
         //Check if TT contains a move
         //Otherwise, if this isn't a PV node (we assume all non-ZW nodes are), potentially use IID (Internal Iterative Deepening)
         ushort bestMove;
-        if((ttEntry & ~TTIdxMask) == (boardHash & ~TTIdxMask)) {
+        if(ttEntryValid ) {
             //Place the move in the TT first
             bestMove = transposMoveTable[boardHash & TTIdxMask];
 
@@ -121,7 +121,8 @@ public partial class MyBot {
         ushort moveVal = move.RawValue;
 
         for(int i = 1; i < NumKillerTableSlots; i++) {
-            if(killerTable[NumKillerTableSlots*ply + i] == moveVal) {
+            ushort killerMove = killerTable[NumKillerTableSlots*ply + i];
+            if(killerMove == 0 || killerMove == moveVal) {
                 //Don't remove the old first move
                 killerTable[NumKillerTableSlots*ply + i] = killerTable[NumKillerTableSlots*ply + 0];
                 break;

@@ -50,6 +50,5 @@ public partial class MyBot {
     };
 
     //TODO Check if disabling near the endgame helps things
-    public bool ShouldApplyDeltaPruning_I(Move move, int alpha, int standPatScore)
-        => standPatScore + DeltaPruningMargins[(int) move.CapturePieceType] < alpha;
+    public bool ShouldApplyDeltaPruning_I(Move move, int alpha, int standPatScore) => standPatScore + DeltaPruningMargins[(int) move.CapturePieceType] <= alpha;
 }

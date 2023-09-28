@@ -28,8 +28,6 @@ public partial class MyBot {
         return extensions;
     }
 
-    public bool IsLMRAllowedForMove_I(Move move, int moveIdx, int depth, int ply)
-        => depth >= 3 && moveIdx >= 6 && IsMoveQuiet_I(move) && !IsThreatEscapeMove_I(move, ply);
-
+    public bool IsLMRAllowedForMove_I(Move move, int moveIdx, int depth, int ply) => depth >= 3 && moveIdx >= 6 && !IsThreatEscapeMove_I(move, ply);
     public int DetermineLMRReduction_I(int moveIdx, int depth) => 2;
 }
