@@ -20,8 +20,8 @@ public partial class Tinyfier {
         foreach(TypeDefinition type in targetTypes) {
             foreach(MethodDefinition method in type.Methods) {
                 if(method.CilMethodBody is not { Instructions: CilInstructionCollection instrs } body) continue;
-                RemoveBaseCtorCalls(body, instrs);
 
+                RemoveBaseCtorCalls(body, instrs);
                 while(true) {
                     bool didModify = false;
                     didModify |= RemoveUnnecessaryCasts(body, instrs);
@@ -204,6 +204,8 @@ public partial class Tinyfier {
     }
 
     private bool RemoveProxyVariables(CilMethodBody body, CilInstructionCollection instrs) {
+        instrs.ExpandMacros(); //Ensure that removing variables does not mess things up
+
         bool didModify = false;
         foreach(CilLocalVariable local in body.LocalVariables.ToArray()) {
             //Ensure there's only one load and no address loads for this local
@@ -275,7 +277,8 @@ public partial class Tinyfier {
             foreach(CilInstruction instr in instrs) {
                 if(instr.IsStloc() && instr.GetLocalVariable(body.LocalVariables) == local) {
                     if(proxiedLocal != null) instr.Operand = proxiedLocal;
-                    else instr.ReplaceWithNop();
+                    else if(loadInstrIdx >= 0) instr.ReplaceWithNop();
+                    else instr.ReplaceWith(CilOpCodes.Pop);
                 }
             }
 
@@ -553,12 +556,21 @@ public partial class Tinyfier {
         foreach(CilInstruction instr in instrs.ToArray()) {
             if(instr.OpCode == CilOpCodes.Nop) {
                 //Fixup jumps
+                foreach(CilExceptionHandler handler in body.ExceptionHandlers) {
+                    if(handler.TryStart?.Offset == instr.Offset) handler.TryStart = nextInstrLabel ??= new CilInstructionLabel();
+                    if(handler.TryEnd?.Offset == instr.Offset) handler.TryEnd = nextInstrLabel ??= new CilInstructionLabel();
+                    if(handler.HandlerStart?.Offset == instr.Offset) handler.HandlerStart = nextInstrLabel ??= new CilInstructionLabel();
+                    if(handler.HandlerEnd?.Offset == instr.Offset) handler.HandlerEnd = nextInstrLabel ??= new CilInstructionLabel();
+                    if(handler.FilterStart?.Offset == instr.Offset) handler.FilterStart = nextInstrLabel ??= new CilInstructionLabel();
+                }
+
                 instrs.CalculateOffsets();
                 foreach(CilInstruction jumpInstr in instrs) {
                     if(!jumpInstr.IsBranch()) continue;
                     if(GetJumpOffset(jumpInstr) != instr.Offset) continue;
                     jumpInstr.Operand = nextInstrLabel ??= new CilInstructionLabel();
                 }
+
                 instrs.Remove(instr);
                 didModify = true;
             } else if(nextInstrLabel != null) {
