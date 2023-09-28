@@ -49,14 +49,13 @@ public partial class MyBot : IChessBot {
         if(ply > 0 && searchBoard.IsRepeatedPosition()) return 0;
 
         //Check if the position is in the TT
-        ulong boardHash = searchBoard.ZobristKey;
-        ulong ttEntry = transposTable[boardHash & TTIdxMask];
+        ulong boardHash = searchBoard.ZobristKey, ttIdx = boardHash & TTIdxMask;
+        ulong ttEntry = transposTable[ttIdx];
         if(CheckTTEntry_I(ttEntry, boardHash, alpha, beta, remDepth, out bool ttEntryValid)) {
+            bestMove = transposMoveTable[ttIdx];
 #if VALIDATE
             if(ply == 0 && bestMove == 0) throw new Exception("Root TT entry has no best move");
 #endif
-
-            bestMove = transposMoveTable[boardHash & TTIdxMask];
             return unchecked((short) ttEntry); //The evaluation is stored in the lower 16 bits of the entry
         }
 
@@ -120,6 +119,17 @@ public partial class MyBot : IChessBot {
             return isInCheck ? Eval.MinEval + ply : 0;
         }
 
+        //Order moves
+        Span<ulong> moveScores = stackalloc ulong[256];
+        ushort firstMove = DetermineFirstMove_I(alpha, beta, remDepth, ply, searchExtensions, isPvCandidateNode, ttEntryValid, ttIdx, ttEntry);
+        ScoreMoves(moves, moveScores, ply, isWhite, firstMove, false);
+
+        ushort poppedFirstMove = firstMove;
+
+#if VALIDATE
+        bool searchedNoisyMoves = false;
+#endif
+
 #if STATS
         //Report that we are starting to search a new node
         STAT_AlphaBeta_SearchNode_I(isPvCandidateNode, false, moves.Length);
@@ -128,30 +138,34 @@ public partial class MyBot : IChessBot {
         if(canFutilityPrune) STAT_FutilityPruning_ReportMoves(moves.Length);
 #endif
 
-        //Order moves
-        int sortedMovesStartIdx = PlaceBestMoveFirst_I(alpha, beta, remDepth, ply, searchExtensions, moves, ttEntryValid, boardHash);
-        SortMoves(moves.Slice(sortedMovesStartIdx), ply);
-
         //Search for the best move
+        int bestScore = Eval.MinSentinel;
+        TTBoundType ttBound = TTBoundType.Upper; //Until we surpass alpha we only have an upper bound
 #if STATS
         bool hasPvMove = false;
 #endif
-
-        int bestScore = Eval.MinSentinel;
-        TTBoundType ttBound = TTBoundType.Upper; //Until we surpass alpha we only have an upper bound
-        bool sortedQuietMoves = false;
         for(int i = 0; i < moves.Length; i++) {
-            Move move = moves[i];
-            bool isQuietMove = IsMoveQuiet_I(move);
+            //Pop the next move to search
+            if(!PopMove_I(moves, moveScores, i, ref poppedFirstMove, out Move move)) {
+#if VALIDATE
+                //Check if we finished searching quiet moves
+                if(searchedNoisyMoves) throw new Exception("Ran out of moves to search");
+                searchedNoisyMoves = true;
+#endif
 
-            //Sort quiet moves if we haven't already
-            if(i >= sortedMovesStartIdx && isQuietMove && !sortedQuietMoves) {
-                SortMoves(moves.Slice(i), ply);
-                sortedQuietMoves = true;
+                //Score quiet moves
+                ScoreMoves(moves, moveScores, ply, isWhite, firstMove, true);
 
-                move = moves[i];
-                isQuietMove = IsMoveQuiet_I(move);
+                //Pop a quiet move now
+                if(!PopMove_I(moves, moveScores, i, ref poppedFirstMove, out move))
+#if VALIDATE
+                    throw new Exception("Ran out of moves to search");
+#else
+                    break;
+#endif
             }
+
+            bool isQuietMove = IsMoveQuiet_I(move);
 
             //FP: Check if we can futility-prune this move
             if(canFutilityPrune && isQuietMove && bestMove != 0) {
@@ -200,8 +214,10 @@ public partial class MyBot : IChessBot {
 
                     goto default;
                 default:
-                    //Don't apply any extensions / reductions except for a full ply when in check
-                    score = -NegaMax(-beta, -alpha, remDepth - (gaveCheck ? 0 : 1), ply+1, out _, searchExtensions);
+                    //Extend by one ply if in check
+                    int checkExt = 0;
+                    if(gaveCheck && searchExtensions < MaxExtension) checkExt = 1;
+                    score = -NegaMax(-beta, -alpha, remDepth-1 + checkExt, ply+1, out _, searchExtensions + checkExt);
                     break;
             }
 

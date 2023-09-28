@@ -22,7 +22,7 @@ public partial class MyBot : IChessBot {
 #endif
 
         //Reset move order tables
-        MoveOrder_Reset_I();
+        ResetMoveOrderTables_I();
 
         //Generate all legal moves for later lookup
         Span<Move> moves = stackalloc Move[256];

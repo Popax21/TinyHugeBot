@@ -14,7 +14,7 @@ public partial class MyBot {
 
         //Probe the TT
         //TODO Is storing our result back into the TT worth it?
-        ulong boardHash = searchBoard.ZobristKey;
+        ulong boardHash = searchBoard.ZobristKey, ttIdx = boardHash & TTIdxMask;
         ulong ttEntry = transposTable[boardHash & TTIdxMask];
         if(CheckTTEntry_I(ttEntry, boardHash, alpha, beta, 0, out bool ttEntryValid)) {
             //The evaluation is stored in the lower 16 bits of the entry
@@ -38,13 +38,20 @@ public partial class MyBot {
         STAT_AlphaBeta_SearchNode_I(false, true, moves.Length);
 #endif
 
-        //Move ordering
-        int sortedMovesStartIdx = PlaceBestMoveFirst_I(alpha, beta, 0, -1, 0, moves, ttEntryValid, boardHash);
-        SortMoves(moves.Slice(sortedMovesStartIdx), ply);
+        //Order moves
+        Span<ulong> moveScores = stackalloc ulong[256];
+        ushort firstMove = DetermineFirstMove_I(alpha, beta, 0, ply, 0, false, ttEntryValid, ttIdx, ttEntry);
+        ScoreMoves(moves, moveScores, ply, searchBoard.IsWhiteToMove, firstMove, false);
 
         ushort bestMove = 0;
         for(int i = 0; i < moves.Length; i++) {
-            Move move = moves[i];
+            //Pop the next move to search
+            if(!PopMove_I(moves, moveScores, i, ref firstMove, out Move move))
+#if VALIDATE
+                throw new Exception("Ran out of moves to search in Q-search");
+#else
+                break;
+#endif
 
             //Apply delta-pruning
             if(ShouldApplyDeltaPruning_I(move, alpha, standPatScore)) {
