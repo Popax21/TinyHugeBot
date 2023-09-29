@@ -191,7 +191,12 @@ public partial class MyBot : IChessBot {
             bool isQuietMove = IsMoveQuiet_I(move);
 
             //LMP: Check if we can prune all following moves
-            if(isQuietMove && lmpSearchCount-- == 0) break;
+            if(isQuietMove && lmpSearchCount-- == 0) {
+#if FSTATS
+                STAT_LateMovePruning_PrunedMoves(moves.Length - i);
+#endif
+                break;
+            }
 
             //FP: Check if we can futility-prune this move
             if(canFutilityPrune && isQuietMove && bestMove != 0) {
