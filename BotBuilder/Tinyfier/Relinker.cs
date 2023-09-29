@@ -15,12 +15,9 @@ public partial class Tinyfier {
 
     private readonly Dictionary<TypeDefinition, ITypeDefOrRef> typeRelinkMap = new Dictionary<TypeDefinition, ITypeDefOrRef>();
 
-    public Tinyfier AddExternalReference(TypeDefinition typeDef, bool allPublic = true) {
+    public Tinyfier AddExternalReference(TypeDefinition typeDef) {
         referencedTypes.Add(typeDef);
-        if(allPublic) {
-            referencedMethods.UnionWith(typeDef.Methods.Where(m => m.IsPublic));
-            referencedFields.UnionWith(typeDef.Fields.Where(f => f.IsPublic));
-        }
+        referencedMethods.UnionWith(typeDef.Methods.Where(m => m.IsConstructor));
         return this;
     }
 

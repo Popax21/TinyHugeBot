@@ -12,6 +12,7 @@ public partial class MyBot : IChessBot {
     private int timeoutCheckNodeCounter = 0;
     public int NegaMax(int alpha, int beta, int remDepth, int ply, out ushort bestMove, int searchExtensions=0) {
         bestMove = 0;
+        if(remDepth < 0) remDepth = 0;
 
 #if VALIDATE
         if(remDepth > MaxDepth) throw new Exception($"Out-of-range depth: {remDepth}");
@@ -29,7 +30,11 @@ public partial class MyBot : IChessBot {
         //Start a new node
         bool isWhite = searchBoard.IsWhiteToMove;
         bool isInCheck = searchBoard.IsInCheck();
-        bool isPvCandidateNode = alpha+1 < beta; //Because of PVS, all nodes without a zero window are considered candidate nodes
+        bool isQSearch = remDepth <= 0;
+        bool isPvCandidateNode = !isQSearch && alpha+1 < beta; //Because of PVS, all nodes without a zero window are considered candidate nodes
+
+        int bestScore = Eval.MinSentinel;
+        TTBoundType ttBound = TTBoundType.Upper; //Until we raise alpha we only have an upper bound
 
 #if VALIDATE
         if(ply == 0) {
@@ -39,11 +44,8 @@ public partial class MyBot : IChessBot {
 #endif
 
 #if STATS
-        STAT_NewNode_I(isPvCandidateNode, false);
+        STAT_NewNode_I(isPvCandidateNode, isQSearch);
 #endif
-
-        //Check if we reached the bottom of the search tree
-        if(remDepth <= 0) return QSearch(alpha, beta, ply);
 
         //Handle repetition
         if(ply > 0 && searchBoard.IsRepeatedPosition()) return 0;
@@ -64,7 +66,7 @@ public partial class MyBot : IChessBot {
 
         //Apply pruning to non-PV candidates (otherwise we duplicate our work on researches I think?)
         bool canFutilityPrune = false;
-        if(!isInCheck && !isPvCandidateNode && beta > Eval.MinMate) {
+        if(!isQSearch && !isInCheck && !isPvCandidateNode && beta > Eval.MinMate) {
             int prunedScore = 0;
 #if FSTATS
             STAT_Pruning_CheckNonPVNode_I();
@@ -107,14 +109,32 @@ public partial class MyBot : IChessBot {
 #endif
         }
 
+        //Apply the standing pat if in Q-search
+        if(isQSearch) {
+            bestScore = GetTTScoreOrEvaluate_I(ttEntryValid, ttEntry); 
+            if(bestScore > alpha) {
+                if(bestScore >= beta) {
+                    ttBound = TTBoundType.Lower;
+                    goto storeInTT;
+                }
+
+                alpha = bestScore;
+                ttBound = TTBoundType.Exact;
+            }
+        }
+
         //Generate legal moves
         Span<Move> moves = stackalloc Move[256];
-        searchBoard.GetLegalMovesNonAlloc(ref moves);
+        searchBoard.GetLegalMovesNonAlloc(ref moves, capturesOnly: isQSearch);
 
         if(moves.Length == 0) {
 #if VALIDATE
             if(ply == 0) throw new Exception("Root node has no valid moves");
 #endif
+
+            //Fail low when in Q-search
+            if(isQSearch) return bestScore;
+
             //Handle checkmate / stalemate
             return isInCheck ? Eval.MinEval + ply : 0;
         }
@@ -132,15 +152,13 @@ public partial class MyBot : IChessBot {
 
 #if STATS
         //Report that we are starting to search a new node
-        STAT_AlphaBeta_SearchNode_I(isPvCandidateNode, false, moves.Length);
+        STAT_AlphaBeta_SearchNode_I(isPvCandidateNode, isQSearch, moves.Length);
 #endif
 #if FSTATS
         if(canFutilityPrune) STAT_FutilityPruning_ReportMoves(moves.Length);
 #endif
 
         //Search for the best move
-        int bestScore = Eval.MinSentinel;
-        TTBoundType ttBound = TTBoundType.Upper; //Until we surpass alpha we only have an upper bound
 #if STATS
         bool hasPvMove = false;
 #endif
@@ -148,6 +166,9 @@ public partial class MyBot : IChessBot {
             //Pop the next move to search
             if(!PopMove_I(moves, moveScores, i, ref poppedFirstMove, out Move move)) {
 #if VALIDATE
+                //We mustn't run out of moves in Q-search
+                if(isQSearch) throw new Exception("Ran out of moves to search in Q-search");
+
                 //Check if we finished searching quiet moves
                 if(searchedNoisyMoves) throw new Exception("Ran out of moves to search");
                 searchedNoisyMoves = true;
@@ -183,25 +204,28 @@ public partial class MyBot : IChessBot {
             int score;
             switch(bestMove != 0) {
                 case true:
-                    //Determine extensions / reductions for this move
-                    int moveExts = DetermineMoveZWExtensions_I(move, gaveCheck, remDepth-1);
-                    if(searchExtensions + moveExts > MaxExtension) moveExts = MaxExtension - searchExtensions;
+                    int moveExts = 0;
+                    if(!isQSearch) {
+                        //Determine extensions / reductions for this move
+                        moveExts = DetermineMoveZWExtensions_I(move, gaveCheck, remDepth-1);
+                        if(searchExtensions + moveExts > MaxExtension) moveExts = MaxExtension - searchExtensions;
 
-                    //LMR: Check if we allow Late Move Reduction for this move
-                    if(isQuietMove && !isInCheck && !gaveCheck && moveExts <= 0 && IsLMRAllowedForMove_I(move, i, remDepth, ply)) {
+                        //LMR: Check if we allow Late Move Reduction for this move
+                        if(isQuietMove && !isInCheck && !gaveCheck && moveExts <= 0 && IsLMRAllowedForMove_I(move, i, remDepth, ply)) {
 #if FSTATS
-                        STAT_LMR_ApplyReduction_I();
+                            STAT_LMR_ApplyReduction_I();
 #endif
 
-                        //Do a ZWS search with reduced depth
-                        moveExts -= DetermineLMRReduction_I(i, remDepth-1);
-                        score = -NegaMax(-alpha - 1, -alpha, remDepth-1 + moveExts, ply+1, out _, searchExtensions);
-                        if(score <= alpha) break; //If we reach alpha research with full depth
+                            //Do a ZWS search with reduced depth
+                            moveExts -= DetermineLMRReduction_I(i, remDepth-1);
+                            score = -NegaMax(-alpha - 1, -alpha, remDepth-1 + moveExts, ply+1, out _, searchExtensions);
+                            if(score <= alpha) break; //If we reach alpha research with full depth
 
-                        moveExts = 0;
+                            moveExts = 0;
 #if FSTATS
-                        STAT_LMR_Research_I();
+                            STAT_LMR_Research_I();
 #endif
+                        }
                     }
 
                     score = -NegaMax(-alpha - 1, -alpha, remDepth-1 + moveExts, ply+1, out _, searchExtensions + moveExts);
@@ -216,7 +240,7 @@ public partial class MyBot : IChessBot {
                 default:
                     //Extend by one ply if in check
                     int checkExt = 0;
-                    if(gaveCheck && searchExtensions < MaxExtension) checkExt = 1;
+                    if(!isQSearch && gaveCheck && searchExtensions < MaxExtension) checkExt = 1;
                     score = -NegaMax(-beta, -alpha, remDepth-1 + checkExt, ply+1, out _, searchExtensions + checkExt);
                     break;
             }
@@ -225,7 +249,7 @@ public partial class MyBot : IChessBot {
 
 #if STATS
             //Report that we searched a move
-            STAT_AlphaBeta_SearchedMove_I(isPvCandidateNode, false);
+            STAT_AlphaBeta_SearchedMove_I(isPvCandidateNode, isQSearch);
 #endif
 
             //Update the best score
@@ -243,7 +267,7 @@ public partial class MyBot : IChessBot {
                 if(score >= beta) {
                     //We failed high; our score is only a lower bound
 #if STATS
-                    STAT_AlphaBeta_FailHigh_I(isPvCandidateNode, false, i);
+                    STAT_AlphaBeta_FailHigh_I(isPvCandidateNode, isQSearch, i);
 #endif
 
                     //Check if the move is quiet
@@ -276,14 +300,15 @@ public partial class MyBot : IChessBot {
 
 #if STATS
         //Check if we failed low
-        if(ttBound == TTBoundType.Upper) STAT_AlphaBeta_FailLow_I(isPvCandidateNode, false);
+        if(ttBound == TTBoundType.Upper) STAT_AlphaBeta_FailLow_I(isPvCandidateNode, isQSearch);
 #endif
 
-        //Insert the best move found into the transposition table (except when in Q-Search)
-        StoreTTEntry_I(boardHash, (short) bestScore, ttBound, remDepth, bestMove);
+        //Insert the best move found into the transposition table (don't store fail-lows when in Q-search)
+        storeInTT:;
+        if(!isQSearch || ttBound != TTBoundType.Upper) StoreTTEntry_I(boardHash, (short) bestScore, ttBound, remDepth, bestMove);
 
 #if VALIDATE
-        if(bestScore < Eval.MinEval) throw new Exception($"Found no best move in node search: best score {bestScore} best move {bestMove} num moves {moves.Length}");
+        if(bestScore < Eval.MinEval) throw new Exception($"Found no best move in node search: best score {bestScore} best move {bestMove}");
 #endif
 
         return bestScore;
