@@ -7,7 +7,7 @@ using BotTuner.Factories;
 namespace BotTuner;
 
 public static partial class Program {
-    public const int BenchmarkTimerMs = 7_500;
+    public const int BenchmarkTimerMs = 21_500;
     public const int NumBenchmarkLastVersions = 3;
 
     public static async Task RunBenchmark(string targetBotPath, string[] posCollections) {
