@@ -16,7 +16,7 @@ public static partial class Program {
             string[] startFens = LoadPositionCollection(posCollections[i]);
 
             //Run matches
-            await MatchRunner.RunMatches(botA, new[] { botB }, startFens, BenchmarkTimerMs, 0, (match, opponent, res) => {
+            await MatchRunner.RunMatches(botA, new[] { botB }, startFens, timerMs, 0, (match, opponent, res) => {
                 scores[i] += res switch {
                     MatchRunner.MatchResult.Win => 1.0,
                     MatchRunner.MatchResult.Draw => 0.5,

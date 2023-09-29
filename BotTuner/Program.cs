@@ -28,7 +28,7 @@ public static partial class Program {
                         opponent = LoadLatestBotVersion();
                     } else opponent = LoadBot(args[2]);
         
-                    await RunCompare(LoadBot(args[1]), opponent, args.Length <= 3 ? 60_000 : int.Parse(args[3]), args.Length <= 4 ? AllPositionCollections : args[4..]);
+                    await RunCompare(LoadBot(args[1]), opponent, args.Length <= 3 ? 21_500 : int.Parse(args[3]), args.Length <= 4 ? AllPositionCollections : args[4..]);
                 } break;
 
                 case "benchmark": {
