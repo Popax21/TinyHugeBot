@@ -38,6 +38,9 @@ public partial class MyBot {
         return depth < 7 && score >= beta;
     }
 
+    private static byte[] lmpSearchCounts = new byte[] { 0, 7, 8, 17, 49 }; //Values taken from ice4
+    public int GetLMPMoveSearchCount_I(int depth, bool isImproving) => depth < 5 ? lmpSearchCounts[depth] / (isImproving ? 1 : 2) : -1;
+
     private const int DeltaPruningSafetyMargin = 2*90; //~200 centipawns
     private static readonly ushort[] DeltaPruningMargins = new ushort[] {
         DeltaPruningSafetyMargin + 1000,    //None - as we only evaluate non-quiet moves this means that it's a pawn promotion, so it has the same margin as a queen

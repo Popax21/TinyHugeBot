@@ -72,13 +72,6 @@ public partial class MyBot {
         return true;
     }
 
-    private int GetTTScoreOrEvaluate_I(bool entryValid, ulong entry) {
-        //TODO Investigate additional TT checks
-        short ttScore = unchecked((short) entry);
-        if(entryValid && Eval.MinMate < ttScore && ttScore < Eval.MaxMate) return ttScore;
-        else return Eval.Evaluate(searchBoard);
-    }
-
     private void StoreTTEntry_I(ulong boardHash, short eval, TTBoundType bound, int depth, ushort bestMove) {
 #if VALIDATE
         //Check for overflows

@@ -8,6 +8,7 @@ public partial class MyBot : IChessBot {
     public const int MaxPlies = 256;
 
     private int[] plyMoveButterflies = new int[MaxPlies];
+    private int[] plyStaticEvals = new int[MaxPlies];
 
     private int timeoutCheckNodeCounter = 0;
     public int NegaMax(int alpha, int beta, int remDepth, int ply, out ushort bestMove, int searchExtensions=0) {
@@ -56,20 +57,26 @@ public partial class MyBot : IChessBot {
 #endif
             return unchecked((short) ttEntry); //The evaluation is stored in the lower 16 bits of the entry
         }
+        short ttScore = unchecked((short) ttEntry);
 
         //Reset any pruning special move values, as they might screw up future move ordering if not cleared
         ResetThreatMove_I(ply);
 
+        //Determine the static evaluation of the position
+        int staticEval = Eval.Evaluate(searchBoard);
+        plyStaticEvals[ply] = staticEval;
+        if(ttEntryValid && Eval.MinMate < ttScore && ttScore < Eval.MaxMate) staticEval = ttScore;
+
+        bool isImproving = ply >= 2 && staticEval > plyStaticEvals[ply-2];
+            
         //Apply pruning to non-PV candidates (otherwise we duplicate our work on researches I think?)
         bool canFutilityPrune = false;
+        int lmpSearchCount = -1;
         if(!isQSearch && !isInCheck && !isPvCandidateNode && beta > Eval.MinMate) {
             int prunedScore = 0;
 #if FSTATS
             STAT_Pruning_CheckNonPVNode_I();
 #endif
-
-            //Determine the static evaluation of the position
-            int staticEval = GetTTScoreOrEvaluate_I(ttEntryValid, ttEntry);
 
             //Apply Reverse Futility Pruning
             if(ApplyReverseFutilityPruning_I(staticEval, beta, remDepth, ref prunedScore)) {
@@ -103,18 +110,17 @@ public partial class MyBot : IChessBot {
 #if FSTATS
             if(canFutilityPrune) STAT_FutilityPruning_AbleNode();
 #endif
+
+            //Determine number of moves to search before LMP kicks in
+            lmpSearchCount = GetLMPMoveSearchCount_I(remDepth, isImproving);
         }
 
         //Apply the standing pat score if in Q-search
-        int standPatScore = Eval.MinSentinel;
-        if(isQSearch) {
-            standPatScore = GetTTScoreOrEvaluate_I(ttEntryValid, ttEntry);
-            if(standPatScore > alpha) {
-                if(standPatScore >= beta) return standPatScore;
+        if(isQSearch && staticEval > alpha) {
+            if(staticEval >= beta) return staticEval;
 
-                //Don't change the TT bound!
-                alpha = standPatScore;
-            }
+            //Don't change the TT bound!
+            alpha = staticEval;
         }
 
         //Generate legal moves
@@ -127,7 +133,7 @@ public partial class MyBot : IChessBot {
 #endif
 
             //Fail low when in Q-search
-            if(isQSearch) return standPatScore;
+            if(isQSearch) return staticEval;
 
             //Handle checkmate / stalemate
             return isInCheck ? Eval.MinEval + ply : 0;
@@ -183,6 +189,9 @@ public partial class MyBot : IChessBot {
             }
 
             bool isQuietMove = IsMoveQuiet_I(move);
+
+            //LMP: Check if we can prune all following moves
+            if(isQuietMove && lmpSearchCount-- == 0) break;
 
             //FP: Check if we can futility-prune this move
             if(canFutilityPrune && isQuietMove && bestMove != 0) {
@@ -305,9 +314,9 @@ public partial class MyBot : IChessBot {
 
         //Insert the best move found into the transposition table
         //Only store in Q-search if we managed to improve over the standing pat
-        if(!isQSearch || bestScore > standPatScore) StoreTTEntry_I(boardHash, (short) bestScore, ttBound, remDepth, bestMove);
+        if(!isQSearch || bestScore > staticEval) StoreTTEntry_I(boardHash, (short) bestScore, ttBound, remDepth, bestMove);
 
-        if(isQSearch && standPatScore > bestScore) return standPatScore;
+        if(isQSearch && staticEval > bestScore) return staticEval;
         else return bestScore;
     }
 }
