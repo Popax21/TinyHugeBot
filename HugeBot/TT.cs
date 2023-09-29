@@ -22,7 +22,7 @@ public partial class MyBot {
     //  bits 24-63: upper hash bits
     private ulong[] transposTable = new ulong[TTSize];
     private ushort[] transposMoveTable = new ushort[TTSize];
-    private ushort[] transposAgeTable = new ushort[TTSize];
+    private byte[] transposAgeTable = new byte[TTSize];
  
     private bool CheckTTEntry_I(ulong entry, ulong boardHash, int alpha, int beta, int depth, out bool validHash) {
         //Check if the hash bits match
@@ -76,6 +76,7 @@ public partial class MyBot {
         else return Eval.Evaluate(searchBoard);
     }
 
+    private byte currentTTAge;
     private void StoreTTEntry_I(ulong boardHash, short eval, TTBoundType bound, int depth, ushort bestMove) {
 #if VALIDATE
         //Check for overflows
@@ -88,19 +89,20 @@ public partial class MyBot {
         bool isUpdate = (prevEntry & ~TTIdxMask) == (boardHash & ~TTIdxMask);
 
         //Check if we should update the existing entry
-        //TODO Implement depth-preferred
-        ushort ttAge = (ushort) (searchBoard.PlyCount + depth / 2);
-        if(isUpdate && transposAgeTable[ttIdx] > ttAge) {            
+        //Keep higher-depth entries, but overwrite older ones
+        if(!isUpdate && transposAgeTable[ttIdx] == currentTTAge) {
+            if((int) ((prevEntry >> 18) & 0x3f) > depth) {    
 #if FSTATS
-            STAT_TTWrite_AgeBail_I();
+                STAT_TTWrite_Bailout_I();
 #endif
-            return;
+                return;
+            }
         }
 
 #if FSTATS
         //Check for collisions
         if((prevEntry & (ulong) TTBoundType.MASK) == (ulong) TTBoundType.None) STAT_TTWrite_NewSlot_I();
-        else if((prevEntry & ~TTIdxMask) != (boardHash & ~TTIdxMask)) STAT_TTWrite_IdxCollision_I();
+        else if(!isUpdate) STAT_TTWrite_IdxCollision_I();
         else STAT_TTWrite_SlotUpdate_I();
 #endif
 
@@ -112,6 +114,6 @@ public partial class MyBot {
             (boardHash & ~TTIdxMask)
         ;
         if(!isUpdate || bound != TTBoundType.Upper) transposMoveTable[ttIdx] = bestMove; //Don't overwrite the old move if we failed low
-        transposAgeTable[ttIdx] = ttAge;
+        transposAgeTable[ttIdx] = currentTTAge;
     }
 }

@@ -24,6 +24,9 @@ public partial class MyBot : IChessBot {
         //Reset move order tables
         ResetMoveOrderTables_I();
 
+        //Increment the TT age
+        unchecked { currentTTAge++; }
+
         //Generate all legal moves for later lookup
         Span<Move> moves = stackalloc Move[256];
         board.GetLegalMovesNonAlloc(ref moves);
