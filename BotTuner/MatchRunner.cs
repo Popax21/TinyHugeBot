@@ -150,7 +150,7 @@ public class MatchRunner : IDisposable {
                     _ => throw new Exception($"Invalid game result {match.Task.Result}")
                 };
 
-                Console.WriteLine($"RUNNER> {match.WhiteBot.Name} (white) vs {match.BlackBot.Name} (black) FEN '{match.StartFEN}' -> {Enum.GetName(matchRes)}");
+                Console.WriteLine($"RUNNER> {match.WhiteBot.Name} (white) vs {match.BlackBot.Name} (black) FEN '{match.StartFEN}' -> {Enum.GetName(matchRes)} [{Enum.GetName(match.Task.Result)}]");
                 matchResCb?.Invoke(match, match.WhiteBot == player ? match.BlackBot : match.WhiteBot, matchRes);
                 HandleMatchResult(match, player, matchRes);
 
