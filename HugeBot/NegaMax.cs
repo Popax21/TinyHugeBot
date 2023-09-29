@@ -33,9 +33,6 @@ public partial class MyBot : IChessBot {
         bool isQSearch = remDepth <= 0;
         bool isPvCandidateNode = !isQSearch && alpha+1 < beta; //Because of PVS, all nodes without a zero window are considered candidate nodes
 
-        int bestScore = Eval.MinSentinel;
-        TTBoundType ttBound = TTBoundType.Upper; //Until we raise alpha we only have an upper bound
-
 #if VALIDATE
         if(ply == 0) {
             if(remDepth <= 0) throw new Exception("Root node can't immediately enter Q-search");
@@ -109,17 +106,15 @@ public partial class MyBot : IChessBot {
 #endif
         }
 
-        //Apply the standing pat if in Q-search
+        //Apply the standing pat score if in Q-search
+        int standPatScore = Eval.MinSentinel;
         if(isQSearch) {
-            bestScore = GetTTScoreOrEvaluate_I(ttEntryValid, ttEntry); 
-            if(bestScore > alpha) {
-                if(bestScore >= beta) {
-                    ttBound = TTBoundType.Lower;
-                    goto storeInTT;
-                }
+            standPatScore = GetTTScoreOrEvaluate_I(ttEntryValid, ttEntry);
+            if(standPatScore > alpha) {
+                if(standPatScore >= beta) return standPatScore;
 
-                alpha = bestScore;
-                ttBound = TTBoundType.Exact;
+                //Don't change the TT bound!
+                alpha = standPatScore;
             }
         }
 
@@ -133,7 +128,7 @@ public partial class MyBot : IChessBot {
 #endif
 
             //Fail low when in Q-search
-            if(isQSearch) return bestScore;
+            if(isQSearch) return standPatScore;
 
             //Handle checkmate / stalemate
             return isInCheck ? Eval.MinEval + ply : 0;
@@ -159,6 +154,8 @@ public partial class MyBot : IChessBot {
 #endif
 
         //Search for the best move
+        int bestScore = Eval.MinSentinel;
+        TTBoundType ttBound = TTBoundType.Upper; //Until we raise alpha we only have an upper bound
 #if STATS
         bool hasPvMove = false;
 #endif
@@ -298,19 +295,20 @@ public partial class MyBot : IChessBot {
             }
         }
 
+#if VALIDATE
+        if(bestScore < Eval.MinEval) throw new Exception($"Found no best move in node search: best score {bestScore} best move {bestMove}");
+#endif
+
 #if STATS
         //Check if we failed low
         if(ttBound == TTBoundType.Upper) STAT_AlphaBeta_FailLow_I(isPvCandidateNode, isQSearch);
 #endif
 
-        //Insert the best move found into the transposition table (don't store fail-lows when in Q-search)
-        storeInTT:;
-        if(!isQSearch || ttBound != TTBoundType.Upper) StoreTTEntry_I(boardHash, (short) bestScore, ttBound, remDepth, bestMove);
+        //Insert the best move found into the transposition table
+        //Only store in Q-search if we managed to improve over the standing pat
+        if(!isQSearch || bestScore > standPatScore) StoreTTEntry_I(boardHash, (short) bestScore, ttBound, remDepth, bestMove);
 
-#if VALIDATE
-        if(bestScore < Eval.MinEval) throw new Exception($"Found no best move in node search: best score {bestScore} best move {bestMove}");
-#endif
-
-        return bestScore;
+        if(isQSearch && standPatScore > bestScore) return standPatScore;
+        else return bestScore;
     }
 }
