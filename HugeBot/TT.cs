@@ -3,16 +3,13 @@ using System;
 namespace HugeBot;
 
 public partial class MyBot {
-    public const int TTSize = 1 << 24; //16k entries * 12b/e -> 192MB
-    private const ulong TTIdxMask = TTSize-1;
+    public const int TTSize = 0x1800000; //24M entries * 10b/e -> 240MB (16MB for other tables)
 
     private enum TTBoundType {
         None = 0b00 << 16,
         Exact = 0b01 << 16, //For PV nodes
         Lower = 0b10 << 16, //For Fail-High / cut nodes
         Upper = 0b11 << 16, //For Fail-Low / all nodes
-
-        MASK = 0b11 << 16
     }
 
     //TT entry structure:
@@ -20,20 +17,26 @@ public partial class MyBot {
     //  bits 16-17: bound/node type
     //  bits 18-23: search depth
     //  bits 24-63: upper hash bits
+    private const ulong TTBoundMask = 0x030000UL;
+    private const ulong TTDepthMask = 0xfc0000UL;
+    private const ulong TTHashMask = ~0xffffffUL;
+ 
     private ulong[] transposTable = new ulong[TTSize];
     private ushort[] transposMoveTable = new ushort[TTSize];
-    private byte[] transposAgeTable = new byte[TTSize];
  
-    private bool CheckTTEntry_I(ulong entry, ulong boardHash, int alpha, int beta, int depth, out bool validHash) {
-        //Check if the hash bits match
-        if((entry & ~TTIdxMask) != (boardHash & ~TTIdxMask)) {
+    private bool CheckTTEntry_I(ulong boardHash, int alpha, int beta, int depth, out ulong index, out bool entryValid, out ulong entry) {
+        //Fetch the entry and check its hash
+        index = boardHash % TTSize;
+        entry = transposTable[index];
+        if((entry & TTHashMask) != (boardHash & TTHashMask)) {
 #if FSTATS
             STAT_TTRead_Miss_I();
 #endif
-            validHash = false;
+            entryValid = false;
             return false;
         }
-        validHash = true;
+        entryValid = true;
+
 
         //Check that the entry searched at least as deep as we would
         if((int) ((entry >> 18) & 0x3f) < depth) {
@@ -45,7 +48,7 @@ public partial class MyBot {
 
         //Check the node bound type
         //TODO ice4 checks whether the node is a PV node for exact scores
-        if(!((TTBoundType) (entry & (ulong) TTBoundType.MASK) switch {
+        if(!((TTBoundType) (entry & TTBoundMask) switch {
             TTBoundType.Exact => true,
             TTBoundType.Lower => beta <= unchecked((short) entry),
             TTBoundType.Upper => unchecked((short) entry) <= alpha,
@@ -76,7 +79,6 @@ public partial class MyBot {
         else return Eval.Evaluate(searchBoard);
     }
 
-    private byte currentTTAge;
     private void StoreTTEntry_I(ulong boardHash, short eval, TTBoundType bound, int depth, ushort bestMove) {
 #if VALIDATE
         //Check for overflows
@@ -84,24 +86,13 @@ public partial class MyBot {
         if(depth < 0 || depth >= (1 << 6)) throw new ArgumentException($"Out-of-bounds TT depth given: {depth}");
 #endif
 
-        ulong ttIdx = boardHash & TTIdxMask;
+        ulong ttIdx = boardHash % TTSize;
         ulong prevEntry = transposTable[ttIdx];
-        bool isUpdate = (prevEntry & ~TTIdxMask) == (boardHash & ~TTIdxMask);
-
-        //Check if we should update the existing entry
-        //Keep higher-depth entries, but overwrite older ones
-        if(!isUpdate && transposAgeTable[ttIdx] == currentTTAge) {
-            if((int) ((prevEntry >> 18) & 0x3f) > depth) {    
-#if FSTATS
-                STAT_TTWrite_Bailout_I();
-#endif
-                return;
-            }
-        }
+        bool isUpdate = (prevEntry & TTHashMask) == (boardHash & TTHashMask);
 
 #if FSTATS
         //Check for collisions
-        if((prevEntry & (ulong) TTBoundType.MASK) == (ulong) TTBoundType.None) STAT_TTWrite_NewSlot_I();
+        if((prevEntry & TTBoundMask) == (ulong) TTBoundType.None) STAT_TTWrite_NewSlot_I();
         else if(!isUpdate) STAT_TTWrite_IdxCollision_I();
         else STAT_TTWrite_SlotUpdate_I();
 #endif
@@ -111,9 +102,8 @@ public partial class MyBot {
             unchecked((ushort) eval) |
             (ulong) bound |
             ((ulong) depth << 18) |
-            (boardHash & ~TTIdxMask)
+            (boardHash & TTHashMask)
         ;
         if(!isUpdate || bound != TTBoundType.Upper) transposMoveTable[ttIdx] = bestMove; //Don't overwrite the old move if we failed low
-        transposAgeTable[ttIdx] = currentTTAge;
     }
 }

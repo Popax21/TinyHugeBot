@@ -48,9 +48,8 @@ public partial class MyBot : IChessBot {
         if(ply > 0 && searchBoard.IsRepeatedPosition()) return 0;
 
         //Check if the position is in the TT
-        ulong boardHash = searchBoard.ZobristKey, ttIdx = boardHash & TTIdxMask;
-        ulong ttEntry = transposTable[ttIdx];
-        if(CheckTTEntry_I(ttEntry, boardHash, alpha, beta, remDepth, out bool ttEntryValid)) {
+        ulong boardHash = searchBoard.ZobristKey;
+        if(CheckTTEntry_I(boardHash, alpha, beta, remDepth, out ulong ttIdx, out bool ttEntryValid, out ulong ttEntry)) {
             bestMove = transposMoveTable[ttIdx];
 #if VALIDATE
             if(ply == 0 && bestMove == 0) throw new Exception("Root TT entry has no best move");
