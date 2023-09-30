@@ -15,8 +15,91 @@ public static class Eval {
     internal const ulong EvalMask = 0x0000_ffff_0000_ffffUL;
 
     private static readonly int[] PhaseContributions = { 0, 1, 1, 2, 4, 0 };
+    private static ulong[,] PeSTOTables = new ulong[12,64];
 
-    public static int Evaluate(Board board) {
+    public struct EvalState {
+        internal bool isWhiteToMove;
+        internal int phase;
+        internal ulong eval;
+
+        public int Resolve() {
+            //Handle early promotion
+            int clampedPhase = phase;
+            if(clampedPhase > 24) clampedPhase = 24;
+
+            //Interpolate between the midgame and endgame evaluation based on the phase
+            short mgEval = unchecked((short) eval), egEval = unchecked((short) (eval >> 32));
+            int resEval = (mgEval * clampedPhase + egEval * (24 - clampedPhase)) / 24;
+            return isWhiteToMove ? resEval : -resEval;
+        }
+
+        public void Update_I(Move move) {
+            int movedPiece = (int) move.MovePieceType - 1;
+            int sideOffset = isWhiteToMove ? 0 : 6;
+
+            //Update the old square
+            eval -= PeSTOTables[movedPiece + sideOffset, move.StartSquare.Index];
+            phase -= PhaseContributions[movedPiece];
+
+            //Update the new square
+            int targetSquare = move.TargetSquare.Index;
+            int newPieceType = move.IsPromotion ? (int) move.PromotionPieceType - 1 : movedPiece;
+            eval += PeSTOTables[newPieceType + sideOffset, targetSquare];
+            phase += PhaseContributions[newPieceType];
+
+            //Update captures (if any)
+            if(move.IsCapture) {
+                int capturedPiece = (int) move.CapturePieceType - 1;
+                int captureSquare = targetSquare;
+                if(move.IsEnPassant) captureSquare += isWhiteToMove ? -8 : +8; //En Passant captures a piece on a different square :)
+                eval -= PeSTOTables[capturedPiece + (sideOffset ^ 6), captureSquare];
+                phase -= PhaseContributions[capturedPiece];
+            }
+
+            //Handle castling
+            if(move.IsCastles) {
+                //This just sucks, I'm not gonna sugarcoat it
+                int oldRookSquare = targetSquare & 56, newRookSquare = oldRookSquare;
+                if((targetSquare & 7) == 2) {
+                    newRookSquare |= 3; 
+                } else {
+                    oldRookSquare |= 7;
+                    newRookSquare |= 5;
+                }
+
+                eval -= PeSTOTables[(int) PieceType.Rook - 1 + sideOffset, oldRookSquare];
+                eval += PeSTOTables[(int) PieceType.Rook - 1 + sideOffset, newRookSquare];
+            }
+
+            //Update the side to move
+            isWhiteToMove ^= true;
+
+#if VALIDATE
+            Validate();
+#endif
+        }
+
+        public void SwitchSide_I() => isWhiteToMove ^= true;
+
+#if VALIDATE
+        public void Validate() {
+            //Check that the phase is in-range
+            if(phase < 0) throw new Exception($"Unexpected evaluation phase value: {phase}");
+
+            //Check for potential overflows
+            if((eval & 0x0000_0000_ffff_0000) < 0x0000_0000_6000_0000 || (eval & 0x0000_0000_ffff_0000) > 0x0000_0000_afff_0000) throw new Exception($"Potential MG eval overflow: 0x{eval:x16}");
+            if((eval & 0xffff_0000_0000_0000) < 0x6000_0000_0000_0000 || (eval & 0xffff_0000_0000_0000) > 0xafff_0000_0000_0000) throw new Exception($"Potential EG eval overflow: 0x{eval:x16}");            
+        }
+
+        public void Check(Move move, EvalState evalState) {
+            if(isWhiteToMove != evalState.isWhiteToMove || phase != evalState.phase || eval != evalState.eval) {
+                throw new Exception($"Incremental eval difference after move {move.ToString()[7..^1]} ({move.MovePieceType} x {move.CapturePieceType}): {isWhiteToMove} {phase} 0x{eval:x16} vs {evalState.isWhiteToMove} {evalState.phase} 0x{evalState.eval:x16}");
+            }
+        }
+#endif
+    }
+
+    public static EvalState Evaluate(Board board) {
         ulong eval = 0x8000_0000_8000_0000;
 
         //Evaluate PST and determine phase
@@ -32,32 +115,13 @@ public static class Eval {
             }
         }
 
+        EvalState state = new EvalState() { isWhiteToMove = board.IsWhiteToMove, eval = eval, phase = phase };
 #if VALIDATE
-        try {
-            //Check that the phase is in-range
-            if(phase < 0) throw new Exception($"Unexpected evaluation phase value: {phase}");
-
-            //Check for potential overflows
-            if((eval & 0x0000_0000_ffff_0000) < 0x0000_0000_6000_0000 || (eval & 0x0000_0000_ffff_0000) > 0x0000_0000_afff_0000) throw new Exception($"Potential MG eval overflow: 0x{eval:x16}");
-            if((eval & 0xffff_0000_0000_0000) < 0x6000_0000_0000_0000 || (eval & 0xffff_0000_0000_0000) > 0xafff_0000_0000_0000) throw new Exception($"Potential EG eval overflow: 0x{eval:x16}");
-        } catch {
-            Console.WriteLine("Eval check tripped - dumping board state:");
-            Console.WriteLine(board.CreateDiagram());
-            Console.WriteLine();
-            throw;
-        }
+        state.Validate();
 #endif
-
-        //Handle early promotion
-        if(phase > 24) phase = 24;
-
-        //Resolve the evaluation
-        short mgEval = unchecked((short) eval), egEval = unchecked((short) (eval >> 32));
-        int resEval = (mgEval * phase + egEval * (24 - phase)) / 24;
-        return board.IsWhiteToMove ? resEval : -resEval;
+        return state;
     }
 
-    private static ulong[,] PeSTOTables = new ulong[12,64];
     private static uint[,] ComprPeSTOTables = new uint[,] {
         //Pawn - White
         {

@@ -63,7 +63,7 @@ public partial class MyBot : IChessBot {
         ResetThreatMove_I(ply);
 
         //Determine the static evaluation of the position
-        int staticEval = Eval.Evaluate(searchBoard);
+        int staticEval = searchEvalState.Resolve();
         plyStaticEvals[ply] = staticEval;
         if(ttEntryValid && Eval.MinMate < ttScore && ttScore < Eval.MaxMate) staticEval = ttScore;
 
@@ -206,9 +206,16 @@ public partial class MyBot : IChessBot {
                 continue;
             }
 
+            //Make the move
             plyMoveButterflies[ply] = GetMoveButterflyIndex_I(move, isWhite);
             searchBoard.MakeMove(move);
             bool gaveCheck = searchBoard.IsInCheck();
+
+            Eval.EvalState prevEvalState = searchEvalState;
+            searchEvalState.Update_I(move);
+#if VALIDATE
+            searchEvalState.Check(move, Eval.Evaluate(searchBoard));
+#endif
 
             //PVS: If we already have a PV move (which should be early because of move ordering), do a ZWS on alpha first to ensure that this move doesn't fail low
             int score;
@@ -255,7 +262,10 @@ public partial class MyBot : IChessBot {
                     break;
             }
 
-            searchBoard.UndoMove(move); //This gets skipped on timeout - we don't care, as the board gets recreated every time a bot thinks
+            //Undo the move
+            //This gets skipped on timeout - we don't care, as the board gets recreated every time a bot thinks
+            searchBoard.UndoMove(move);
+            searchEvalState = prevEvalState;
 
 #if STATS
             //Report that we searched a move

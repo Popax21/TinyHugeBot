@@ -14,8 +14,12 @@ public partial class MyBot {
         //Evaluate the null move using a ZWS
         plyMoveButterflies[ply] = 0;
         searchBoard.ForceSkipTurn();
+        searchEvalState.SwitchSide_I();
+
         score = -NegaMax(-beta, -beta+1, remDepth - 1 - R, ply+1, out threatMoves[ply], searchExtensions);
+
         searchBoard.UndoSkipTurn(); 
+        searchEvalState.SwitchSide_I();
 
         return true;
     }

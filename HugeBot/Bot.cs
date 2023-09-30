@@ -5,6 +5,7 @@ namespace HugeBot;
 
 public partial class MyBot : IChessBot {
     private Board searchBoard = null!;
+    private Eval.EvalState searchEvalState;
     private Timer searchTimer = null!;
     private int searchAbortTime;
 
@@ -24,6 +25,9 @@ public partial class MyBot : IChessBot {
         //Notify the stats tracker that the search starts
         STAT_StartGlobalSearch();
 #endif
+
+        //Determine the initial evaluation
+        searchEvalState = Eval.Evaluate(board);
 
         //Reset move order tables
         ResetMoveOrderTables_I();
