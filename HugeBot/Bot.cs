@@ -8,6 +8,10 @@ public partial class MyBot : IChessBot {
     private Timer searchTimer = null!;
     private int searchAbortTime;
 
+#if BESTMOVE
+    private int bestRootScore;
+#endif
+
     public Move Think(Board board, Timer timer) {
         //Determine search times
         searchBoard = board;
@@ -101,7 +105,7 @@ public partial class MyBot : IChessBot {
 #endif
 #if BESTMOVE
                 //Log the best move
-                Console.WriteLine($"Searched to depth {curDepth} in {timer.MillisecondsElapsedThisTurn:d5}ms: best move {bestMove.ToString()[7..^1]} eval {(!didTimeOut ? curBestEval.ToString() : "????")}");
+                Console.WriteLine($"Searched to depth {curDepth} in {timer.MillisecondsElapsedThisTurn:d5}ms: best move {bestMove.ToString()[7..^1]} eval {bestRootScore}");
 #endif
                 return bestMove;
             }

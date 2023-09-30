@@ -266,6 +266,11 @@ public partial class MyBot : IChessBot {
             if(score > bestScore) {
                 bestScore = score;
                 bestMove = move.RawValue;
+
+#if BESTMOVE
+                //Store the best root score in case the search gets terminated
+                if(ply == 0) bestRootScore = score;
+#endif
             }
 #if VALIDATE
             else if(i == 0) throw new Exception($"First move failed to raise best score: {move} {score}");
