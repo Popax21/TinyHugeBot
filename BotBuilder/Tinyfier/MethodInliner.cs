@@ -42,14 +42,14 @@ public partial class Tinyfier {
                 method.IsAssembly = true;
             }
 
-            declType.Methods.Remove(inlineTarget);
+            // declType.Methods.Remove(inlineTarget);
         }
 
         //Inline selected method calls in target types
         int numInlinedCalls = 0;
         foreach(TypeDefinition type in targetTypes) {
             foreach(MethodDefinition method in type.Methods) {
-                if(method.CilMethodBody != null) numInlinedCalls += InlineMethodCalls(method.CilMethodBody);
+                if(method.CilMethodBody != null && numInlinedCalls == 0) numInlinedCalls += InlineMethodCalls(method.CilMethodBody);
             }
         }
         Log($"Inlined {numInlinedCalls} method calls");
@@ -106,25 +106,9 @@ public partial class Tinyfier {
             }
 
             //Fixup jumps to the inlined method call
-            CilInstructionLabel? startLabel = null;
-            if(argsEndIdx+1 < idx) {
-                body.Instructions.CalculateOffsets();
-                int argsStartOff = body.Instructions[argsEndIdx+1].Offset, argsEndOff = instr.Offset + instr.Size;
-
-                foreach(CilInstruction jumpInstr in body.Instructions) {
-                    if(!jumpInstr.IsBranch()) continue;
-
-                    //Determine and check the jump target
-                    int jumpOff = GetJumpOffset(jumpInstr);
-                    if(jumpOff < argsStartOff || jumpOff >= argsEndOff) continue;
-                    if(jumpOff != argsStartOff) {
-                        throw new InvalidCilInstructionException($"Detected jump into middle of inlined function call: {jumpInstr} [0x{argsStartOff:x} <= 0x{jumpOff:x} <= 0x{argsEndOff:x}]");
-                    }
-
-                    //Remap the jump
-                    jumpInstr.Operand = startLabel ??= new CilInstructionLabel();
-                }
-            }
+            CilInstructionLabel startLabel = new CilInstructionLabel();
+            body.Instructions.CalculateOffsets();
+            RedirectJumps(body, body.Instructions[argsEndIdx+1].Offset, startLabel);
 
             //Remove original instructions
             body.Instructions.RemoveRange(argsEndIdx+1, idx - argsEndIdx);
@@ -229,6 +213,7 @@ public partial class Tinyfier {
 
             //Cleanup
             body.Instructions.CalculateOffsets();
+            body.Instructions.OptimizeMacros();
             body.VerifyLabels();
             body.ComputeMaxStack();
 

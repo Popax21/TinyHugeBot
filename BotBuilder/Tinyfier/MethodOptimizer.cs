@@ -14,6 +14,22 @@ public partial class Tinyfier {
         sbyte off => off,
         _ => throw new Exception($"Invalid jump instruction operand: {instr}")
     };
+    private void RedirectJumps(CilMethodBody body, int targetOffset, CilInstructionLabel newLabel) {
+        foreach(CilExceptionHandler handler in body.ExceptionHandlers) {
+            if(handler.TryStart?.Offset == targetOffset) handler.TryStart = newLabel;
+            if(handler.TryEnd?.Offset == targetOffset) handler.TryEnd = newLabel;
+            if(handler.HandlerStart?.Offset == targetOffset) handler.HandlerStart = newLabel;
+            if(handler.HandlerEnd?.Offset == targetOffset) handler.HandlerEnd = newLabel;
+            if(handler.FilterStart?.Offset == targetOffset) handler.FilterStart = newLabel;
+        }
+
+        body.Instructions.CalculateOffsets();
+        foreach(CilInstruction jumpInstr in body.Instructions) {
+            if(!jumpInstr.IsBranch()) continue;
+            if(GetJumpOffset(jumpInstr) != targetOffset) continue;
+            jumpInstr.Operand = newLabel;
+        }
+    }
 
     private void OptimizeMethods() {
         int numMethodBodies = 0;
@@ -500,6 +516,7 @@ public partial class Tinyfier {
         }
 
         while(dfsStack.TryPop(out int instrIdx)) {
+            if(instrIdx < 0) throw new Exception($"Invalid instruction offset in method {body.Owner}");
             if(visited[instrIdx]) continue;
             visited[instrIdx] = true;      
 
@@ -556,21 +573,7 @@ public partial class Tinyfier {
         foreach(CilInstruction instr in instrs.ToArray()) {
             if(instr.OpCode == CilOpCodes.Nop) {
                 //Fixup jumps
-                foreach(CilExceptionHandler handler in body.ExceptionHandlers) {
-                    if(handler.TryStart?.Offset == instr.Offset) handler.TryStart = nextInstrLabel ??= new CilInstructionLabel();
-                    if(handler.TryEnd?.Offset == instr.Offset) handler.TryEnd = nextInstrLabel ??= new CilInstructionLabel();
-                    if(handler.HandlerStart?.Offset == instr.Offset) handler.HandlerStart = nextInstrLabel ??= new CilInstructionLabel();
-                    if(handler.HandlerEnd?.Offset == instr.Offset) handler.HandlerEnd = nextInstrLabel ??= new CilInstructionLabel();
-                    if(handler.FilterStart?.Offset == instr.Offset) handler.FilterStart = nextInstrLabel ??= new CilInstructionLabel();
-                }
-
-                instrs.CalculateOffsets();
-                foreach(CilInstruction jumpInstr in instrs) {
-                    if(!jumpInstr.IsBranch()) continue;
-                    if(GetJumpOffset(jumpInstr) != instr.Offset) continue;
-                    jumpInstr.Operand = nextInstrLabel ??= new CilInstructionLabel();
-                }
-
+                RedirectJumps(body, instr.Offset, nextInstrLabel ??= new CilInstructionLabel());
                 instrs.Remove(instr);
                 didModify = true;
             } else if(nextInstrLabel != null) {

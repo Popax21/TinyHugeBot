@@ -7,15 +7,29 @@ public partial class Tinyfier {
         //Flatten all top-level target types, and collect nested types as additional targets
         for(int i = 0; i < targetTypes.Count; i++) {
             //Add nested types to the target list
-            foreach(TypeDefinition nestedType in targetTypes[i].NestedTypes.ToArray()) {
+            TypeDefinition targetType = targetTypes[i];
+            foreach(TypeDefinition nestedType in targetType.NestedTypes.ToArray()) {
                 //Update visibility
                 if(nestedType.IsNestedPrivate) {
                     nestedType.Attributes &= ~TypeAttributes.VisibilityMask;
                     nestedType.IsNotPublic = true;
                 } else {
                     nestedType.Attributes &= ~TypeAttributes.VisibilityMask;
-                    nestedType.IsPublic = targetTypes[i].IsPublic;
-                    nestedType.IsNotPublic = targetTypes[i].IsNotPublic;
+                    nestedType.IsPublic = targetType.IsPublic;
+                    nestedType.IsNotPublic = targetType.IsNotPublic;
+                }
+
+                //Ensure every top-level member is at least internal
+                foreach(FieldDefinition field in targetType.Fields) {
+                    if(!field.IsPrivate) continue;
+                    field.IsPrivate = false;
+                    field.IsAssembly = true;
+                }
+
+                foreach(MethodDefinition method in targetType.Methods) {
+                    if(!method.IsPrivate) continue;
+                    method.IsPrivate = false;
+                    method.IsAssembly = true;
                 }
 
                 targetTypes[i].NestedTypes.Remove(nestedType);

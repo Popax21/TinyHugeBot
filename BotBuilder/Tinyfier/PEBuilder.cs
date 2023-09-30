@@ -11,7 +11,7 @@ using AsmResolver.PE.File.Headers;
 public partial class Tinyfier {
     private PEFile BuildPE() {
         //Build the tiny bot DLL by modifying some other parameters
-        IPEImage tinyBotImg = new ManagedPEImageBuilder().CreateImage(Module).ConstructedImage ?? throw new InvalidOperationException("No tiny bot PEImage was built");
+        IPEImage tinyBotImg = new ManagedPEImageBuilder(ThrowErrorListener.Instance).CreateImage(Module).ConstructedImage ?? throw new InvalidOperationException("No tiny bot PEImage was built");
         tinyBotImg.MachineType = MachineType.Amd64; //This surpresses the native bootstrapping code - we change it back afterwards to maintain compat with other platforms
         tinyBotImg.Resources = null;
         tinyBotImg.Imports.Clear();
