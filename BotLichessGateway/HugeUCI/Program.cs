@@ -6,7 +6,7 @@ namespace HugeUCI {
     class Program {
 
         static MyBot bot;
-        static Board board;
+        static ChessChallenge.Chess.Board board;
 
         static void Main(string[] args) {
             while (true) {
@@ -29,23 +29,25 @@ namespace HugeUCI {
                         break;
 
                     case "position":
+                        board = new ChessChallenge.Chess.Board();
                         int offset;
                         if (command[1] == "startpos") {
-                            board = Board.CreateBoardFromFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+                            board.LoadPosition("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
                             offset = 3;
                         } else {
-                            board = Board.CreateBoardFromFEN(string.Join(" ", command[2..8]));
+                            board.LoadPosition(string.Join(" ", command[2..8]));
                             offset = 9;
                         }
                         for (; offset < command.Length; offset++) {
-                            var move = new Move(command[offset], board);
-                            board.MakeMove(move);
+                            Board board2 = new Board(board);
+                            var move = new Move(command[offset], board2);
+                            board.MakeMove(new ChessChallenge.Chess.Move(move.RawValue), false);
                         }
                         break;
 
                     case "go":
                         var timer = new Timer(int.Parse(command[2]));
-                        var move2 = bot.Think(board, timer);
+                        var move2 = bot.Think(new Board(board), timer);
                         Console.WriteLine($"bestmove {move2.ToString()[7..^1]}");
                         break;
 
