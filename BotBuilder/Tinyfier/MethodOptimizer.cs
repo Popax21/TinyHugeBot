@@ -318,6 +318,7 @@ public partial class Tinyfier {
         Stack<ExprValue> evalStack = new Stack<ExprValue>();
         ExprValue PopOrAny() => evalStack.TryPop(out ExprValue val) ? val : default;
 
+        instrs.CalculateOffsets();
         for(int instrIdx = 0; instrIdx < instrs.Count; instrIdx++) {
             CilInstruction instr = instrs[instrIdx];
 
@@ -573,6 +574,7 @@ public partial class Tinyfier {
         foreach(CilInstruction instr in instrs.ToArray()) {
             if(instr.OpCode == CilOpCodes.Nop) {
                 //Fixup jumps
+                body.Instructions.CalculateOffsets();
                 RedirectJumps(body, instr.Offset, nextInstrLabel ??= new CilInstructionLabel());
                 instrs.Remove(instr);
                 didModify = true;

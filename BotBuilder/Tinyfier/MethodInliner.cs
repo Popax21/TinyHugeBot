@@ -42,14 +42,14 @@ public partial class Tinyfier {
                 method.IsAssembly = true;
             }
 
-            // declType.Methods.Remove(inlineTarget);
+            declType.Methods.Remove(inlineTarget);
         }
 
         //Inline selected method calls in target types
         int numInlinedCalls = 0;
         foreach(TypeDefinition type in targetTypes) {
             foreach(MethodDefinition method in type.Methods) {
-                if(method.CilMethodBody != null && numInlinedCalls == 0) numInlinedCalls += InlineMethodCalls(method.CilMethodBody);
+                if(method.CilMethodBody != null) numInlinedCalls += InlineMethodCalls(method.CilMethodBody);
             }
         }
         Log($"Inlined {numInlinedCalls} method calls");
