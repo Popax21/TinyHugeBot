@@ -41,7 +41,7 @@ namespace HugeUCI {
                         for (; offset < command.Length; offset++) {
                             Board board2 = new Board(board);
                             var move = new Move(command[offset], board2);
-                            board.MakeMove(new ChessChallenge.Chess.Move(move.RawValue), false);
+                            board.MakeMove(new ChessChallenge.Chess.Move(move.RawValue), inSearch: false);
                         }
                         break;
 
