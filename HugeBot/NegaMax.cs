@@ -206,6 +206,15 @@ public partial class MyBot : IChessBot {
                 continue;
             }
 
+            //DP: Check if we can delta-prune this move (assuming we're in Q-search) 
+            if(isQSearch && ShouldApplyDeltaPruning_I(move, alpha, staticEval)) {
+#if FSTATS
+                STAT_DeltaPruning_PrunedMove();
+#endif
+
+                continue;
+            }
+
             //Make the move
             plyMoveButterflies[ply] = GetMoveButterflyIndex_I(move, isWhite);
             searchBoard.MakeMove(move);
