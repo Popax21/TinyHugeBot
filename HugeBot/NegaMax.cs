@@ -50,11 +50,8 @@ public partial class MyBot : IChessBot {
 
         //Check if the position is in the TT
         ulong boardHash = searchBoard.ZobristKey;
-        if(CheckTTEntry_I(boardHash, alpha, beta, remDepth, out ulong ttIdx, out bool ttEntryValid, out ulong ttEntry)) {
+        if(CheckTTEntry_I(boardHash, alpha, beta, remDepth, out ulong ttIdx, out bool ttEntryValid, out ulong ttEntry) && ply > 0) {
             bestMove = transposMoveTable[ttIdx];
-#if VALIDATE
-            if(ply == 0 && bestMove == 0) throw new Exception("Root TT entry has no best move");
-#endif
             return unchecked((short) ttEntry); //The evaluation is stored in the lower 16 bits of the entry
         }
         short ttScore = unchecked((short) ttEntry);
