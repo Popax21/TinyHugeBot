@@ -30,7 +30,6 @@ public static class SEE {
         attackers |= (pieceBitboards[1*2 + 0] | pieceBitboards[1*2 + 1]) & KnightAttacks[targetSquare];
 
         // - sliders (bishops / rooks / queens)
-        //TODO Look into using magic bitboards here
         static ulong DeterminePosRayAttacks(int square, ulong occup, int dir) {
             ulong attacks = RayAttacks[dir*65 + square];
             int blockSq = BitOperations.TrailingZeroCount(attacks & occup);
@@ -62,7 +61,6 @@ public static class SEE {
         attackers |= (pieceBitboards[5*2 + 0] | pieceBitboards[5*2 + 1]) & KingAttacks[targetSquare];
 
         //Execute the SEE swap algorithm
-        //TODO Consider X-Rays
         int depth = 0;
         Span<int> gains = stackalloc int[32];
         gains[0] = PieceValues[(int) move.CapturePieceType - 1];
