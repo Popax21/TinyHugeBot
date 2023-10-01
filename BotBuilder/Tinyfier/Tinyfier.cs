@@ -101,7 +101,7 @@ public partial class Tinyfier {
         InlineMethodCalls();
         RelinkTargetReferences();
         TrimTypeMembers();
-        OptimizeMethods();
+        // OptimizeMethods();
         RenameTypes();
 
         //Remove other types if requested

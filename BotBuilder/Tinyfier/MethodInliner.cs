@@ -24,6 +24,14 @@ public partial class Tinyfier {
         }
         Log($"Discovered {inlineTargetMethods.Count} inline target methods");
 
+        //Inline selected method calls in target types
+        int numInlinedCalls = 0;
+        foreach(TypeDefinition type in targetTypes) {
+            foreach(MethodDefinition method in type.Methods) {
+                if(method.CilMethodBody != null) numInlinedCalls += InlineMethodCalls(method.CilMethodBody);
+            }
+        }
+        Log($"Inlined {numInlinedCalls} method calls");
 
         //Make all members of types with inline target methods at least internal
         //Afterwards, remove inline target methods from their types
@@ -44,15 +52,6 @@ public partial class Tinyfier {
 
             declType.Methods.Remove(inlineTarget);
         }
-
-        //Inline selected method calls in target types
-        int numInlinedCalls = 0;
-        foreach(TypeDefinition type in targetTypes) {
-            foreach(MethodDefinition method in type.Methods) {
-                if(method.CilMethodBody != null) numInlinedCalls += InlineMethodCalls(method.CilMethodBody);
-            }
-        }
-        Log($"Inlined {numInlinedCalls} method calls");
     }
 
     private int InlineMethodCalls(CilMethodBody body) {
@@ -74,7 +73,9 @@ public partial class Tinyfier {
 
             //Copy locals
             CilLocalVariable[] newLocals = new CilLocalVariable[inlineBody.LocalVariables.Count];
-            for(int i = 0; i < newLocals.Length; i++) body.LocalVariables.Add(newLocals[i] = new CilLocalVariable(inlineBody.LocalVariables[i].VariableType));
+            for(int i = 0; i < newLocals.Length; i++) {
+                body.LocalVariables.Add(newLocals[i] = new CilLocalVariable(inlineBody.LocalVariables[i].VariableType));
+            }
 
             //Parse arguments
             int numArgs = inlineMethod.Signature!.GetTotalParameterCount();
