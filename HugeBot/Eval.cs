@@ -99,7 +99,7 @@ public static class Eval {
 #endif
     }
 
-    public static EvalState Evaluate(Board board) {
+    public static EvalState Evaluate_I(Board board) {
         ulong eval = 0x8000_0000_8000_0000;
 
         //Evaluate PST and determine phase

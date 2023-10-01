@@ -65,14 +65,14 @@ public partial class MyBot {
         public int TTWrite_NewSlots, TTWrite_SlotUpdates, TTWrite_IdxCollisions, TTWrite_Bailouts;
 
         //Depth adjustment stats
-        public int CheckExtensions, MateThreatExtensions, BotvinnikMarkoffExtensions;
+        public int CheckExtensions, MateThreatExtensions;
         public int LMR_AppliedReductions, LMR_Researches;
 
         //Pruning stats
         public int Pruning_CheckedNonPVNodes;
         public int ReverseFutilityPruning_PrunedNodes, NullMovePruning_PrunedNodes;
         public int FutilityPruning_AbleNodes, FutilityPruning_TotalMoves, FutilityPruning_PrunedMoves;
-        public int LateMovePruning_PrunedMoves, DeltaPruning_PrunedMoves;
+        public int LateMovePruning_PrunedMoves, DeltaPruning_PrunedMoves, SEE_PrunedMoves;
 
         //Move order stats
         public int MoveOrder_BestMoveInvokes, MoveOrder_BestMoveTTHits, MoveOrder_BestMoveIIDInvokes;
@@ -100,13 +100,13 @@ public partial class MyBot {
             TTRead_Misses = TTRead_DepthMisses = TTRead_BoundMisses = TTRead_Hits = 0;
             TTWrite_NewSlots = TTWrite_SlotUpdates = TTWrite_IdxCollisions = TTWrite_Bailouts = 0;
 
-            CheckExtensions = MateThreatExtensions = BotvinnikMarkoffExtensions = 0;
+            CheckExtensions = MateThreatExtensions = 0;
             LMR_AppliedReductions = LMR_Researches = 0;
 
             Pruning_CheckedNonPVNodes = 0;
             ReverseFutilityPruning_PrunedNodes = NullMovePruning_PrunedNodes = 0;
-            FutilityPruning_AbleNodes = FutilityPruning_TotalMoves= FutilityPruning_PrunedMoves = 0;
-            LateMovePruning_PrunedMoves = DeltaPruning_PrunedMoves = 0;
+            FutilityPruning_AbleNodes = FutilityPruning_TotalMoves = FutilityPruning_PrunedMoves = 0;
+            LateMovePruning_PrunedMoves = DeltaPruning_PrunedMoves = SEE_PrunedMoves = 0;
 
             MoveOrder_BestMoveInvokes = MoveOrder_BestMoveTTHits = MoveOrder_BestMoveIIDInvokes = 0;
             MoveOrder_MovesScored = MoveOrder_NoisyMoves = MoveOrder_KillerMoves = MoveOrder_ThreatEscapeMoves = 0;
@@ -137,7 +137,6 @@ public partial class MyBot {
 
             CheckExtensions += nestedTracker.CheckExtensions;
             MateThreatExtensions += nestedTracker.MateThreatExtensions;
-            BotvinnikMarkoffExtensions += nestedTracker.BotvinnikMarkoffExtensions;
 
             LMR_AppliedReductions += nestedTracker.LMR_AppliedReductions;
             LMR_Researches += nestedTracker.LMR_Researches;
@@ -150,6 +149,7 @@ public partial class MyBot {
             FutilityPruning_PrunedMoves += nestedTracker.FutilityPruning_PrunedMoves;
             LateMovePruning_PrunedMoves += nestedTracker.LateMovePruning_PrunedMoves;
             DeltaPruning_PrunedMoves += nestedTracker.DeltaPruning_PrunedMoves;
+            SEE_PrunedMoves += nestedTracker.SEE_PrunedMoves;
 
             MoveOrder_BestMoveInvokes += nestedTracker.MoveOrder_BestMoveInvokes;
             MoveOrder_BestMoveTTHits += nestedTracker.MoveOrder_BestMoveTTHits;
@@ -208,16 +208,16 @@ public partial class MyBot {
             printStat($"TT writes: total {numTTWrites} new slots {FormatPercentageI(TTWrite_NewSlots, numTTWrites)} slot updates {FormatPercentageI(TTWrite_SlotUpdates, numTTWrites)} idx collisions {FormatPercentageI(TTWrite_IdxCollisions, numTTWrites)} bails {FormatPercentageI(TTWrite_Bailouts, numTTWrites)}");
 
             //Depth adjustment stats
-            int totalExtensions = CheckExtensions + MateThreatExtensions + BotvinnikMarkoffExtensions;
+            int totalExtensions = CheckExtensions + MateThreatExtensions;
             int totalSearchedMoves = PVCandidateStats.AlphaBeta_SearchedMoves + ZeroWindowStats.AlphaBeta_SearchedMoves;
-            printStat($"extensions: total {FormatPercentageI(totalExtensions, totalSearchedMoves)} check {FormatPercentageI(CheckExtensions, totalExtensions)} mate threat {FormatPercentageI(MateThreatExtensions, totalExtensions)} bm {FormatPercentageI(BotvinnikMarkoffExtensions, totalExtensions)}");
+            printStat($"extensions: total {FormatPercentageI(totalExtensions, totalSearchedMoves)} check {FormatPercentageI(CheckExtensions, totalExtensions)} mate threat {FormatPercentageI(MateThreatExtensions, totalExtensions)}");
             printStat($"LMR: applied reductions {FormatPercentageI(LMR_AppliedReductions, PVCandidateStats.AlphaBeta_SearchedMoves)} researches {FormatPercentageI(LMR_Researches, LMR_AppliedReductions)}");
 
             //Pruning stats
             printStat($"non-PV pruning: checked nodes {FormatPercentageI(Pruning_CheckedNonPVNodes, ZeroWindowStats.AlphaBeta_SearchedNodes)} NPM {FormatPercentageI(NullMovePruning_PrunedNodes, Pruning_CheckedNonPVNodes)} RFP {FormatPercentageI(ReverseFutilityPruning_PrunedNodes, Pruning_CheckedNonPVNodes)}");
             printStat($"futility pruning: able nodes {FormatPercentageI(FutilityPruning_AbleNodes, Pruning_CheckedNonPVNodes)} pruned moves {FormatPercentageI(FutilityPruning_PrunedMoves, FutilityPruning_TotalMoves)}");
             printStat($"late move pruning: pruned moves {FormatPercentageI(LateMovePruning_PrunedMoves, ZeroWindowStats.AlphaBeta_GeneratedMoves)}");
-            printStat($"delta pruning: pruned moves {FormatPercentageI(DeltaPruning_PrunedMoves, QSearchStats.AlphaBeta_GeneratedMoves)}");
+            printStat($"Q-search pruning: DP {FormatPercentageI(DeltaPruning_PrunedMoves, QSearchStats.AlphaBeta_GeneratedMoves)} SEE {FormatPercentageI(SEE_PrunedMoves, QSearchStats.AlphaBeta_GeneratedMoves)}");
 
             //Move ordering stats
             printStat($"move ordering: best move invocs {MoveOrder_BestMoveInvokes} TT hits {FormatPercentageI(MoveOrder_BestMoveTTHits, MoveOrder_BestMoveInvokes)} IID invocs {FormatPercentageI(MoveOrder_BestMoveIIDInvokes, MoveOrder_BestMoveInvokes)}");
@@ -311,7 +311,6 @@ public partial class MyBot {
 
     [MethodImpl(StatMImpl)] private void STAT_CheckExtension_I() => depthStats.CheckExtensions++;
     [MethodImpl(StatMImpl)] private void STAT_MateThreatExtension_I() => depthStats.MateThreatExtensions++;
-    [MethodImpl(StatMImpl)] private void STAT_BotvinnikMarkoffExtension_I() => depthStats.BotvinnikMarkoffExtensions++;
 
     [MethodImpl(StatMImpl)] private void STAT_LMR_ApplyReduction_I() => depthStats.LMR_AppliedReductions++;
     [MethodImpl(StatMImpl)] private void STAT_LMR_Research_I() => depthStats.LMR_Researches++;
@@ -319,11 +318,12 @@ public partial class MyBot {
     [MethodImpl(StatMImpl)] private void STAT_Pruning_CheckNonPVNode_I() => depthStats.Pruning_CheckedNonPVNodes++;
     [MethodImpl(StatMImpl)] private void STAT_ReverseFutilityPruning_PrunedNode_I() => depthStats.ReverseFutilityPruning_PrunedNodes++;
     [MethodImpl(StatMImpl)] private void STAT_NullMovePruning_PrunedNode_I() => depthStats.NullMovePruning_PrunedNodes++;
-    [MethodImpl(StatMImpl)] private void STAT_FutilityPruning_AbleNode() => depthStats.FutilityPruning_AbleNodes++;
-    [MethodImpl(StatMImpl)] private void STAT_FutilityPruning_ReportMoves(int numMoves) => depthStats.FutilityPruning_TotalMoves += numMoves;
-    [MethodImpl(StatMImpl)] private void STAT_FutilityPruning_PrunedMove() => depthStats.FutilityPruning_PrunedMoves++;
-    [MethodImpl(StatMImpl)] private void STAT_LateMovePruning_PrunedMoves(int numMoves) => depthStats.LateMovePruning_PrunedMoves += numMoves;
-    [MethodImpl(StatMImpl)] private void STAT_DeltaPruning_PrunedMove() => depthStats.DeltaPruning_PrunedMoves++;
+    [MethodImpl(StatMImpl)] private void STAT_FutilityPruning_AbleNode_I() => depthStats.FutilityPruning_AbleNodes++;
+    [MethodImpl(StatMImpl)] private void STAT_FutilityPruning_ReportMoves_I(int numMoves) => depthStats.FutilityPruning_TotalMoves += numMoves;
+    [MethodImpl(StatMImpl)] private void STAT_FutilityPruning_PrunedMove_I() => depthStats.FutilityPruning_PrunedMoves++;
+    [MethodImpl(StatMImpl)] private void STAT_LateMovePruning_PrunedMoves_I(int numMoves) => depthStats.LateMovePruning_PrunedMoves += numMoves;
+    [MethodImpl(StatMImpl)] private void STAT_DeltaPruning_PrunedMove_I() => depthStats.DeltaPruning_PrunedMoves++;
+    [MethodImpl(StatMImpl)] private void STAT_SEE_PrunedMove_I() => depthStats.SEE_PrunedMoves++;
 
     [MethodImpl(StatMImpl)] private void STAT_MoveOrder_BestMoveInvoke_I() => depthStats.MoveOrder_BestMoveInvokes++;
     [MethodImpl(StatMImpl)] private void STAT_MoveOrder_BestMoveTTHit_I() => depthStats.MoveOrder_BestMoveTTHits++;

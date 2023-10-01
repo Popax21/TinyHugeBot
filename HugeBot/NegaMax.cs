@@ -105,7 +105,7 @@ public partial class MyBot : IChessBot {
             //Determine if we can futility prune
             canFutilityPrune = CanFutilityPrune_I(staticEval, alpha, remDepth);
 #if FSTATS
-            if(canFutilityPrune) STAT_FutilityPruning_AbleNode();
+            if(canFutilityPrune) STAT_FutilityPruning_AbleNode_I();
 #endif
 
             //Determine number of moves to search before LMP kicks in
@@ -152,7 +152,7 @@ public partial class MyBot : IChessBot {
         STAT_AlphaBeta_SearchNode_I(isPvCandidateNode, isQSearch, moves.Length);
 #endif
 #if FSTATS
-        if(canFutilityPrune) STAT_FutilityPruning_ReportMoves(moves.Length);
+        if(canFutilityPrune) STAT_FutilityPruning_ReportMoves_I(moves.Length);
 #endif
 
         //Search for the best move
@@ -190,7 +190,7 @@ public partial class MyBot : IChessBot {
             //LMP: Check if we can prune all following moves
             if(isQuietMove && lmpSearchCount-- == 0) {
 #if FSTATS
-                STAT_LateMovePruning_PrunedMoves(moves.Length - i);
+                STAT_LateMovePruning_PrunedMoves_I(moves.Length - i);
 #endif
                 break;
             }
@@ -198,7 +198,7 @@ public partial class MyBot : IChessBot {
             //FP: Check if we can futility-prune this move
             if(canFutilityPrune && isQuietMove && bestMove != 0) {
 #if FSTATS
-                STAT_FutilityPruning_PrunedMove();
+                STAT_FutilityPruning_PrunedMove_I();
 #endif
                 continue;
             }
@@ -206,9 +206,17 @@ public partial class MyBot : IChessBot {
             //DP: Check if we can delta-prune this move (assuming we're in Q-search) 
             if(isQSearch && ShouldApplyDeltaPruning_I(move, alpha, staticEval)) {
 #if FSTATS
-                STAT_DeltaPruning_PrunedMove();
+                STAT_DeltaPruning_PrunedMove_I();
 #endif
+                continue;
+            }
 
+            //Check the SEE (Static Exchange Evaluation) when in Q-search
+            //Don't check for En-Passant because they attack a different square than the pawn is moving to
+            if(isQSearch && !move.IsEnPassant && SEE.EvaluateCapture(searchBoard, move, isWhite) < 0) {
+#if FSTATS
+                STAT_SEE_PrunedMove_I();
+#endif
                 continue;
             }
 
@@ -217,10 +225,11 @@ public partial class MyBot : IChessBot {
             searchBoard.MakeMove(move);
             bool gaveCheck = searchBoard.IsInCheck();
 
+            //Update the evaluation state
             Eval.EvalState prevEvalState = searchEvalState;
             searchEvalState.Update_I(move);
 #if VALIDATE
-            searchEvalState.Check(move, Eval.Evaluate(searchBoard));
+            searchEvalState.Check(move, Eval.Evaluate_I(searchBoard));
 #endif
 
             //PVS: If we already have a PV move (which should be early because of move ordering), do a ZWS on alpha first to ensure that this move doesn't fail low
@@ -330,7 +339,7 @@ public partial class MyBot : IChessBot {
         }
 
 #if VALIDATE
-        if(bestScore < Eval.MinEval) throw new Exception($"Found no best move in node search: best score {bestScore} best move {bestMove}");
+        if(!isQSearch && bestScore < Eval.MinEval) throw new Exception($"Found no best move in node search: best score {bestScore} best move {bestMove}");
 #endif
 
 #if STATS

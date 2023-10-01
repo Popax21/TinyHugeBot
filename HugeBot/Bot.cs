@@ -27,7 +27,7 @@ public partial class MyBot : IChessBot {
 #endif
 
         //Determine the initial evaluation
-        searchEvalState = Eval.Evaluate(board);
+        searchEvalState = Eval.Evaluate_I(board);
 
         //Reset move order tables
         ResetMoveOrderTables_I();
