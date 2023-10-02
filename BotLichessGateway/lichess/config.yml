@@ -1,4 +1,4 @@
-token: "x"    # Lichess OAuth2 Token.
+token: "xxxxx"    # Lichess OAuth2 Token.
 url: "https://lichess.org/"        # Lichess base URL.
 
 engine:                            # Engine settings.
