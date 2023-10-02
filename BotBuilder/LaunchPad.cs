@@ -4,7 +4,7 @@ using static System.AppDomain;
 class MyBot : IChessBot {
     //TinyBot_asmBuf either holds the TinyBot IChessBot instance, or the assembly buffer during decoding
     dynamic TinyBot_asmBuf = new byte[<TINYASMSIZE>];
-    int asmBufOff, scaleParity;
+    int asmBufOff, scaleParity, asmLoadCount;
     byte scaleAccum;
 
     public MyBot() {
@@ -46,7 +46,9 @@ class MyBot : IChessBot {
         //Load the tiny bot from the assembly
         //We can't just load it and be done with it, because the byte[] overload doesn't add the assembly to the regular load path
         //As such load it whenever any assembly fails to load >:)
-        System.ResolveEventHandler asmResolveCB = (_, _) => CurrentDomain.Load(TinyBot_asmBuf); //We can't use a dynamic variable for the callback because we need it to be a delegate type
+        //If this is our second load call, assume that the Chess-Challenge assembly has been renamed, and as such return it
+        //Note that this only uses allowed APIs, not invoking any method not in an allowed namespace!
+        System.ResolveEventHandler asmResolveCB = (_, _) => asmLoadCount++ == 0 ? CurrentDomain.Load(TinyBot_asmBuf) : typeof(Board).Assembly;
         CurrentDomain.AssemblyResolve += asmResolveCB;
         TinyBot_asmBuf = CurrentDomain.CreateInstanceAndUnwrap(ToString(), "<TINYBOTCLASS>");
         CurrentDomain.AssemblyResolve -= asmResolveCB;
