@@ -60,7 +60,7 @@ public partial class MyBot : IChessBot {
         ResetThreatMove_I(ply);
 
         //Determine the static evaluation of the position
-        int staticEval = searchEvalState.Resolve();
+        int staticEval = searchEvalState.Resolve_I(searchBoard);
         plyStaticEvals[ply] = staticEval;
         if(ttEntryValid && Eval.MinMate < ttScore && ttScore < Eval.MaxMate) staticEval = ttScore;
 

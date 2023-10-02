@@ -12,17 +12,26 @@ public static class Eval {
     public const short MinMate = -29000, MaxMate = +29000;
     public const int MinSentinel = -0x10_0000, MaxSentinel = +0x10_0000;
 
-    internal const ulong EvalMask = 0x0000_ffff_0000_ffffUL;
-
     private static readonly int[] PhaseContributions = { 0, 1, 1, 2, 4, 0 };
-    private static ulong[] PeSTOTables = new ulong[12*64];
+    private static readonly ulong[] PeSTOTables = new ulong[12*64];
+
+    private static readonly byte[] CenterManhattanDst = {
+        6, 5, 4, 3, 3, 4, 5, 6,
+        5, 4, 3, 2, 2, 3, 4, 5,
+        4, 3, 2, 1, 1, 2, 3, 4,
+        3, 2, 1, 0, 0, 1, 2, 3,
+        3, 2, 1, 0, 0, 1, 2, 3,
+        4, 3, 2, 1, 1, 2, 3, 4,
+        5, 4, 3, 2, 2, 3, 4, 5,
+        6, 5, 4, 3, 3, 4, 5, 6,
+    };
 
     public struct EvalState {
         internal bool isWhiteToMove;
         internal int phase;
         internal ulong eval;
 
-        public int Resolve() {
+        public int Resolve_I(Board board) {
             //Handle early promotion
             int clampedPhase = phase;
             if(clampedPhase > 24) clampedPhase = 24;
@@ -30,20 +39,37 @@ public static class Eval {
             //Interpolate between the midgame and endgame evaluation based on the phase
             short mgEval = unchecked((short) eval), egEval = unchecked((short) (eval >> 32));
             int resEval = (mgEval * clampedPhase + egEval * (24 - clampedPhase)) / 24;
+
+            //Apply mop-up evaluation if there are no pawns and the losing side only has their king
+            if((board.GetPieceBitboard(PieceType.Pawn, true) | board.GetPieceBitboard(PieceType.Pawn, false)) == 0) {
+                Square whiteKing = board.GetPieceList(PieceType.King, true)[0].Square;
+                Square blackKing = board.GetPieceList(PieceType.King, false)[0].Square;
+                int kingManhattanDst = Math.Abs(whiteKing.Rank - blackKing.Rank) + Math.Abs(whiteKing.File - blackKing.File);
+
+                bool whiteOnlyKing = board.WhitePiecesBitboard == board.GetPieceBitboard(PieceType.King, true);
+                bool blackOnlyKing = board.BlackPiecesBitboard == board.GetPieceBitboard(PieceType.King, false);
+                if(whiteOnlyKing && blackOnlyKing) return 0;
+                else if(blackOnlyKing) {
+                    resEval += (16 * (14 - kingManhattanDst) + 47 * CenterManhattanDst[blackKing.Index]) / 10;
+                } else if(whiteOnlyKing) {
+                    resEval -= (16 * (14 - kingManhattanDst) + 47 * CenterManhattanDst[whiteKing.Index]) / 10;
+                }
+            }
+
             return isWhiteToMove ? resEval : -resEval;
         }
 
         public void Update_I(Move move) {
-            int movedPiece = (int) move.MovePieceType - 1;
+            int movedPieceType = (int) move.MovePieceType - 1;
             int sideOffset = isWhiteToMove ? 0 : 6;
 
             //Update the old square
-            eval -= PeSTOTables[(movedPiece + sideOffset) << 6 | move.StartSquare.Index];
-            phase -= PhaseContributions[movedPiece];
+            eval -= PeSTOTables[(movedPieceType + sideOffset) << 6 | move.StartSquare.Index];
+            phase -= PhaseContributions[movedPieceType];
 
             //Update the new square
             int targetSquare = move.TargetSquare.Index;
-            int newPieceType = move.IsPromotion ? (int) move.PromotionPieceType - 1 : movedPiece;
+            int newPieceType = move.IsPromotion ? (int) move.PromotionPieceType - 1 : movedPieceType;
             eval += PeSTOTables[(newPieceType + sideOffset) << 6 | targetSquare];
             phase += PhaseContributions[newPieceType];
 
